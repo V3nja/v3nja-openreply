@@ -83,6 +83,7 @@ export async function enqueueVerifiedWebhook(
         instagramAccountId: account.id,
         instagramUserId: event.commenterId,
         username: event.commenterName,
+        tag: "comment",
       });
 
       await queue.add(
@@ -112,6 +113,7 @@ export async function enqueueVerifiedWebhook(
         workspaceId: account.workspaceId,
         instagramAccountId: account.id,
         instagramUserId: event.senderId,
+        tag: "dm",
       });
 
       await queue.add(
@@ -137,6 +139,7 @@ export async function enqueueVerifiedWebhook(
         workspaceId: account.workspaceId,
         instagramAccountId: account.id,
         instagramUserId: event.userId,
+        tag: "button-tap",
       });
 
       await queue.add(
