@@ -9,11 +9,10 @@ import { formatBrandedArtistDM } from "@/lib/utils/artist-dm";
 import { LiveDataStore } from "@/lib/db/live-store";
 
 const LIVE_TOKEN =
-  process.env.PAGE_ACCESS_TOKEN ||
-  process.env.INSTAGRAM_ACCESS_TOKEN ||
-  "EAASO6H4IszIBSctXA6UtP2RRagFz8VcyDruAZBuKVvlvDbhftvRA5z2MXB9A377v4WHSE1UvKXfHWU2dxpZAyz3RuIV7gcyg16HzHyDZBXVSQFIlbWa5fb5kW52JLwWFnkoHFj1INsR07RDLoj39rg5x8ZB1duIRcBraj672XUWJaXqxCIAEZAzqja5Wk5CZADkOQfGU6T8ybtNlJgNaK59LBaa7D9C9YS7hnEPAZDZD";
+  process.env.PAGE_ACCESS_TOKEN || process.env.INSTAGRAM_ACCESS_TOKEN;
 
-const PAGE_ID = "100148156116636";
+const PAGE_ID = process.env.INSTAGRAM_PAGE_ID || "100148156116636";
+const GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION || "v25.0";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -21,8 +20,15 @@ export async function GET(request: NextRequest) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  const expectedToken =
-    process.env.WEBHOOK_VERIFY_TOKEN || "v3nja_webhook_secret_2026";
+  const expectedToken = process.env.WEBHOOK_VERIFY_TOKEN;
+
+  if (!expectedToken) {
+    console.error("[Webhook] WEBHOOK_VERIFY_TOKEN is not configured");
+    return NextResponse.json(
+      { success: false, error: "Webhook verification is not configured" },
+      { status: 500 }
+    );
+  }
 
   if (mode === "subscribe" && token === expectedToken) {
     console.log("[Webhook] Verified successfully by Meta!");
@@ -39,9 +45,17 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
 
   try {
-    const payload = JSON.parse(rawBody);
-    console.log("[Webhook] Inbound Meta event payload:", JSON.stringify(payload));
+    if (!LIVE_TOKEN) {
+      console.error("[Webhook] Meta access token is not configured");
+      return NextResponse.json(
+        { success: false, error: "Webhook delivery is not configured" },
+        { status: 503 }
+      );
+    }
 
+    const payload = JSON.parse(rawBody);
+
+    // Never log the raw Meta payload: it can contain user and message data.
     const commentEvents = parseCommentEvents(payload);
     const messageEvents = parseMessageEvents(payload);
     const activeCampaigns = LiveDataStore.getCampaigns().filter((c) => c.isActive);
@@ -63,7 +77,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (matchedAutomation) {
-        console.log(`[Webhook] Matched campaign "${matchedAutomation.name}" for comment "${commentText}"`);
+        console.log(`[Webhook] Matched campaign "${matchedAutomation.name}"`);
 
         // Format rich V3NJA WRLD artist DM
         const primaryLink = matchedAutomation.trackedLinks?.[0]?.destinationUrl || "https://v3nja-official.web.app";
@@ -77,7 +91,7 @@ export async function POST(request: NextRequest) {
         });
 
         // 1. Send Private Reply DM via Meta Graph API Page messaging endpoint
-        const dmUrl = `https://graph.facebook.com/v22.0/${PAGE_ID}/messages?access_token=${LIVE_TOKEN}`;
+        const dmUrl = `https://graph.facebook.com/${GRAPH_API_VERSION}/${PAGE_ID}/messages?access_token=${LIVE_TOKEN}`;
         let dmSuccess = false;
         let dmErrorMessage: string | null = null;
 
@@ -93,15 +107,17 @@ export async function POST(request: NextRequest) {
             }),
           });
           const dmJson = await dmRes.json();
-          console.log("[Webhook] Direct message response:", JSON.stringify(dmJson));
+          console.log("[Webhook] Direct message delivery completed", {
+            success: Boolean(dmJson.recipient_id || dmJson.message_id),
+          });
           if (dmJson.recipient_id || dmJson.message_id) {
             dmSuccess = true;
           } else if (dmJson.error) {
             dmErrorMessage = dmJson.error.message;
           }
         } catch (e: any) {
-          console.warn("[Webhook] Direct message send error:", e);
-          dmErrorMessage = e.message;
+          console.warn("[Webhook] Direct message send error:", e?.message || "unknown error");
+          dmErrorMessage = e?.message || "unknown error";
         }
 
         // 2. Send Anti-Spam Randomized Public Reply on Instagram Comment
@@ -113,7 +129,7 @@ export async function POST(request: NextRequest) {
             commenterName
           );
 
-          const replyUrl = `https://graph.facebook.com/v22.0/${commentId}/replies?access_token=${LIVE_TOKEN}`;
+          const replyUrl = `https://graph.facebook.com/${GRAPH_API_VERSION}/${commentId}/replies?access_token=${LIVE_TOKEN}`;
           try {
             const replyRes = await fetch(replyUrl, {
               method: "POST",
@@ -125,9 +141,11 @@ export async function POST(request: NextRequest) {
               }),
             });
             const replyJson = await replyRes.json();
-            console.log("[Webhook] Public comment reply response:", JSON.stringify(replyJson));
-          } catch (e) {
-            console.warn("[Webhook] Public reply error:", e);
+            console.log("[Webhook] Public comment reply delivery completed", {
+              success: Boolean(replyJson.id || replyJson.message_id),
+            });
+          } catch (e: any) {
+            console.warn("[Webhook] Public reply error:", e?.message || "unknown error");
           }
         }
 
@@ -174,7 +192,7 @@ export async function POST(request: NextRequest) {
           smartLinkUrl: primaryLink,
         });
 
-        const dmUrl = `https://graph.facebook.com/v22.0/${PAGE_ID}/messages?access_token=${LIVE_TOKEN}`;
+        const dmUrl = `https://graph.facebook.com/${GRAPH_API_VERSION}/${PAGE_ID}/messages?access_token=${LIVE_TOKEN}`;
         try {
           const dmRes = await fetch(dmUrl, {
             method: "POST",
@@ -187,7 +205,9 @@ export async function POST(request: NextRequest) {
             }),
           });
           const dmJson = await dmRes.json();
-          console.log("[Webhook] Inbound DM reply response:", JSON.stringify(dmJson));
+          console.log("[Webhook] Inbound DM reply delivery completed", {
+            success: Boolean(dmJson.message_id),
+          });
 
           LiveDataStore.recordDmEvent({
             commenterId: senderId,
@@ -203,14 +223,14 @@ export async function POST(request: NextRequest) {
             errorMessage: dmJson.error?.message || null,
           });
         } catch (e: any) {
-          console.warn("[Webhook] Inbound DM reply error:", e);
+          console.warn("[Webhook] Inbound DM reply error:", e?.message || "unknown error");
         }
       }
     }
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (err: any) {
-    console.error("[Webhook Error]:", err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 200 });
+    console.error("[Webhook Error]:", err?.message || "unknown error");
+    return NextResponse.json({ success: false, error: "Webhook processing failed" }, { status: 200 });
   }
 }
