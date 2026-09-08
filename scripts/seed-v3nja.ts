@@ -6,7 +6,7 @@ const connectionString =
 const pool = new pg.Pool({ connectionString });
 
 async function main() {
-  console.log("Linking real Instagram Account ID 17841450944703637 for @v3nja2.0...");
+  console.log("Setting production token and real Instagram ID for @v3nja2.0...");
 
   await pool.query(`
     UPDATE "InstagramAccount"
@@ -14,11 +14,12 @@ async function main() {
       "instagramId" = '17841450944703637',
       "username" = 'v3nja2.0',
       "name" = 'V3NJA Official (@v3nja2.0)',
+      "accessToken" = '1283029104898866|NXSXQuDYiNgo84tvoyLI9zgfg5E',
       "webhookSubscribed" = true
-    WHERE "username" = 'v3nja2.0' OR "instagramId" = '17841400000000001';
+    WHERE "username" = 'v3nja2.0' OR "instagramId" = '17841400000000001' OR "instagramId" = '17841450944703637';
   `);
 
-  console.log("✓ Real Instagram ID linked!");
+  console.log("✓ Live production token and @v3nja2.0 saved!");
 }
 
 main()
