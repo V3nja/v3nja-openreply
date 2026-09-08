@@ -131,7 +131,11 @@ async function campaignsForResponse(ids: string[], workspaceId: string) {
   return Promise.all(ids.map((id) => campaignForResponse(id, workspaceId)));
 }
 
-const createData = (body: Record<string, unknown>, instagramAccountId: string, workspaceId: string) => ({
+const createData = (
+  body: Record<string, unknown>,
+  instagramAccountId: string,
+  workspaceId: string
+) => ({
   workspaceId,
   instagramAccountId,
   name: boundedText(body.name, MAX_NAME, "Untitled Campaign"),
@@ -143,7 +147,11 @@ const createData = (body: Record<string, unknown>, instagramAccountId: string, w
   keywords: keywords(body.keywords),
   matchAnyWord: Boolean(body.matchAnyWord),
   dmTriggerEnabled: Boolean(body.dmTriggerEnabled),
-  dmMessage: boundedText(body.dmMessage, MAX_MESSAGE, "Thanks for commenting! Here is the link:"),
+  dmMessage: boundedText(
+    body.dmMessage,
+    MAX_MESSAGE,
+    "Thanks for commenting! Here is the link:"
+  ),
   openingDmEnabled: Boolean(body.openingDmEnabled),
   openingDmMessage: boundedText(body.openingDmMessage, MAX_MESSAGE) || null,
   openingDmButtonLabel: boundedText(body.openingDmButtonLabel, 100) || null,
@@ -210,7 +218,9 @@ function updateData(body: Record<string, unknown>) {
       case "followPromptMessage":
       case "followUpMessage":
         data[key] = boundedText(body[key], MAX_MESSAGE) || null;
-        if (key === "dmMessage" && !data[key]) data[key] = "Thanks for commenting! Here is the link:";
+        if (key === "dmMessage" && !data[key]) {
+          data[key] = "Thanks for commenting! Here is the link:";
+        }
         break;
       case "postId":
         data[key] = boundedText(body[key], 500) || null;
@@ -245,6 +255,68 @@ function updateData(body: Record<string, unknown>) {
   return data;
 }
 
+async function syncTrackedLinks(
+  automationId: string,
+  workspaceId: string,
+  body: Record<string, unknown>
+) {
+  const primary = parseDestination(body.trackedDestinationUrl);
+  const secondary = parseDestination(body.secondaryDestinationUrl);
+  const desired = [
+    primary
+      ? {
+          destinationUrl: primary,
+          label: boundedText(body.linkButtonLabel, 100, "Open link") || "Open link",
+        }
+      : null,
+    secondary
+      ? {
+          destinationUrl: secondary,
+          label: boundedText(body.secondaryButtonLabel, 100, "Open link") || "Open link",
+        }
+      : null,
+  ];
+
+  await prisma.$transaction(async (tx) => {
+    const links = await tx.trackedLink.findMany({
+      where: { automationId, workspaceId },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+
+    for (let index = 0; index < desired.length; index += 1) {
+      const next = desired[index];
+      const current = links[index];
+      if (next && current) {
+        await tx.trackedLink.update({
+          where: { id: current.id },
+          data: next,
+        });
+      } else if (next) {
+        await tx.trackedLink.create({
+          data: {
+            workspaceId,
+            automationId,
+            slug: generateTrackedLinkSlug(),
+            ...next,
+          },
+        });
+      }
+    }
+
+    for (const link of links.slice(desired.length)) {
+      await tx.trackedLink.delete({ where: { id: link.id } });
+    }
+
+    for (let index = desired.length; index < Math.min(links.length, desired.length); index += 1) {
+      const current = links[index];
+      if (current && !desired[index]) {
+        await tx.trackedLink.delete({ where: { id: current.id } });
+      }
+    }
+  });
+}
+
 export async function GET(request: NextRequest) {
   const context = await getCurrentWorkspaceContext();
   if (!context) return errorResponse("Unauthorized", 401);
@@ -265,7 +337,12 @@ export async function GET(request: NextRequest) {
       select: { id: true },
     });
 
-    const data = (await campaignsForResponse(automations.map((item) => item.id), context.workspaceId)).filter(Boolean);
+    const data = (
+      await campaignsForResponse(
+        automations.map((item) => item.id),
+        context.workspaceId
+      )
+    ).filter(Boolean);
 
     return NextResponse.json(
       { success: true, data },
@@ -302,21 +379,36 @@ export async function POST(request: NextRequest) {
     }
 
     const destinationUrl = parseDestination(body.trackedDestinationUrl);
+    const secondaryDestinationUrl = parseDestination(body.secondaryDestinationUrl);
+    const linkCreates = [
+      destinationUrl
+        ? {
+            workspaceId: context.workspaceId,
+            slug: generateTrackedLinkSlug(),
+            label: boundedText(body.linkButtonLabel, 100, "Open link") || "Open link",
+            destinationUrl,
+          }
+        : null,
+      secondaryDestinationUrl
+        ? {
+            workspaceId: context.workspaceId,
+            slug: generateTrackedLinkSlug(),
+            label:
+              boundedText(body.secondaryButtonLabel, 100, "Open link") || "Open link",
+            destinationUrl: secondaryDestinationUrl,
+          }
+        : null,
+    ].filter(Boolean) as Array<{
+      workspaceId: string;
+      slug: string;
+      label: string;
+      destinationUrl: string;
+    }>;
+
     const created = await prisma.automation.create({
       data: {
         ...createData(body, instagramAccountId, context.workspaceId),
-        ...(destinationUrl
-          ? {
-              trackedLinks: {
-                create: {
-                  workspaceId: context.workspaceId,
-                  slug: generateTrackedLinkSlug(),
-                  label: boundedText(body.linkButtonLabel, 100, "Open link") || "Open link",
-                  destinationUrl,
-                },
-              },
-            }
-          : {}),
+        ...(linkCreates.length ? { trackedLinks: { create: linkCreates } } : {}),
       },
       select: { id: true },
     });
@@ -351,36 +443,13 @@ export async function PATCH(request: NextRequest) {
       select: { id: true },
     });
 
-    const destinationUrl = body.trackedDestinationUrl === undefined
-      ? undefined
-      : parseDestination(body.trackedDestinationUrl);
-
-    if (destinationUrl !== undefined) {
-      const link = await prisma.trackedLink.findFirst({
-        where: { automationId: id, workspaceId: context.workspaceId },
-        orderBy: { createdAt: "asc" },
-        select: { id: true },
-      });
-
-      if (link) {
-        await prisma.trackedLink.update({
-          where: { id: link.id },
-          data: {
-            destinationUrl,
-            label: boundedText(body.linkButtonLabel, 100, "Open link") || "Open link",
-          },
-        });
-      } else if (destinationUrl) {
-        await prisma.trackedLink.create({
-          data: {
-            workspaceId: context.workspaceId,
-            automationId: id,
-            slug: generateTrackedLinkSlug(),
-            label: boundedText(body.linkButtonLabel, 100, "Open link") || "Open link",
-            destinationUrl,
-          },
-        });
-      }
+    if (
+      body.trackedDestinationUrl !== undefined ||
+      body.secondaryDestinationUrl !== undefined ||
+      body.linkButtonLabel !== undefined ||
+      body.secondaryButtonLabel !== undefined
+    ) {
+      await syncTrackedLinks(id, context.workspaceId, body);
     }
 
     const data = await campaignForResponse(updated.id, context.workspaceId);
