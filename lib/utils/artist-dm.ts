@@ -1,8 +1,5 @@
 /**
  * V3NJA WRLD Luxury Artist DM Formatter
- *
- * Formats direct messages with clean typography, emoji hierarchy,
- * personalized username greetings, smart link embeds, and official artist outro.
  */
 
 export function formatBrandedArtistDM({
@@ -27,7 +24,7 @@ export function formatBrandedArtistDM({
 
 Yo @${username}! Bless up for showing love ❤️
 
-🔒 Follow Gate:
+🔒 Follow Gate Active:
 ${followPrompt.replace(/\{username\}/gi, username)}
 
 👉 Tap follow on @v3nja2.0, then enjoy the official music drop!`;
@@ -38,17 +35,17 @@ ${followPrompt.replace(/\{username\}/gi, username)}
   if (body) {
     body = body.replace(/\{username\}/gi, username);
   } else {
-    body = `Yo @${username}! 🔥 Here is the official music smart link you requested.`;
+    body = `Yo @${username}! 🔥 Here is the official VIP smart link you requested.`;
   }
 
   if (smartLinkUrl && !body.includes(smartLinkUrl)) {
-    body = `${body}\n\n🔗 Stream / Watch:\n${smartLinkUrl}`;
+    body = `${body}\n\n🎧 Stream & Watch:\n${smartLinkUrl}`;
   }
 
   return `🔥 V3NJA WRLD · OFFICIAL DROP 🌍
 
 ${body}
 
-🎧 Available on Spotify, Apple Music, Audiomack & YouTube.
-Tag @v3nja2.0 in your IG story with the track! 🚀❤️`;
+Available on Spotify, Apple Music, Audiomack & YouTube.
+Tag @v3nja2.0 in your IG story with the vibe! 🚀❤️`;
 }
