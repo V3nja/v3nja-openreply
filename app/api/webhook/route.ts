@@ -7,9 +7,11 @@ import {
 import { matchKeywords } from "@/lib/utils/keyword-matcher";
 
 const LIVE_TOKEN =
-  process.env.INSTAGRAM_ACCESS_TOKEN ||
   process.env.PAGE_ACCESS_TOKEN ||
+  process.env.INSTAGRAM_ACCESS_TOKEN ||
   "EAASO6H4IszIBSctXA6UtP2RRagFz8VcyDruAZBuKVvlvDbhftvRA5z2MXB9A377v4WHSE1UvKXfHWU2dxpZAyz3RuIV7gcyg16HzHyDZBXVSQFIlbWa5fb5kW52JLwWFnkoHFj1INsR07RDLoj39rg5x8ZB1duIRcBraj672XUWJaXqxCIAEZAzqja5Wk5CZADkOQfGU6T8ybtNlJgNaK59LBaa7D9C9YS7hnEPAZDZD";
+
+const PAGE_ID = "100148156116636";
 
 const HARDCODED_CAMPAIGNS = [
   {
@@ -123,14 +125,13 @@ export async function POST(request: NextRequest) {
       if (matchedAutomation) {
         console.log(`[Webhook] Matched campaign "${matchedAutomation.name}" for comment "${commentText}"`);
 
-        // Send Private Reply DM via Meta Graph API
-        const dmUrl = `https://graph.facebook.com/v22.0/17841450944703637/messages`;
+        // Send Private Reply DM via Meta Graph API using verified Page endpoint
+        const dmUrl = `https://graph.facebook.com/v22.0/${PAGE_ID}/messages?access_token=${LIVE_TOKEN}`;
         try {
           const dmRes = await fetch(dmUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${LIVE_TOKEN}`,
             },
             body: JSON.stringify({
               recipient: { comment_id: commentId },
@@ -145,13 +146,12 @@ export async function POST(request: NextRequest) {
 
         // Send Public Reply on Comment
         if (matchedAutomation.publicReplyEnabled && matchedAutomation.publicReplyMessage) {
-          const replyUrl = `https://graph.facebook.com/v22.0/${commentId}/replies`;
+          const replyUrl = `https://graph.facebook.com/v22.0/${commentId}/replies?access_token=${LIVE_TOKEN}`;
           try {
             await fetch(replyUrl, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${LIVE_TOKEN}`,
               },
               body: JSON.stringify({
                 message: matchedAutomation.publicReplyMessage,
@@ -178,13 +178,12 @@ export async function POST(request: NextRequest) {
       }
 
       if (matchedAutomation) {
-        const dmUrl = `https://graph.facebook.com/v22.0/17841450944703637/messages`;
+        const dmUrl = `https://graph.facebook.com/v22.0/${PAGE_ID}/messages?access_token=${LIVE_TOKEN}`;
         try {
           await fetch(dmUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${LIVE_TOKEN}`,
             },
             body: JSON.stringify({
               recipient: { id: senderId },
