@@ -1,35 +1,36 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
-import { getCurrentWorkspaceId } from "@/lib/auth";
+import { getCurrentWorkspaceContext } from "@/lib/workspace-access";
 import { getDMQueue } from "@/lib/queue/client";
-import { getWorkerHealth } from "@/lib/ops/worker-health";
+import { getWorkerAlerts, getWorkerHealth } from "@/lib/ops/worker-health";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  try {
-    const workspaceId = await getCurrentWorkspaceId();
-    if (!workspaceId) {
-      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
-    }
+  const context = await getCurrentWorkspaceContext();
+  if (!context) {
+    return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
+  }
 
-    const [account, queueCounts, workerHealth, webhookFailures, dmFailures, operationalEvents] = await Promise.all([
+  try {
+    const [account, queueCounts, workerHealth, workerAlerts, webhookFailures, dmFailures, operationalEvents] = await Promise.all([
       prisma.instagramAccount.findFirst({
-        where: { workspaceId },
+        where: { workspaceId: context.workspaceId },
         orderBy: { connectedAt: "asc" },
         select: { instagramId: true, username: true, webhookSubscribed: true, connectedAt: true, updatedAt: true },
       }),
       getDMQueue().getJobCounts("waiting", "active", "delayed", "failed"),
       getWorkerHealth(),
+      getWorkerAlerts(12),
       prisma.webhookEvent.findMany({
-        where: { workspaceId, status: "FAILED" },
+        where: { workspaceId: context.workspaceId, status: "FAILED" },
         orderBy: { createdAt: "desc" },
         take: 8,
         select: { id: true, object: true, errorMessage: true, createdAt: true },
       }),
       prisma.dmLog.findMany({
-        where: { workspaceId, status: "FAILED" },
+        where: { workspaceId: context.workspaceId, status: "FAILED" },
         orderBy: { updatedAt: "desc" },
         take: 8,
         select: {
@@ -43,7 +44,7 @@ export async function GET() {
         },
       }),
       prisma.operationalEvent.findMany({
-        where: { workspaceId },
+        where: { workspaceId: context.workspaceId },
         orderBy: { createdAt: "desc" },
         take: 12,
         select: { id: true, source: true, level: true, message: true, createdAt: true, resolvedAt: true },
@@ -68,10 +69,12 @@ export async function GET() {
           ageMs: workerHealth.ageMs,
           heartbeat: workerHealth.heartbeat,
         },
-        workerAlerts: [],
+        workerAlerts,
         webhookFailures,
         dmFailures,
-        tokenRefreshFailures: [],
+        tokenRefreshFailures: operationalEvents.filter((event) =>
+          /token|oauth|refresh/i.test(`${event.source} ${event.message}`)
+        ),
         operationalEvents,
       },
       headers: { "Cache-Control": "no-store" },
