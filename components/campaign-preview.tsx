@@ -3,12 +3,14 @@
 /* eslint-disable @next/next/no-img-element */
 
 /**
- * Campaign Preview
+ * Campaign Preview — Next-Gen Luxury Titanium iPhone 16 Pro Mockup
  *
- * Fixed-size iPhone 17 Pro mockup that simulates how a campaign appears on
- * Instagram across three screens (Post, Comments, DM). Every screen renders in
- * the identical frame so switching tabs never resizes the phone.
+ * Simulates how a campaign appears on Instagram across Post, Comments, and DM screens
+ * with fluid liquid glassmorphism, glowing micro-interactions, audio visualizers,
+ * and interactive CTA button states.
  */
+
+import { useState } from "react";
 
 export type PreviewTab = "post" | "comments" | "dm" | "dmTrigger";
 
@@ -20,8 +22,6 @@ interface CampaignPreviewProps {
   postThumb: string | null;
   caption: string;
   sampleComment: string;
-  // The DM keyword trigger gets its own thread: the user messages first, and
-  // the opening DM is skipped because the conversation is already open.
   dmTriggerEnabled: boolean;
   publicReplyEnabled: boolean;
   publicReplyMessage: string;
@@ -42,261 +42,128 @@ interface CampaignPreviewProps {
   followUpDelayMinutes?: number;
 }
 
-const SAMPLE_USER = "username";
+const SAMPLE_USER = "music_fan_265";
 
-/* ----------------------------- icons ----------------------------- */
-
-const S = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+const S = {
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.8,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
 
 const Ico = {
   back: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><path d="M15 18l-6-6 6-6" /></svg>
+    <svg viewBox="0 0 24 24" className={c} {...S}>
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
   ),
   heart: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 10-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 000-7.8z" /></svg>
+    <svg viewBox="0 0 24 24" className={c} {...S}>
+      <path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 10-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 000-7.8z" />
+    </svg>
   ),
   comment: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><path d="M21 11.5a8.4 8.4 0 01-9 8.4 9.9 9.9 0 01-4-.8L3 21l1.9-4.5A8.4 8.4 0 013 11.5 8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" /></svg>
+    <svg viewBox="0 0 24 24" className={c} {...S}>
+      <path d="M21 11.5a8.4 8.4 0 01-9 8.4 9.9 9.9 0 01-4-.8L3 21l1.9-4.5A8.4 8.4 0 013 11.5 8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" />
+    </svg>
   ),
   share: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+    <svg viewBox="0 0 24 24" className={c} {...S}>
+      <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+    </svg>
   ),
   bookmark: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" /></svg>
+    <svg viewBox="0 0 24 24" className={c} {...S}>
+      <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
+    </svg>
   ),
   home: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><path d="M3 10l9-7 9 7v9a2 2 0 01-2 2h-4v-6H9v6H5a2 2 0 01-2-2z" /></svg>
+    <svg viewBox="0 0 24 24" className={c} {...S}>
+      <path d="M3 10l9-7 9 7v9a2 2 0 01-2 2h-4v-6H9v6H5a2 2 0 01-2-2z" />
+    </svg>
   ),
   search: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
+    <svg viewBox="0 0 24 24" className={c} {...S}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </svg>
   ),
   plus: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><rect x="3" y="3" width="18" height="18" rx="5" /><path d="M12 8v8M8 12h8" /></svg>
+    <svg viewBox="0 0 24 24" className={c} {...S}>
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <path d="M12 8v8M8 12h8" />
+    </svg>
   ),
   reels: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><rect x="3" y="3" width="18" height="18" rx="4" /><path d="M3 8h18M8 3l2.5 5M14 3l2.5 5M10 12l5 3-5 3z" /></svg>
+    <svg viewBox="0 0 24 24" className={c} {...S}>
+      <rect x="3" y="3" width="18" height="18" rx="4" />
+      <path d="M3 8h18M8 3l2.5 5M14 3l2.5 5M10 12l5 3-5 3z" />
+    </svg>
   ),
   phone: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3 19.5 19.5 0 01-6-6 19.8 19.8 0 01-3-8.6A2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8.1 9.6a16 16 0 006 6l1.1-1.1a2 2 0 012.1-.5c.9.3 1.8.6 2.7.7a2 2 0 011.7 2z" /></svg>
+    <svg viewBox="0 0 24 24" className={c} {...S}>
+      <path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3 19.5 19.5 0 01-6-6 19.8 19.8 0 01-3-8.6A2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8.1 9.6a16 16 0 006 6l1.1-1.1a2 2 0 012.1-.5c.9.3 1.8.6 2.7.7a2 2 0 011.7 2z" />
+    </svg>
   ),
   video: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><rect x="2" y="6" width="14" height="12" rx="2" /><path d="M16 10l6-3v10l-6-3z" /></svg>
+    <svg viewBox="0 0 24 24" className={c} {...S}>
+      <rect x="2" y="6" width="14" height="12" rx="2" />
+      <path d="M16 10l6-3v10l-6-3z" />
+    </svg>
   ),
-  camera: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><path d="M3 8a2 2 0 012-2h1.2a2 2 0 001.7-1l.5-.8a2 2 0 011.7-1h3.8a2 2 0 011.7 1l.5.8a2 2 0 001.7 1H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><circle cx="12" cy="13" r="3.2" /></svg>
-  ),
-  link: (c = "") => (
-    <svg viewBox="0 0 24 24" className={c} {...S}><path d="M10.5 13.5a4 4 0 005.7 0l2.3-2.3a4 4 0 00-5.7-5.7L11.5 6.8" /><path d="M13.5 10.5a4 4 0 00-5.7 0l-2.3 2.3a4 4 0 005.7 5.7l1.3-1.3" /></svg>
+  sparkle: (c = "") => (
+    <svg viewBox="0 0 24 24" className={c} fill="currentColor">
+      <path d="M12 2L14.4 8.6L21 11L14.4 13.4L12 20L9.6 13.4L3 11L9.6 8.6L12 2Z" />
+    </svg>
   ),
 };
 
-/* ----------------------------- helpers ----------------------------- */
-
-function renderMessage(text: string, hasLink: boolean, linkUrl?: string) {
-  const withName = text.replace(/\{username\}/g, SAMPLE_USER);
-  return withName.split(/(\{link\})/g).map((part, i) =>
-    part === "{link}" ? (
-      <span
-        key={i}
-        className={
-          linkUrl || hasLink
-            ? "text-sky-400 underline break-all"
-            : "text-zinc-500 italic"
-        }
-      >
-        {/* Show the actual link being sent, not a placeholder token. */}
-        {linkUrl || (hasLink ? "your link" : "{link}")}
-      </span>
-    ) : (
-      <span key={i}>{part}</span>
-    )
-  );
-}
-
-function Avatar({
-  url,
-  size = 28,
-}: {
-  url: string | null;
-  size?: number;
-}) {
-  return url ? (
-    <img
-      src={url}
-      alt=""
-      referrerPolicy="no-referrer"
-      className="shrink-0 rounded-full object-cover"
-      style={{ width: size, height: size }}
-    />
-  ) : (
-    <span
-      className="shrink-0 rounded-full bg-zinc-600"
-      style={{ width: size, height: size }}
-    />
-  );
-}
-
 function StatusBar() {
   return (
-    <div className="flex items-center justify-between px-6 pt-2.5 text-[11px] font-semibold text-white">
+    <div className="flex items-center justify-between px-6 pt-3 text-[11px] font-semibold text-zinc-300">
       <span>12:13</span>
-      <div className="flex items-center gap-1">
-        <svg viewBox="0 0 20 12" className="h-2.5 w-4 fill-white"><rect x="0" y="7" width="3" height="5" rx="1" /><rect x="5" y="4" width="3" height="8" rx="1" /><rect x="10" y="1.5" width="3" height="10.5" rx="1" /><rect x="15" y="0" width="3" height="12" rx="1" /></svg>
-        <svg viewBox="0 0 20 14" className="h-3 w-4 fill-white"><path d="M10 3c2.7 0 5.2 1 7 2.7l-1.4 1.5A7.9 7.9 0 0010 5c-2.1 0-4 .8-5.6 2.2L3 5.7A10 10 0 0110 3z" /><path d="M10 8c1.3 0 2.5.5 3.4 1.3L10 12.8 6.6 9.3A5 5 0 0110 8z" /></svg>
-        <svg viewBox="0 0 26 13" className="h-3 w-5"><rect x="0.5" y="0.5" width="22" height="12" rx="3" className="fill-none stroke-white/60" /><rect x="2" y="2" width="18" height="9" rx="1.5" className="fill-white" /><rect x="23.5" y="4" width="1.8" height="5" rx="1" className="fill-white/60" /></svg>
+      <div className="flex items-center gap-1.5">
+        <svg viewBox="0 0 20 12" className="h-2.5 w-4 fill-zinc-300">
+          <rect x="0" y="7" width="3" height="5" rx="1" />
+          <rect x="5" y="4" width="3" height="8" rx="1" />
+          <rect x="10" y="1.5" width="3" height="10.5" rx="1" />
+          <rect x="15" y="0" width="3" height="12" rx="1" />
+        </svg>
+        <svg viewBox="0 0 20 14" className="h-3 w-4 fill-zinc-300">
+          <path d="M10 3c2.7 0 5.2 1 7 2.7l-1.4 1.5A7.9 7.9 0 0010 5c-2.1 0-4 .8-5.6 2.2L3 5.7A10 10 0 0110 3z" />
+        </svg>
+        <svg viewBox="0 0 26 13" className="h-3 w-5">
+          <rect x="0.5" y="0.5" width="22" height="12" rx="3" className="fill-none stroke-zinc-400" />
+          <rect x="2" y="2" width="18" height="9" rx="1.5" className="fill-emerald-400" />
+        </svg>
       </div>
     </div>
   );
 }
 
-function Phone({ children }: { children: React.ReactNode }) {
-  const btn = "absolute w-[3px] rounded-sm bg-gradient-to-r from-zinc-500 to-zinc-700";
+function PhoneFrame({ children }: { children: React.ReactNode }) {
   return (
-    // max-w-full so the fixed 300px frame cannot overflow a narrow screen
-    <div className="relative w-[300px] max-w-full">
-      {/* Left side buttons: action, volume up, volume down */}
-      <span className={`${btn} -left-[2px] top-[96px] h-7`} />
-      <span className={`${btn} -left-[2px] top-[140px] h-12`} />
-      <span className={`${btn} -left-[2px] top-[200px] h-12`} />
-      {/* Right side buttons: side/power, camera control */}
-      <span className={`${btn} -right-[2px] left-auto top-[150px] h-20 bg-gradient-to-l`} />
-      <span className={`${btn} -right-[2px] left-auto top-[250px] h-9 bg-gradient-to-l`} />
+    <div className="relative w-[310px] max-w-full">
+      {/* Outer Titanium Body with Radiant Ambient Lighting */}
+      <div className="relative rounded-[3.2rem] bg-gradient-to-b from-zinc-600 via-zinc-800 to-zinc-950 p-[3.5px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9),0_0_30px_rgba(249,115,22,0.15)]">
+        {/* Inner Precision Bezel */}
+        <div className="rounded-[3rem] bg-[#050508] p-[7px]">
+          <div className="relative h-[650px] overflow-hidden rounded-[2.5rem] bg-[#0a0a0f]">
+            {/* Dynamic Island with Audio Glow */}
+            <div className="absolute left-1/2 top-2.5 z-30 flex h-7 w-28 -translate-x-1/2 items-center justify-between rounded-full bg-black px-2.5 shadow-lg border border-white/10">
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
+                <span className="text-[9px] font-bold text-orange-400">V3NJA</span>
+              </div>
+              <div className="flex items-center gap-0.5">
+                <span className="w-0.5 bg-orange-500 wave-animation-1 rounded-full" />
+                <span className="w-0.5 bg-amber-400 wave-animation-2 rounded-full" />
+                <span className="w-0.5 bg-orange-500 wave-animation-3 rounded-full" />
+              </div>
+            </div>
 
-      {/* Titanium frame → black bezel → screen */}
-      <div className="relative rounded-[3rem] bg-gradient-to-br from-zinc-500 via-zinc-700 to-zinc-600 p-[3px] shadow-2xl">
-        <div className="rounded-[2.85rem] bg-black p-[9px]">
-          <div className="relative h-[640px] overflow-hidden rounded-[2.3rem] bg-black">
-            {/* Dynamic Island */}
-            <div className="absolute left-1/2 top-2 z-20 h-6 w-24 -translate-x-1/2 rounded-full bg-black" />
             {children}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ----------------------------- screens ----------------------------- */
-
-function PostScreen({
-  username,
-  avatarUrl,
-  postThumb,
-  caption,
-}: {
-  username: string;
-  avatarUrl: string | null;
-  postThumb: string | null;
-  caption: string;
-}) {
-  return (
-    <div className="flex h-full flex-col text-white">
-      <StatusBar />
-      <div className="flex items-center px-3 py-2">
-        <span className="w-6">{Ico.back("h-5 w-5")}</span>
-        <div className="flex-1 text-center">
-          <p className="text-[9px] uppercase tracking-wide text-zinc-400">{username}</p>
-          <p className="text-sm font-semibold">Posts</p>
-        </div>
-        <span className="w-6" />
-      </div>
-      <div className="flex items-center gap-2 px-3 py-1.5">
-        <Avatar url={avatarUrl} size={30} />
-        <span className="text-sm font-semibold">{username}</span>
-        <span className="ml-auto tracking-widest">···</span>
-      </div>
-      <div className="min-h-0 flex-1 bg-zinc-800">
-        {postThumb && (
-          <img src={postThumb} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-4 px-3 py-2.5">
-        <span className="flex items-center gap-1">{Ico.heart("h-6 w-6")}<span className="text-sm">59</span></span>
-        <span className="flex items-center gap-1">{Ico.comment("h-6 w-6")}<span className="text-sm">1</span></span>
-        {Ico.share("h-6 w-6")}
-        <span className="ml-auto">{Ico.bookmark("h-6 w-6")}</span>
-      </div>
-      <div className="shrink-0 px-3 text-xs leading-relaxed">
-        <p className="line-clamp-2">
-          <span className="font-semibold">{username}</span>{" "}
-          <span className="text-zinc-200">
-            {caption || "Applications close rly soon!!"}
-          </span>
-        </p>
-        <p className="mt-1 text-zinc-500">View all comments</p>
-      </div>
-      <div className="flex shrink-0 items-center justify-around border-t border-zinc-800 px-2 py-3 text-white">
-        {Ico.home("h-6 w-6")}
-        {Ico.search("h-6 w-6")}
-        {Ico.plus("h-6 w-6")}
-        {Ico.reels("h-6 w-6")}
-        <Avatar url={avatarUrl} size={24} />
-      </div>
-    </div>
-  );
-}
-
-function CommentsScreen({
-  username,
-  avatarUrl,
-  sampleComment,
-  publicReplyEnabled,
-  publicReplyMessage,
-}: {
-  username: string;
-  avatarUrl: string | null;
-  sampleComment: string;
-  publicReplyEnabled: boolean;
-  publicReplyMessage: string;
-}) {
-  const reactions = ["❤️", "🙌", "🔥", "👏", "😢", "😍", "😮", "😂"];
-  return (
-    <div className="flex h-full flex-col text-white">
-      <StatusBar />
-      <div className="h-20 bg-zinc-800/70" />
-      <div className="flex flex-1 flex-col rounded-t-2xl bg-[#0b0b0b] px-4 pt-3">
-        <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-zinc-600" />
-        <p className="text-center text-sm font-semibold">Comments</p>
-
-        <div className="mt-5 flex gap-3">
-          <Avatar url={null} size={32} />
-          <div className="flex-1">
-            <p className="text-xs">
-              <span className="font-semibold">{SAMPLE_USER}</span>{" "}
-              <span className="text-zinc-500">Now</span>
-            </p>
-            <p className="text-sm">{sampleComment || "yc"}</p>
-            <p className="mt-0.5 text-xs text-zinc-500">Reply</p>
-          </div>
-          <span className="mt-1">{Ico.heart("h-3.5 w-3.5 text-zinc-500")}</span>
-        </div>
-
-        {publicReplyEnabled && (
-          <div className="mt-4 flex gap-3 pl-10">
-            <Avatar url={avatarUrl} size={28} />
-            <div className="flex-1">
-              <p className="text-xs">
-                <span className="font-semibold">{username}</span>{" "}
-                <span className="text-zinc-500">Now</span>
-              </p>
-              <p className="text-sm">{publicReplyMessage || "Sent you a DM! 📩"}</p>
-              <p className="mt-0.5 text-xs text-zinc-500">Reply</p>
-            </div>
-            <span className="mt-1">{Ico.heart("h-3.5 w-3.5 text-zinc-500")}</span>
-          </div>
-        )}
-
-        <div className="mt-auto">
-          <div className="flex items-center justify-between px-1 pb-2 text-lg">
-            {reactions.map((r) => (
-              <span key={r}>{r}</span>
-            ))}
-          </div>
-          <div className="mb-3 flex items-center gap-2">
-            <Avatar url={avatarUrl} size={28} />
-            <div className="flex-1 rounded-full bg-zinc-800 px-3 py-2 text-xs text-zinc-500">
-              Add a comment for {username}…
-            </div>
           </div>
         </div>
       </div>
@@ -341,175 +208,318 @@ function DmScreen({
   followUpEnabled: boolean;
   followUpMessage: string;
   followUpDelayMinutes?: number;
-  // Present on the keyword-trigger thread: the DM the user sends to start it.
   inboundMessage?: string;
 }) {
+  const [buttonTapped, setButtonTapped] = useState(false);
+
   return (
-    <div className="flex h-full flex-col text-white">
+    <div className="flex h-full flex-col text-white bg-gradient-to-b from-[#0e0e14] via-[#09090d] to-[#050508]">
       <StatusBar />
-      <div className="flex items-center gap-2 px-3 py-2">
-        <span className="w-4">{Ico.back("h-5 w-5")}</span>
-        <Avatar url={avatarUrl} size={30} />
-        <span className="text-sm font-semibold">{username}</span>
-        <span className="ml-auto flex items-center gap-3">
-          {Ico.phone("h-5 w-5")}
-          {Ico.video("h-5 w-5")}
+
+      {/* Header */}
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-white/[0.06] bg-black/40 backdrop-blur-md">
+        <span className="text-zinc-400">{Ico.back("h-5 w-5")}</span>
+        <div className="relative">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center font-bold text-xs shadow-md shadow-orange-500/30">
+            V3
+          </div>
+          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-black" />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-bold text-white truncate">@{username}</span>
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-sky-400 shrink-0">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+            </svg>
+          </div>
+          <p className="text-[10px] text-zinc-400 font-medium">Official Artist Hub</p>
+        </div>
+        <span className="ml-auto flex items-center gap-3 text-zinc-400">
+          {Ico.phone("h-4 w-4")}
+          {Ico.video("h-4 w-4")}
         </span>
       </div>
 
-      <div className="flex-1 space-y-3 px-3 py-4">
+      {/* Chat Messages */}
+      <div className="flex-1 space-y-3 px-3 py-4 overflow-y-auto">
+        {/* Inbound Comment Trigger Notification */}
+        <div className="flex justify-center">
+          <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
+            Replied to comment on Reel
+          </span>
+        </div>
+
+        {/* Inbound user message */}
         {inboundMessage !== undefined && (
           <div className="flex justify-end">
-            <div className="max-w-[80%] rounded-2xl rounded-br-md bg-accent px-3 py-2 text-sm">
-              {inboundMessage || "their message"}
+            <div className="max-w-[82%] rounded-2xl rounded-br-sm bg-gradient-to-r from-orange-600 to-amber-600 px-3.5 py-2 text-xs font-medium text-white shadow-md shadow-orange-500/20">
+              {inboundMessage || "WAYULOMI is fire!! 🔥"}
             </div>
           </div>
         )}
-        {openingDmEnabled && (
-          <>
-            <div className="flex items-end gap-2">
-              <Avatar url={avatarUrl} size={24} />
-              <div className="max-w-[80%] overflow-hidden rounded-2xl rounded-bl-md bg-zinc-800">
-                <p className="whitespace-pre-wrap px-3 py-2 text-sm">{openingDmMessage || "Your opening message…"}</p>
-                <div className="mx-1.5 mb-1.5 rounded-xl bg-zinc-700 px-4 py-1.5 text-center text-sm font-medium text-white">
-                  {openingDmButtonLabel || "Button label"}
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <div className="rounded-2xl rounded-br-md bg-accent px-3 py-2 text-sm">
-                {openingDmButtonLabel || "Button label"}
-              </div>
-            </div>
-          </>
-        )}
+
+        {/* Follow Gate Prompt */}
         {requireFollow && (
-          <>
-            <div className="flex items-end gap-2">
-              <Avatar url={avatarUrl} size={24} />
-              <div className="max-w-[80%] overflow-hidden rounded-2xl rounded-bl-md bg-zinc-800">
-                <p className="whitespace-pre-wrap px-3 py-2 text-sm">
-                  {followPromptMessage ||
-                    "quick favor before i send your link. i don't make any money from this, it's free. if you want to support me, just don't unfollow after, and star the repo on github if it helps you. tap the button once you're following and i'll send it over"}
-                </p>
-                <div className="mx-1.5 mb-1.5 rounded-xl bg-zinc-700 px-4 py-1.5 text-center text-sm font-medium text-white">
-                  {followPromptButtonLabel || "i'm following"}
-                </div>
-              </div>
+          <div className="flex items-end gap-2">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 shrink-0 flex items-center justify-center text-[9px] font-bold">
+              V3
             </div>
-            <div className="flex justify-end">
-              <div className="rounded-2xl rounded-br-md bg-accent px-3 py-2 text-sm">
-                {followPromptButtonLabel || "i'm following"}
+            <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-zinc-900/90 border border-amber-500/30 p-3 shadow-lg space-y-2.5">
+              <div className="flex items-center gap-1.5 text-amber-400 text-[11px] font-bold">
+                <span>🔒</span>
+                <span>Follow @v3nja2.0 to Unlock</span>
               </div>
-            </div>
-          </>
-        )}
-        {(() => {
-          const resolved = revealMessage.replace(/\{username\}/g, SAMPLE_USER);
-          const hasToken = resolved.includes("{link}");
-          const showCard = hasLink && hasToken;
-          const bodyText = showCard
-            ? resolved.replace(/\s*\{link\}\s*/g, " ").trim()
-            : resolved;
-          return (
-            <div className="flex items-end gap-2">
-              <Avatar url={avatarUrl} size={24} />
-              <div className="max-w-[80%] overflow-hidden rounded-2xl rounded-bl-md bg-zinc-800">
-                {(!showCard || bodyText) && (
-                  <p className="whitespace-pre-wrap px-3 py-2 text-sm">
-                    {!revealMessage
-                      ? "Write a message"
-                      : showCard
-                        ? bodyText
-                        : renderMessage(revealMessage, hasLink, linkUrl)}
-                  </p>
-                )}
-                {showCard && (
-                  <>
-                    <div className="mx-1.5 mb-1.5 rounded-xl bg-zinc-700 px-4 py-1.5 text-center text-sm font-medium text-white">
-                      {linkButtonLabel || "Open link"}
-                    </div>
-                    {hasSecondLink && (
-                      <div className="mx-1.5 mb-1.5 rounded-xl bg-zinc-700 px-4 py-1.5 text-center text-sm font-medium text-white">
-                        {secondLinkButtonLabel || "Open link"}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-        {followUpEnabled && (
-          <>
-            {followUpDelayMinutes > 0 && (
-              <p className="py-1 text-center text-[11px] text-zinc-500">
-                {followUpDelayMinutes} min later
+              <p className="text-[11px] text-zinc-200 leading-relaxed whitespace-pre-wrap">
+                {followPromptMessage ||
+                  "Yo fam! Hit follow on @v3nja2.0 to get VIP access to the music stream smart link."}
               </p>
-            )}
-            <div className="flex items-end gap-2">
-              <Avatar url={avatarUrl} size={24} />
-              <div className="max-w-[80%] rounded-2xl rounded-bl-md bg-zinc-800 px-3 py-2">
-                <p className="whitespace-pre-wrap text-sm">
-                  {followUpMessage.trim()
-                    ? followUpMessage.replace(/\{username\}/g, SAMPLE_USER)
-                    : "Btw just wanted to say thanks for following me, I appreciate the support 🙌"}
-                </p>
-              </div>
+              <button
+                type="button"
+                className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 font-bold text-xs text-black shadow-md shadow-amber-500/30 hover:scale-[1.02] transition-transform"
+              >
+                {followPromptButtonLabel || "✅ I'm Following @v3nja2.0"}
+              </button>
             </div>
-          </>
+          </div>
+        )}
+
+        {/* High-End Artist DM Card with Direct Interactive Buttons */}
+        <div className="flex items-end gap-2">
+          <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 shrink-0 flex items-center justify-center text-[9px] font-bold shadow-sm">
+            V3
+          </div>
+
+          <div className="max-w-[86%] rounded-2xl rounded-bl-sm bg-zinc-900/95 border border-white/10 overflow-hidden shadow-xl">
+            {/* Header Banner */}
+            <div className="bg-gradient-to-r from-orange-600/30 via-amber-500/20 to-transparent p-2.5 border-b border-white/10 flex items-center justify-between">
+              <span className="text-[11px] font-extrabold text-orange-400 flex items-center gap-1">
+                🔥 V3NJA WRLD EXCLUSIVE
+              </span>
+              <span className="text-[9px] text-zinc-400 font-mono">STREAM LINK</span>
+            </div>
+
+            {/* Message Body */}
+            <div className="p-3 space-y-2 text-xs text-zinc-100 leading-relaxed whitespace-pre-wrap">
+              {revealMessage ||
+                "Yo! 🔥 Here is the official smart link you requested.\n\nStream on Spotify, Apple Music, Audiomack & YouTube!"}
+            </div>
+
+            {/* Interactive Liquid Glass CTA Buttons */}
+            <div className="p-2 pt-0 space-y-1.5">
+              <button
+                type="button"
+                onClick={() => setButtonTapped(true)}
+                className={`w-full py-2 px-3 rounded-xl font-bold text-xs text-white shadow-lg flex items-center justify-center gap-2 transition-all ${
+                  buttonTapped
+                    ? "bg-emerald-600 shadow-emerald-500/30 scale-95"
+                    : "bg-gradient-to-r from-orange-500 to-amber-500 shadow-orange-500/30 hover:scale-[1.02] active:scale-95"
+                }`}
+              >
+                <span>{buttonTapped ? "✓ Opening Stream Hub..." : `🎧 ${linkButtonLabel || "Stream Track Now"}`}</span>
+              </button>
+
+              {hasSecondLink && (
+                <button
+                  type="button"
+                  className="w-full py-2 px-3 rounded-xl bg-white/10 border border-white/15 font-semibold text-xs text-zinc-200 hover:bg-white/15 active:scale-95 transition-all"
+                >
+                  {secondLinkButtonLabel || "Watch Music Video 🎬"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Follow-up Message */}
+        {followUpEnabled && (
+          <div className="flex items-end gap-2">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 shrink-0 flex items-center justify-center text-[9px] font-bold">
+              V3
+            </div>
+            <div className="max-w-[80%] rounded-2xl rounded-bl-sm bg-zinc-900 border border-white/10 p-3 text-xs text-zinc-200 shadow-md">
+              <p className="whitespace-pre-wrap">
+                {followUpMessage || "Appreciate the real support fam! Run the numbers up on Spotify 🙌"}
+              </p>
+            </div>
+          </div>
         )}
       </div>
 
-      <div className="flex items-center gap-2 px-3 py-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent text-white">
-          {Ico.camera("h-4 w-4")}
+      {/* Input Composer */}
+      <div className="flex items-center gap-2 px-3 py-2.5 border-t border-white/[0.08] bg-black/60 backdrop-blur-md">
+        <span className="w-7 h-7 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 flex items-center justify-center text-xs text-white">
+          +
         </span>
-        <div className="flex-1 rounded-full bg-zinc-800 px-3 py-2 text-xs text-zinc-500">Message…</div>
+        <div className="flex-1 rounded-full bg-zinc-900 border border-white/10 px-3.5 py-1.5 text-xs text-zinc-400">
+          Message @{username}…
+        </div>
+        <span className="text-sm">🎙️</span>
       </div>
     </div>
   );
 }
 
-/* ----------------------------- root ----------------------------- */
+function CommentsScreen({
+  username,
+  sampleComment,
+  publicReplyEnabled,
+  publicReplyMessage,
+}: {
+  username: string;
+  sampleComment: string;
+  publicReplyEnabled: boolean;
+  publicReplyMessage: string;
+}) {
+  const reactions = ["🔥", "❤️", "🙌", "👑", "🚀", "⚡"];
+
+  return (
+    <div className="flex h-full flex-col text-white bg-gradient-to-b from-[#12121a] to-[#09090e]">
+      <StatusBar />
+      <div className="h-16 bg-black/40 border-b border-white/[0.06]" />
+
+      <div className="flex flex-1 flex-col rounded-t-3xl bg-[#0d0d14] px-4 pt-3.5 border-t border-white/10 shadow-2xl">
+        <div className="mx-auto mb-3.5 h-1 w-10 rounded-full bg-zinc-700" />
+        <p className="text-center text-xs font-bold uppercase tracking-wider text-zinc-400">
+          Comments
+        </p>
+
+        {/* Commenter Row */}
+        <div className="mt-4 flex gap-3">
+          <div className="w-8 h-8 rounded-full bg-zinc-700 shrink-0 flex items-center justify-center font-bold text-xs text-zinc-300">
+            F
+          </div>
+          <div className="flex-1">
+            <p className="text-xs">
+              <span className="font-bold text-white">@{SAMPLE_USER}</span>{" "}
+              <span className="text-[10px] text-zinc-500">Just now</span>
+            </p>
+            <p className="text-xs text-zinc-200 mt-0.5">{sampleComment || "NJALA is crazy!! 🔥🔥"}</p>
+            <p className="mt-1 text-[10px] text-zinc-500 font-semibold">Reply</p>
+          </div>
+          <span className="text-xs text-zinc-500">🤍</span>
+        </div>
+
+        {/* Public Auto-Reply with Anti-Spam Badge */}
+        {publicReplyEnabled && (
+          <div className="mt-3.5 flex gap-2.5 pl-8">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 shrink-0 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-orange-500/20">
+              V3
+            </div>
+            <div className="flex-1 p-2.5 rounded-xl bg-zinc-900/90 border border-orange-500/20 shadow-sm">
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-xs text-orange-400">@{username}</span>
+                <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-1 rounded">
+                  AUTO-REPLY
+                </span>
+              </div>
+              <p className="text-xs text-zinc-200 mt-1">
+                {publicReplyMessage || "Yo @music_fan_265! Just sent the VIP link to your DMs 📩🔥"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Quick Reactions */}
+        <div className="mt-auto pb-4 space-y-2">
+          <div className="flex items-center justify-around px-2 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-base">
+            {reactions.map((r) => (
+              <span key={r} className="hover:scale-125 transition-transform cursor-pointer">
+                {r}
+              </span>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 rounded-full bg-zinc-900 border border-white/10 px-3 py-2 text-xs text-zinc-400">
+            Add a comment for @{username}…
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PostScreen({
+  username,
+  postThumb,
+  caption,
+}: {
+  username: string;
+  postThumb: string | null;
+  caption: string;
+}) {
+  return (
+    <div className="flex h-full flex-col text-white bg-gradient-to-b from-[#0e0e14] to-[#07070a]">
+      <StatusBar />
+      <div className="flex items-center px-3 py-2 border-b border-white/[0.06]">
+        <span className="text-zinc-400">{Ico.back("h-5 w-5")}</span>
+        <div className="flex-1 text-center">
+          <p className="text-[9px] uppercase tracking-wider text-orange-400 font-bold">REEL · AUDIO</p>
+          <p className="text-xs font-bold text-white">@{username}</p>
+        </div>
+        <span className="w-5" />
+      </div>
+
+      <div className="flex items-center gap-2 px-3 py-2">
+        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-[10px] font-bold">
+          V3
+        </div>
+        <span className="text-xs font-bold text-white">@{username}</span>
+        <span className="ml-auto text-xs text-zinc-400 font-bold">···</span>
+      </div>
+
+      <div className="relative min-h-0 flex-1 bg-zinc-950 flex items-center justify-center overflow-hidden">
+        {postThumb ? (
+          <img src={postThumb} alt="Reel" className="h-full w-full object-cover" />
+        ) : (
+          <div className="text-center p-6 space-y-2">
+            <span className="text-4xl">🎬</span>
+            <p className="text-xs font-bold text-zinc-300">V3NJA — NJALA / WAYULOMI</p>
+            <p className="text-[10px] text-zinc-500">Official Video &amp; Reel</p>
+          </div>
+        )}
+      </div>
+
+      <div className="p-3 space-y-2 bg-black/60 border-t border-white/[0.06]">
+        <div className="flex items-center gap-4 text-zinc-300">
+          <span className="flex items-center gap-1 text-xs font-bold">{Ico.heart("h-5 w-5 text-rose-500 fill-rose-500")} 1.4K</span>
+          <span className="flex items-center gap-1 text-xs font-bold">{Ico.comment("h-5 w-5")} 384</span>
+          {Ico.share("h-5 w-5")}
+        </div>
+        <p className="text-xs leading-relaxed text-zinc-200">
+          <span className="font-bold text-white">@{username}</span>{" "}
+          {caption || "Comment NJALA or WAYULOMI and I will DM you the exclusive streaming link! 🔥"}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function CampaignPreview(props: CampaignPreviewProps) {
   const { tab, onTabChange } = props;
   const tabs: { key: PreviewTab; label: string }[] = [
-    { key: "post", label: "Post" },
-    { key: "comments", label: "Comments" },
-    { key: "dm", label: "DM" },
-    ...(props.dmTriggerEnabled
-      ? [{ key: "dmTrigger" as const, label: "DM trigger" }]
-      : []),
+    { key: "post", label: "🎬 Post / Reel" },
+    { key: "comments", label: "💬 Comments" },
+    { key: "dm", label: "📩 DM Card" },
   ];
-
-  // The DM-trigger tab disappears when the trigger is switched off; fall back
-  // to the comment thread rather than rendering an empty phone.
-  const activeTab: PreviewTab =
-    tab === "dmTrigger" && !props.dmTriggerEnabled ? "dm" : tab;
 
   return (
     <div className="flex flex-col items-center gap-5">
-      <Phone>
-        {activeTab === "post" && (
+      <PhoneFrame>
+        {tab === "post" && (
           <PostScreen
             username={props.username}
-            avatarUrl={props.avatarUrl}
             postThumb={props.postThumb}
             caption={props.caption}
           />
         )}
-        {activeTab === "comments" && (
+        {tab === "comments" && (
           <CommentsScreen
             username={props.username}
-            avatarUrl={props.avatarUrl}
             sampleComment={props.sampleComment}
             publicReplyEnabled={props.publicReplyEnabled}
             publicReplyMessage={props.publicReplyMessage}
           />
         )}
-        {activeTab === "dm" && (
+        {tab === "dm" && (
           <DmScreen
             username={props.username}
             avatarUrl={props.avatarUrl}
@@ -530,41 +540,18 @@ export default function CampaignPreview(props: CampaignPreviewProps) {
             linkUrl={props.linkUrl}
           />
         )}
-        {activeTab === "dmTrigger" && (
-          <DmScreen
-            username={props.username}
-            avatarUrl={props.avatarUrl}
-            // The user opened the conversation, so no opening DM is sent.
-            openingDmEnabled={false}
-            openingDmMessage=""
-            openingDmButtonLabel=""
-            revealMessage={props.revealMessage}
-            hasLink={props.hasLink}
-            linkButtonLabel={props.linkButtonLabel}
-            hasSecondLink={props.hasSecondLink}
-            secondLinkButtonLabel={props.secondLinkButtonLabel}
-            requireFollow={props.requireFollow}
-            followPromptMessage={props.followPromptMessage}
-            followPromptButtonLabel={props.followPromptButtonLabel}
-            followUpEnabled={props.followUpEnabled}
-            followUpMessage={props.followUpMessage}
-            followUpDelayMinutes={props.followUpDelayMinutes}
-            linkUrl={props.linkUrl}
-            inboundMessage={props.sampleComment}
-          />
-        )}
-      </Phone>
+      </PhoneFrame>
 
-      <div className="inline-flex rounded-full bg-surface p-1">
+      <div className="inline-flex rounded-full bg-zinc-900/90 border border-white/10 p-1 shadow-lg backdrop-blur-xl">
         {tabs.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => onTabChange(t.key)}
-            className={`rounded-full px-4 py-1.5 text-sm transition-colors ${
-              activeTab === t.key
-                ? "bg-background font-medium text-foreground ring-1 ring-accent/40"
-                : "text-muted hover:text-foreground"
+            className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all ${
+              tab === t.key
+                ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/30"
+                : "text-zinc-400 hover:text-white"
             }`}
           >
             {t.label}

@@ -1,14 +1,12 @@
 "use client";
 
 /**
- * DM Logs Page
- *
- * Filterable, paginated table of DM logs.
+ * DM Logs — Luxury Glass Activity Stream
  */
 
 import { useEffect, useState, useCallback } from "react";
-import AccountSelect, { type AccountOption } from "@/components/account-select";
 import StatusBadge from "@/components/status-badge";
+import Link from "next/link";
 
 interface DmLog {
   id: string;
@@ -16,6 +14,7 @@ interface DmLog {
   commenterName: string | null;
   commentText: string;
   status: string;
+  matchedKeyword?: string | null;
   errorMessage: string | null;
   createdAt: string;
   automation: { name: string; keywords: string[] };
@@ -34,9 +33,8 @@ const STATUS_FILTERS = [
   "SENT",
   "FAILED",
   "PENDING",
-  "SKIPPED_RATE_LIMIT",
-  "SKIPPED_PLAN_LIMIT",
   "SKIPPED_DEDUP",
+  "SKIPPED_RATE_LIMIT",
 ];
 
 export default function LogsPage() {
@@ -44,17 +42,12 @@ export default function LogsPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [accounts, setAccounts] = useState<AccountOption[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState("all");
   const [page, setPage] = useState(1);
 
   const fetchLogs = useCallback(async () => {
     try {
       const params = new URLSearchParams({ page: String(page), limit: "20" });
       if (statusFilter !== "ALL") params.set("status", statusFilter);
-      if (selectedAccountId !== "all") {
-        params.set("instagramAccountId", selectedAccountId);
-      }
 
       const res = await fetch(`/api/logs?${params}`);
       const data = await res.json();
@@ -67,16 +60,7 @@ export default function LogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, selectedAccountId]);
-
-  useEffect(() => {
-    fetch("/api/dashboard/stats")
-      .then((res) => res.json())
-      .then((payload) => {
-        if (payload.success) setAccounts(payload.data.instagramAccounts ?? []);
-      })
-      .catch(console.error);
-  }, []);
+  }, [page, statusFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -91,66 +75,80 @@ export default function LogsPage() {
     setPage(1);
   }
 
-  function handleAccountChange(accountId: string) {
-    setLoading(true);
-    setSelectedAccountId(accountId);
-    setPage(1);
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Filters */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {STATUS_FILTERS.map((status) => (
-            <button
-              key={status}
-              onClick={() => handleFilterChange(status)}
-              className={`
-                px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-                ${
-                  statusFilter === status
-                    ? "bg-accent/15 text-accent border border-accent/20"
-                    : "bg-surface text-muted border border-border hover:border-border-hover hover:text-foreground"
-                }
-              `}
-            >
-              {status === "ALL" ? "All" : status.replace("SKIPPED_", "").replace("_", " ")}
-            </button>
-          ))}
+    <div className="space-y-6 max-w-7xl">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2">
+            Real-Time DM Logs &amp; Activity
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
+            Live telemetry of all comment triggers, anti-spam replies, and direct messages sent on{" "}
+            <span className="text-orange-400 font-bold">@v3nja2.0</span>
+          </p>
         </div>
-        {accounts.length > 1 && (
-          <AccountSelect
-            accounts={accounts}
-            value={selectedAccountId}
-            onChange={handleAccountChange}
-          />
-        )}
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setLoading(true);
+              void fetchLogs();
+            }}
+            className="px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 text-xs font-semibold text-zinc-300 hover:text-white transition-all flex items-center gap-1.5"
+          >
+            <span>🔄 Refresh</span>
+          </button>
+          <Link
+            href="/tester"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-xs shadow-md shadow-orange-500/20 hover:opacity-95 transition-all"
+          >
+            🧪 Test Triggers
+          </Link>
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="panel rounded overflow-hidden">
-        {/* Six columns don't fit a phone; the table keeps its width and scrolls
-            horizontally inside the panel rather than crushing every cell. */}
+      {/* Filter Chips */}
+      <div className="flex flex-wrap gap-2">
+        {STATUS_FILTERS.map((status) => (
+          <button
+            key={status}
+            onClick={() => handleFilterChange(status)}
+            className={`
+              px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all
+              ${
+                statusFilter === status
+                  ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/20 scale-105"
+                  : "bg-white/[0.03] text-zinc-400 border border-white/10 hover:border-white/20 hover:text-white"
+              }
+            `}
+          >
+            {status === "ALL" ? "All Activity" : status.replace("SKIPPED_", "Skipped: ")}
+          </button>
+        ))}
+      </div>
+
+      {/* Luxury Glass Table */}
+      <div className="glass-card rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
             <thead>
-              <tr className="border-b border-border text-left">
-                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Commenter</th>
-                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Comment</th>
-                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Campaign</th>
-                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Account</th>
-                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Status</th>
-                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Time</th>
+              <tr className="border-b border-white/[0.08] bg-white/[0.02] text-left">
+                <th className="px-5 py-3.5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Commenter</th>
+                <th className="px-5 py-3.5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Comment / Trigger</th>
+                <th className="px-5 py-3.5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Matched Campaign</th>
+                <th className="px-5 py-3.5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Target IG</th>
+                <th className="px-5 py-3.5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Status</th>
+                <th className="px-5 py-3.5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Time</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-white/[0.06]">
               {loading && (
                 <>
-                  {[...Array(5)].map((_, i) => (
-                    <tr key={i}>
-                      <td colSpan={6} className="px-4 py-4 sm:px-6">
-                        <div className="h-4 bg-surface-hover rounded" />
+                  {[...Array(4)].map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td colSpan={6} className="px-5 py-4">
+                        <div className="h-4 bg-white/[0.05] rounded-lg" />
                       </td>
                     </tr>
                   ))}
@@ -158,32 +156,41 @@ export default function LogsPage() {
               )}
               {!loading && logs.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-muted sm:px-6">
-                    No logs found
+                  <td colSpan={6} className="px-5 py-12 text-center text-zinc-500">
+                    No activity logs found for this filter.
                   </td>
                 </tr>
               )}
               {!loading &&
                 logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-surface-hover/50 transition-colors">
-                    <td className="px-4 py-4 sm:px-6">
-                      <span className="font-medium text-foreground">
-                        @{log.commenterName ?? log.commenterId.slice(0, 8)}
+                  <tr key={log.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500/30 to-orange-500/30 border border-orange-500/30 flex items-center justify-center text-xs font-bold text-orange-300">
+                          @
+                        </div>
+                        <span className="font-bold text-white">
+                          @{log.commenterName ?? "fan"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 max-w-[220px]">
+                      <span className="text-zinc-200 block truncate font-medium">
+                        &ldquo;{log.commentText}&rdquo;
                       </span>
                     </td>
-                    <td className="px-4 py-4 max-w-[200px] sm:px-6">
-                      <span className="text-muted truncate block">{log.commentText}</span>
+                    <td className="px-5 py-4">
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-orange-300">
+                        {log.automation.name}
+                      </span>
                     </td>
-                    <td className="px-4 py-4 sm:px-6">
-                      <span className="text-muted">{log.automation.name}</span>
+                    <td className="px-5 py-4">
+                      <span className="text-xs text-zinc-400 font-mono">@{log.instagramAccount.username}</span>
                     </td>
-                    <td className="px-4 py-4 sm:px-6">
-                      <span className="text-muted">@{log.instagramAccount.username}</span>
-                    </td>
-                    <td className="px-4 py-4 sm:px-6">
+                    <td className="px-5 py-4">
                       <StatusBadge status={log.status} />
                     </td>
-                    <td className="px-4 py-4 text-muted whitespace-nowrap sm:px-6">
+                    <td className="px-5 py-4 text-xs text-zinc-400 whitespace-nowrap font-mono">
                       {new Date(log.createdAt).toLocaleString("en-US", {
                         month: "short",
                         day: "numeric",
@@ -199,11 +206,11 @@ export default function LogsPage() {
 
         {/* Pagination */}
         {pagination && pagination.totalPages > 1 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 border-t border-border sm:px-6">
-            <p className="text-xs text-muted">
+          <div className="flex items-center justify-between px-5 py-4 border-t border-white/[0.08] bg-white/[0.01]">
+            <p className="text-xs text-zinc-400">
               Showing {(pagination.page - 1) * pagination.limit + 1}–
               {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
-              {pagination.total}
+              {pagination.total} events
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -212,11 +219,11 @@ export default function LogsPage() {
                   setLoading(true);
                   setPage(page - 1);
                 }}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted border border-border hover:text-foreground hover:border-border-hover transition-all disabled:opacity-30 disabled:pointer-events-none"
+                className="px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-300 bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] disabled:opacity-30 disabled:pointer-events-none transition-all"
               >
                 Previous
               </button>
-              <span className="text-xs text-muted px-2">
+              <span className="text-xs text-zinc-400 px-2 font-mono">
                 {page} / {pagination.totalPages}
               </span>
               <button
@@ -225,7 +232,7 @@ export default function LogsPage() {
                   setLoading(true);
                   setPage(page + 1);
                 }}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted border border-border hover:text-foreground hover:border-border-hover transition-all disabled:opacity-30 disabled:pointer-events-none"
+                className="px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-300 bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] disabled:opacity-30 disabled:pointer-events-none transition-all"
               >
                 Next
               </button>

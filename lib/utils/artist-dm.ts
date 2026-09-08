@@ -1,5 +1,5 @@
 /**
- * V3NJA WRLD Artist-Branded DM Formatter
+ * V3NJA WRLD Luxury Artist DM Formatter
  *
  * Formats direct messages with clean typography, emoji hierarchy,
  * personalized username greetings, smart link embeds, and official artist outro.
@@ -23,14 +23,14 @@ export function formatBrandedArtistDM({
   const username = (commenterName || "fam").replace(/^@/, "");
 
   if (followGated && followPrompt) {
-    return `👑 V3NJA WRLD · FAN EXCLUSIVE 🌍
+    return `👑 V3NJA WRLD · VIP ACCESS 🌍
 
-Yo @${username}! Bless up for showing love on the track ❤️
+Yo @${username}! Bless up for showing love ❤️
 
-🔒 FOLLOW REQUIREMENT:
+🔒 Follow Gate:
 ${followPrompt.replace(/\{username\}/gi, username)}
 
-👉 Make sure you follow @v3nja2.0 on Instagram, then tap the link to unlock full audio & visuals!`;
+👉 Tap follow on @v3nja2.0, then enjoy the official music drop!`;
   }
 
   let body = rawMessage?.trim() || "";
@@ -38,18 +38,17 @@ ${followPrompt.replace(/\{username\}/gi, username)}
   if (body) {
     body = body.replace(/\{username\}/gi, username);
   } else {
-    body = `Yo @${username}! 🔥 Here is the exclusive official smart link you requested.`;
+    body = `Yo @${username}! 🔥 Here is the official music smart link you requested.`;
   }
 
-  // Ensure smart link is cleanly embedded if provided and not already inside message
   if (smartLinkUrl && !body.includes(smartLinkUrl)) {
-    body = `${body}\n\n🔗 Stream / Watch: ${smartLinkUrl}`;
+    body = `${body}\n\n🔗 Stream / Watch:\n${smartLinkUrl}`;
   }
 
   return `🔥 V3NJA WRLD · OFFICIAL DROP 🌍
 
 ${body}
 
-🎧 Available on Apple Music, Spotify, Audiomack & YouTube.
-Tag @v3nja2.0 in your IG story with the vibe! 🚀❤️`;
+🎧 Available on Spotify, Apple Music, Audiomack & YouTube.
+Tag @v3nja2.0 in your IG story with the track! 🚀❤️`;
 }

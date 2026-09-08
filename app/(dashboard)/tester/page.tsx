@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 export default function TesterPage() {
   const [username, setUsername] = useState("music_fan_265");
-  const [commentText, setCommentText] = useState("NJALA 🔥");
-  const [postTitle, setPostTitle] = useState("V3NJA — NJALA Official Reel (Out Now)");
+  const [commentText, setCommentText] = useState("WAYULOMI is fire! Send link 🔥");
+  const [postTitle, setPostTitle] = useState("WAYULOMI Visuals & Music Video");
   const [triggerType, setTriggerType] = useState<"COMMENT" | "STORY_REPLY" | "STORY_MENTION">("COMMENT");
   const [isFollowing, setIsFollowing] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -13,12 +14,12 @@ export default function TesterPage() {
   const [isUnlocked, setIsUnlocked] = useState(false);
 
   const quickKeywords = [
-    { label: "🔥 NJALA (Song)", text: "Drop NJALA now bro 🔥", post: "V3NJA — NJALA Official Reel (Out Now)" },
-    { label: "🎶 WAYULOMI (Video)", text: "WAYULOMI is a hit! Send link ❤️", post: "WAYULOMI Visuals & Music Video" },
-    { label: "⚡ ZANGA (Single)", text: "ZANGA ⚡⚡", post: "ZANGA Viral Reel Clip" },
-    { label: "💥 MOTO (Snippet)", text: "MOTO 🔥🔥", post: "MOTO Single Release Reel" },
+    { label: "🎶 WAYULOMI (Video)", text: "WAYULOMI is fire! Send link 🔥", post: "WAYULOMI Visuals & Music Video" },
+    { label: "🔥 NJALA (Single)", text: "Drop NJALA now bro 🔥", post: "V3NJA — NJALA Official Reel (Out Now)" },
+    { label: "⚡ MIRAKO (Pre-Save)", text: "MIRAKO Pre-Save link please!", post: "MIRAKO Drops Soon" },
+    { label: "💥 ZANGA (Reel)", text: "ZANGA ⚡⚡", post: "ZANGA Viral Reel Clip" },
     { label: "👕 MERCH (Store)", text: "Need the MERCH discount code!", post: "V3NJA Exclusive Merch Drop 2026" },
-    { label: "🌍 WRLD VIP (Pass)", text: "JOIN the VIP squad", post: "V3NJA WRLD Fan Club Announcement" },
+    { label: "👑 VIP (Inner Circle)", text: "JOIN the VIP squad", post: "V3NJA WRLD Fan Club Announcement" },
   ];
 
   async function handleSimulate(overrideFollowing?: boolean) {
@@ -55,36 +56,47 @@ export default function TesterPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-5xl">
+    <div className="space-y-8 max-w-6xl">
       {/* Header */}
-      <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="text-3xl">🧪</span>
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 via-orange-500 to-rose-500 flex items-center justify-center text-2xl shadow-lg shadow-orange-500/20 shrink-0">
+            🧪
+          </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              @v3nja2.0 Comment &amp; Story → DM Live Simulator
+            <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+              Live Automation &amp; Interactive DM Engine
             </h1>
-            <p className="text-sm text-muted">
-              Test your V3NJA keyword triggers, Story reply automations, and Follow-to-Unlock gating in real-time.
+            <p className="text-xs sm:text-sm text-zinc-400">
+              Simulate real-time comment triggers, anti-spam public replies, and interactive DM cards for{" "}
+              <span className="text-orange-400 font-bold">@v3nja2.0</span>
             </p>
           </div>
         </div>
+
+        <Link
+          href="/logs"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 text-zinc-300 hover:text-white font-semibold text-xs transition-all self-start"
+        >
+          <span>View Live Activity Logs</span>
+          <span>→</span>
+        </Link>
       </div>
 
       {/* Grid: Simulator Controls & Live Instagram Preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left: Input Form */}
         <div className="lg:col-span-7 space-y-5">
-          <div className="panel rounded-xl p-6 space-y-4">
+          <div className="glass-card rounded-2xl p-6 space-y-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-foreground">
-                Inbound Instagram Trigger
+              <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                <span>Inbound Trigger Configuration</span>
               </h2>
               <a
                 href="https://www.instagram.com/v3nja2.0/"
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-orange-500 font-bold bg-orange-500/10 px-2 py-0.5 rounded hover:bg-orange-500/20"
+                className="text-xs text-orange-400 font-bold bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 rounded-full hover:bg-orange-500/20 transition-colors"
               >
                 Target: @v3nja2.0 ↗
               </a>
@@ -92,8 +104,8 @@ export default function TesterPage() {
 
             {/* Quick Trigger Chips */}
             <div>
-              <label className="block text-xs font-medium text-muted mb-2">
-                Quick Music &amp; Merch Triggers:
+              <label className="block text-xs font-semibold text-zinc-400 mb-2">
+                Quick Preset Music Triggers:
               </label>
               <div className="flex flex-wrap gap-2">
                 {quickKeywords.map((k) => (
@@ -104,7 +116,7 @@ export default function TesterPage() {
                       setCommentText(k.text);
                       setPostTitle(k.post);
                     }}
-                    className="px-2.5 py-1 text-xs rounded-lg border border-border bg-surface-hover hover:border-orange-500 hover:text-orange-500 transition-colors font-medium"
+                    className="px-3 py-1.5 text-xs rounded-xl border border-white/10 bg-white/[0.03] hover:border-orange-500/50 hover:bg-orange-500/10 hover:text-orange-300 text-zinc-300 transition-all font-medium active:scale-95"
                   >
                     {k.label}
                   </button>
@@ -117,10 +129,10 @@ export default function TesterPage() {
               <button
                 type="button"
                 onClick={() => setTriggerType("COMMENT")}
-                className={`py-1.5 px-2 text-xs font-semibold rounded-lg border transition-all ${
+                className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
                   triggerType === "COMMENT"
-                    ? "bg-orange-500 text-white border-orange-500 shadow-sm"
-                    : "bg-surface border-border text-muted hover:text-foreground"
+                    ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 shadow-md shadow-orange-500/20 scale-[1.02]"
+                    : "bg-white/[0.03] border-white/10 text-zinc-400 hover:text-white"
                 }`}
               >
                 🎬 Reel Comment
@@ -128,21 +140,21 @@ export default function TesterPage() {
               <button
                 type="button"
                 onClick={() => setTriggerType("STORY_REPLY")}
-                className={`py-1.5 px-2 text-xs font-semibold rounded-lg border transition-all ${
+                className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
                   triggerType === "STORY_REPLY"
-                    ? "bg-orange-500 text-white border-orange-500 shadow-sm"
-                    : "bg-surface border-border text-muted hover:text-foreground"
+                    ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 shadow-md shadow-orange-500/20 scale-[1.02]"
+                    : "bg-white/[0.03] border-white/10 text-zinc-400 hover:text-white"
                 }`}
               >
-                📱 IG Story Reply
+                📱 Story Reply
               </button>
               <button
                 type="button"
                 onClick={() => setTriggerType("STORY_MENTION")}
-                className={`py-1.5 px-2 text-xs font-semibold rounded-lg border transition-all ${
+                className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
                   triggerType === "STORY_MENTION"
-                    ? "bg-orange-500 text-white border-orange-500 shadow-sm"
-                    : "bg-surface border-border text-muted hover:text-foreground"
+                    ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 shadow-md shadow-orange-500/20 scale-[1.02]"
+                    : "bg-white/[0.03] border-white/10 text-zinc-400 hover:text-white"
                 }`}
               >
                 🏷️ Story Mention
@@ -150,19 +162,22 @@ export default function TesterPage() {
             </div>
 
             {/* Follower Gate Toggle */}
-            <div className="p-3 rounded-lg bg-surface-hover/70 border border-border flex items-center justify-between">
+            <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
               <div>
-                <div className="text-xs font-semibold text-foreground">Fan Follower Status</div>
-                <div className="text-[11px] text-muted">Test Follow-to-Unlock Gate</div>
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>🔒</span>
+                  <span>Follow-to-Unlock Gate Status</span>
+                </div>
+                <div className="text-[11px] text-zinc-400">Simulate follower verification logic</div>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setIsFollowing(true)}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
                     isFollowing
-                      ? "bg-emerald-500 text-white font-bold"
-                      : "bg-surface text-muted hover:text-foreground border border-border"
+                      ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20"
+                      : "bg-white/[0.05] text-zinc-400 hover:text-white border border-white/10"
                   }`}
                 >
                   ✓ Follows @v3nja2.0
@@ -170,13 +185,13 @@ export default function TesterPage() {
                 <button
                   type="button"
                   onClick={() => setIsFollowing(false)}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
                     !isFollowing
-                      ? "bg-amber-500 text-white font-bold"
-                      : "bg-surface text-muted hover:text-foreground border border-border"
+                      ? "bg-amber-500 text-black shadow-md shadow-amber-500/20"
+                      : "bg-white/[0.05] text-zinc-400 hover:text-white border border-white/10"
                   }`}
                 >
-                  ✕ Not Following (Gate)
+                  ✕ Not Following (Locked)
                 </button>
               </div>
             </div>
@@ -188,46 +203,26 @@ export default function TesterPage() {
               }}
               className="space-y-4 pt-1"
             >
-              {triggerType === "COMMENT" && (
-                <div>
-                  <label className="block text-xs font-medium text-muted mb-1">
-                    Target Reel on @v3nja2.0:
-                  </label>
-                  <select
-                    value={postTitle}
-                    onChange={(e) => setPostTitle(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg bg-surface border border-border text-foreground focus:outline-none focus:border-orange-500"
-                  >
-                    <option>V3NJA — NJALA Official Reel (Out Now)</option>
-                    <option>WAYULOMI Visuals &amp; Music Video</option>
-                    <option>ZANGA Viral Reel Clip</option>
-                    <option>MOTO Single Release Reel</option>
-                    <option>V3NJA Exclusive Merch Drop 2026</option>
-                    <option>V3NJA WRLD Fan Club Announcement</option>
-                  </select>
-                </div>
-              )}
-
               <div>
-                <label className="block text-xs font-medium text-muted mb-1">
-                  Fan Username:
+                <label className="block text-xs font-semibold text-zinc-400 mb-1">
+                  Fan Instagram Handle:
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-sm text-muted">@</span>
+                  <span className="absolute left-3.5 top-2.5 text-sm font-bold text-orange-400">@</span>
                   <input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
-                    className="w-full pl-8 pr-3 py-2 text-sm rounded-lg bg-surface border border-border text-foreground focus:outline-none focus:border-orange-500"
+                    className="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl bg-black/40 border border-white/10 text-white placeholder:text-zinc-600 focus:outline-none focus:border-orange-500/60 focus:ring-1 focus:ring-orange-500/40"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-muted mb-1">
+                <label className="block text-xs font-semibold text-zinc-400 mb-1">
                   {triggerType === "COMMENT"
-                    ? "Comment Text:"
+                    ? "Inbound Comment Text:"
                     : triggerType === "STORY_REPLY"
                     ? "Story Reply Message:"
                     : "Story Mention Caption:"}
@@ -237,23 +232,24 @@ export default function TesterPage() {
                   onChange={(e) => setCommentText(e.target.value)}
                   required
                   rows={2}
-                  placeholder="e.g. NJALA is crazy! 🔥"
-                  className="w-full px-3 py-2 text-sm rounded-lg bg-surface border border-border text-foreground focus:outline-none focus:border-orange-500 resize-none"
+                  placeholder="e.g. WAYULOMI is crazy! Send the link 🔥"
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-black/40 border border-white/10 text-white placeholder:text-zinc-600 focus:outline-none focus:border-orange-500/60 focus:ring-1 focus:ring-orange-500/40 resize-none"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-all shadow-md shadow-orange-500/20 flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-500 via-amber-500 to-rose-500 hover:opacity-95 text-white font-extrabold text-sm transition-all shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2 active:scale-98"
               >
                 {loading ? (
-                  <span>Processing Trigger...</span>
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Executing Real-Time Automation...
+                  </span>
                 ) : (
                   <>
-                    <span>
-                      ⚡ Trigger Automation &amp; Dispatch DM to @{username}
-                    </span>
+                    <span>⚡ Run Automation &amp; Generate Interactive DM</span>
                   </>
                 )}
               </button>
@@ -261,63 +257,69 @@ export default function TesterPage() {
           </div>
         </div>
 
-        {/* Right: Mock Instagram Feed & DM Preview */}
+        {/* Right: Simulated Output */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="panel rounded-xl p-5 space-y-4 border-zinc-700/60 shadow-lg">
-            <h3 className="text-xs uppercase font-bold tracking-wider text-muted flex items-center justify-between">
+          <div className="glass-card rounded-2xl p-5 space-y-4 shadow-2xl">
+            <h3 className="text-xs uppercase font-extrabold tracking-wider text-zinc-400 flex items-center justify-between">
               <span>Instagram Live Output</span>
               {result?.matched && (
-                <span className="text-emerald-500 font-semibold text-[11px] flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-emerald-400 font-bold text-xs flex items-center gap-1.5 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   DM Sent to @{username}
                 </span>
               )}
             </h3>
 
-            {/* Simulated Post Comment Item */}
-            <div className="p-3.5 rounded-lg bg-surface-hover/80 border border-border space-y-2">
-              <div className="text-[11px] text-muted font-medium flex items-center justify-between">
-                <span>
-                  {triggerType === "COMMENT"
-                    ? `REEL: ${postTitle.slice(0, 22)}...`
-                    : triggerType === "STORY_REPLY"
-                    ? "IG STORY REACTION"
-                    : "IG STORY MENTION"}
-                </span>
-                <span>Just now</span>
+            {/* Comment Block */}
+            <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-2">
+              <div className="text-[11px] text-zinc-400 font-medium flex items-center justify-between">
+                <span>REEL: {postTitle}</span>
+                <span className="text-[10px] text-zinc-500">Just now</span>
               </div>
-              <div className="flex items-start gap-2 text-sm">
-                <span className="font-semibold text-foreground">@{username}</span>
-                <span className="text-foreground">{commentText}</span>
+              <div className="flex items-start gap-2 text-xs">
+                <span className="font-bold text-white">@{username}</span>
+                <span className="text-zinc-200">{commentText}</span>
               </div>
 
-              {/* Public Reply (Only for Reel comments) */}
+              {/* Anti-Spam Public Reply */}
               {result?.publicReply && triggerType === "COMMENT" && (
-                <div className="ml-4 pl-3 border-l-2 border-orange-500/80 pt-1 text-xs">
-                  <span className="font-bold text-orange-500">@v3nja2.0 </span>
-                  <span className="text-foreground font-medium">{result.publicReply}</span>
+                <div className="ml-3 pl-3 border-l-2 border-orange-500 pt-1 text-xs space-y-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold text-orange-400">@v3nja2.0</span>
+                    <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/15 px-1 rounded">
+                      ANTI-SPAM ROTATED
+                    </span>
+                  </div>
+                  <span className="text-zinc-300 font-medium">{result.publicReply}</span>
                 </div>
               )}
             </div>
 
-            {/* Simulated DM Message Bubble */}
-            <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-white space-y-3">
-              <div className="flex items-center gap-2 border-b border-zinc-800 pb-2.5">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center font-bold text-[10px] text-white">
-                  V3
+            {/* Interactive DM Card */}
+            <div className="rounded-2xl bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border border-white/15 overflow-hidden shadow-2xl">
+              {/* Header */}
+              <div className="p-3 bg-white/[0.04] border-b border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center font-bold text-[10px] text-white shadow-md">
+                    V3
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white leading-tight">V3NJA Official (@v3nja2.0)</div>
+                    <div className="text-[10px] text-zinc-400">Direct Message · Verified Meta API</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-xs font-bold text-white leading-tight">V3NJA Official (@v3nja2.0)</div>
-                  <div className="text-[10px] text-zinc-400">Direct Message · Official Graph API</div>
+                <div className="flex items-center gap-0.5">
+                  <span className="w-0.5 h-3 bg-orange-500 wave-animation-1 rounded-full" />
+                  <span className="w-0.5 h-4 bg-amber-400 wave-animation-2 rounded-full" />
+                  <span className="w-0.5 h-2.5 bg-orange-500 wave-animation-3 rounded-full" />
                 </div>
               </div>
 
               {result?.matched ? (
-                <div className="space-y-3">
-                  {/* Gate prompt or unlocked message */}
+                <div className="p-3.5 space-y-3">
                   {!isUnlocked && result.isFollowGatedPrompt ? (
-                    <div className="space-y-3">
-                      <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 whitespace-pre-wrap leading-relaxed">
+                    <div className="space-y-2.5">
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 whitespace-pre-wrap leading-relaxed">
                         🔒 <strong>Follow-Gate Active:</strong>
                         <br />
                         {result.dmMessage}
@@ -325,7 +327,7 @@ export default function TesterPage() {
                       <button
                         type="button"
                         onClick={handleUnlockFollowGate}
-                        className="block text-center w-full py-2 px-3 rounded-lg bg-amber-500 font-semibold text-xs text-zinc-950 hover:bg-amber-400 transition-colors animate-bounce"
+                        className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 font-bold text-xs text-black shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-95 transition-all"
                       >
                         {result.linkButtonLabel}
                       </button>
@@ -333,47 +335,48 @@ export default function TesterPage() {
                   ) : (
                     <div className="space-y-3">
                       {isUnlocked && (
-                        <div className="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 p-2 rounded border border-emerald-500/20">
+                        <div className="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
                           ✓ Follow verified on @v3nja2.0! Smart link unlocked:
                         </div>
                       )}
-                      <div className="p-3 rounded-lg bg-orange-600/20 border border-orange-500/30 text-xs text-orange-100 whitespace-pre-wrap leading-relaxed">
+                      
+                      <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-zinc-200 whitespace-pre-wrap leading-relaxed">
                         {isUnlocked ? result.fullDmMessageUnlocked : result.dmMessage}
                       </div>
+
                       <a
-                        href="https://v3njamusic.web.app/njala"
+                        href="https://v3njamusic.web.app/wayulomi"
                         target="_blank"
                         rel="noreferrer"
-                        className="block text-center w-full py-2 px-3 rounded-lg bg-orange-500 font-semibold text-xs text-white hover:bg-orange-600 transition-colors"
+                        className="block text-center w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-orange-500 via-amber-500 to-rose-500 font-bold text-xs text-white hover:opacity-95 shadow-lg shadow-orange-500/25 active:scale-95 transition-all"
                       >
-                        🔗 {isUnlocked ? result.fullLinkButtonLabelUnlocked : result.linkButtonLabel}
+                        🎧 {isUnlocked ? result.fullLinkButtonLabelUnlocked : result.linkButtonLabel}
                       </a>
                     </div>
                   )}
 
-                  <div className="text-[10px] text-zinc-400 flex items-center justify-between pt-1">
-                    <span>Campaign: <strong>{result.campaign.name}</strong></span>
-                    <span>Keyword: <strong>{result.campaign.matchedKeyword}</strong></span>
+                  <div className="text-[10px] text-zinc-400 flex items-center justify-between pt-1 border-t border-white/[0.06]">
+                    <span>Campaign: <strong className="text-white">{result.campaign.name}</strong></span>
+                    <span>Matched: <strong className="text-orange-400">{result.campaign.matchedKeyword}</strong></span>
                   </div>
                 </div>
               ) : result && !result.matched ? (
-                <div className="p-3 rounded-lg bg-zinc-800/80 text-xs text-zinc-400 text-center">
-                  ⚠️ No campaign keyword matched &ldquo;{commentText}&rdquo;. Try commenting <strong>NJALA</strong>, <strong>WAYULOMI</strong>, or <strong>MERCH</strong>.
+                <div className="p-4 text-xs text-zinc-400 text-center">
+                  ⚠️ No campaign keyword matched &ldquo;{commentText}&rdquo;.
                 </div>
               ) : (
-                <div className="py-6 text-center text-xs text-zinc-500">
-                  Hit <strong>Trigger Automation &amp; Dispatch DM</strong> on the left to test the flow!
+                <div className="py-8 text-center text-xs text-zinc-500">
+                  Click <strong>Run Automation</strong> above to preview the interactive flow!
                 </div>
               )}
             </div>
 
-            {/* Database & Log confirmation */}
             {result?.logId && (
-              <div className="text-xs text-muted flex items-center justify-between px-1">
-                <span>PostgreSQL Log ID: <code className="text-foreground">{result.logId.slice(0, 10)}...</code></span>
-                <a href="/logs" className="text-orange-500 hover:underline font-medium">
-                  View in DM Logs →
-                </a>
+              <div className="text-xs text-zinc-400 flex items-center justify-between px-1">
+                <span>Log ID: <code className="text-orange-400">{result.logId}</code></span>
+                <Link href="/logs" className="text-orange-400 hover:underline font-bold">
+                  View in Logs →
+                </Link>
               </div>
             )}
           </div>
