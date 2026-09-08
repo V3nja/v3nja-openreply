@@ -6,6 +6,11 @@ import {
 } from "@/lib/meta/webhook";
 import { matchKeywords } from "@/lib/utils/keyword-matcher";
 
+const LIVE_TOKEN =
+  process.env.INSTAGRAM_ACCESS_TOKEN ||
+  process.env.PAGE_ACCESS_TOKEN ||
+  "EAASO6H4IszIBSctXA6UtP2RRagFz8VcyDruAZBuKVvlvDbhftvRA5z2MXB9A377v4WHSE1UvKXfHWU2dxpZAyz3RuIV7gcyg16HzHyDZBXVSQFIlbWa5fb5kW52JLwWFnkoHFj1INsR07RDLoj39rg5x8ZB1duIRcBraj672XUWJaXqxCIAEZAzqja5Wk5CZADkOQfGU6T8ybtNlJgNaK59LBaa7D9C9YS7hnEPAZDZD";
+
 const HARDCODED_CAMPAIGNS = [
   {
     id: "camp_njala",
@@ -16,7 +21,6 @@ const HARDCODED_CAMPAIGNS = [
       "Yo! 🔥 Here is the NJALA smart link you asked for.\n\nListen to V3NJA — NJALA on Apple Music, Spotify, Audiomack & YouTube ❤️👇\nhttps://v3njamusic.web.app/njala\n\nTag @v3nja2.0 in your IG story with the track!",
     publicReplyEnabled: true,
     publicReplyMessage: "Check your DMs 🔥❤️",
-    requireFollow: true,
   },
   {
     id: "camp_wayulomi",
@@ -27,7 +31,6 @@ const HARDCODED_CAMPAIGNS = [
       "Yo! 🚀 Here is the official smart link for WAYULOMI.\n\nStream audio & watch official visuals here:\nhttps://v3njamusic.web.app/wayulomi\n\nDrop a comment on YouTube telling me your favourite line! 🔥",
     publicReplyEnabled: true,
     publicReplyMessage: "Sent you the vibe! 🎶",
-    requireFollow: false,
   },
   {
     id: "camp_zanga",
@@ -38,7 +41,6 @@ const HARDCODED_CAMPAIGNS = [
       "⚡ ZANGA is out now! Stream it on all platforms via official smart link:\nhttps://v3njamusic.web.app/zanga\n\nAppreciate the love fam! ❤️",
     publicReplyEnabled: true,
     publicReplyMessage: "In your inbox now! ⚡",
-    requireFollow: false,
   },
   {
     id: "camp_moto",
@@ -49,7 +51,6 @@ const HARDCODED_CAMPAIGNS = [
       "🔥 MOTO is live!\n\nOfficial smart link to all platforms:\nhttps://v3njamusic.web.app/moto\n\nTurn the volume all the way up! 🎧",
     publicReplyEnabled: true,
     publicReplyMessage: "Check DM! 🔥",
-    requireFollow: false,
   },
   {
     id: "camp_merch",
@@ -60,7 +61,6 @@ const HARDCODED_CAMPAIGNS = [
       "Yo fam! Exclusive V3NJA Merch & Tees are live.\n\n🛒 Store: https://v3njamusic.web.app/merch\nUse discount code **V3NJA10** for 10% off your entire order!\n\nLimited stock worldwide.",
     publicReplyEnabled: true,
     publicReplyMessage: "DMed you the drop link 👕",
-    requireFollow: false,
   },
   {
     id: "camp_vip",
@@ -71,7 +71,6 @@ const HARDCODED_CAMPAIGNS = [
       "Welcome to V3NJA WRLD VIP! 🌍❤️\n\nYou are now in the inner circle. Access official music hub & secret drops:\nhttps://v3njamusic.web.app\n\nStay locked in right here on Instagram!",
     publicReplyEnabled: true,
     publicReplyMessage: "Welcome to the family ❤️",
-    requireFollow: false,
   },
 ];
 
@@ -105,31 +104,14 @@ export async function POST(request: NextRequest) {
     const commentEvents = parseCommentEvents(payload);
     const messageEvents = parseMessageEvents(payload);
 
-    const token =
-      process.env.INSTAGRAM_ACCESS_TOKEN ||
-      "1283029104898866|NXSXQuDYiNgo84tvoyLI9zgfg5E";
-
-    // 1. Load automations from DB or fallback
-    let automations = HARDCODED_CAMPAIGNS;
-    try {
-      const dbAutomations = await prisma.automation.findMany({
-        where: { isActive: true },
-      });
-      if (dbAutomations && dbAutomations.length > 0) {
-        automations = dbAutomations as any;
-      }
-    } catch (e) {
-      console.warn("[Webhook] Using embedded active campaigns fallback");
-    }
-
-    // 2. Process Inbound Comments
+    // 1. Process Inbound Comments
     for (const event of commentEvents) {
-      const { commentId, commentText, commenterName, commenterId, instagramAccountId } = event;
+      const { commentId, commentText, commenterName, commenterId } = event;
 
       let matchedAutomation: any = null;
       let matchedKeyword: string | null = null;
 
-      for (const auto of automations) {
+      for (const auto of HARDCODED_CAMPAIGNS) {
         const res = matchKeywords(commentText, auto.keywords, auto.wholeWordMatch);
         if (res.matched) {
           matchedAutomation = auto;
@@ -139,18 +121,16 @@ export async function POST(request: NextRequest) {
       }
 
       if (matchedAutomation) {
-        console.log(`[Webhook] Matched campaign "${matchedAutomation.name}" for keyword "${matchedKeyword}"`);
+        console.log(`[Webhook] Matched campaign "${matchedAutomation.name}" for comment "${commentText}"`);
 
         // Send Private Reply DM via Meta Graph API
-        const targetAccountId = instagramAccountId || "17841450944703637";
-        const dmUrl = `https://graph.facebook.com/v22.0/${targetAccountId}/messages`;
-        
+        const dmUrl = `https://graph.facebook.com/v22.0/17841450944703637/messages`;
         try {
           const dmRes = await fetch(dmUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${LIVE_TOKEN}`,
             },
             body: JSON.stringify({
               recipient: { comment_id: commentId },
@@ -171,7 +151,7 @@ export async function POST(request: NextRequest) {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${LIVE_TOKEN}`,
               },
               body: JSON.stringify({
                 message: matchedAutomation.publicReplyMessage,
@@ -180,6 +160,39 @@ export async function POST(request: NextRequest) {
           } catch (e) {
             console.warn("[Webhook] Public reply error:", e);
           }
+        }
+      }
+    }
+
+    // 2. Process Inbound Direct Messages
+    for (const event of messageEvents) {
+      const { messageText, senderId } = event;
+
+      let matchedAutomation: any = null;
+      for (const auto of HARDCODED_CAMPAIGNS) {
+        const res = matchKeywords(messageText, auto.keywords, auto.wholeWordMatch);
+        if (res.matched) {
+          matchedAutomation = auto;
+          break;
+        }
+      }
+
+      if (matchedAutomation) {
+        const dmUrl = `https://graph.facebook.com/v22.0/17841450944703637/messages`;
+        try {
+          await fetch(dmUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${LIVE_TOKEN}`,
+            },
+            body: JSON.stringify({
+              recipient: { id: senderId },
+              message: { text: matchedAutomation.dmMessage },
+            }),
+          });
+        } catch (e) {
+          console.warn("[Webhook] Inbound DM reply error:", e);
         }
       }
     }
