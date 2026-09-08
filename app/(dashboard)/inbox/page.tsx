@@ -48,7 +48,10 @@ export default function InboxPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [queuedRequestId, setQueuedRequestId] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
+
   const active = conversations.find((c) => c.id === activeId) ?? null;
 
   useEffect(() => {
@@ -131,6 +134,7 @@ export default function InboxPage() {
         if (data.success) {
           setMessages(data.data.messages);
           writeCache(msgCacheKey(conversationId), data.data.messages);
+          setQueuedRequestId(null);
         }
       } catch {
         // Keep the currently visible thread on transient failures.
@@ -190,6 +194,7 @@ export default function InboxPage() {
   function openConversation(id: string) {
     setActiveId(id);
     setSendError(null);
+    setQueuedRequestId(null);
     const cached = readCache<ThreadMessage[]>(msgCacheKey(id), CACHE_MAX_AGE_MS);
     setMessages(cached.data ?? []);
     setThreadLoading(!cached.data);
@@ -200,6 +205,7 @@ export default function InboxPage() {
     if (!text || !active?.contact.id || sending) return;
     setSending(true);
     setSendError(null);
+
     const optimistic: ThreadMessage = {
       id: `optimistic-${Date.now()}`,
       text,
@@ -214,12 +220,22 @@ export default function InboxPage() {
       const res = await fetch("/api/instagram/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instagramAccountId: selectedAccountId, recipientId: active.contact.id, text }),
+        body: JSON.stringify({
+          instagramAccountId: selectedAccountId,
+          recipientId: active.contact.id,
+          text,
+        }),
       });
       const data = await res.json();
       if (data.success) {
-        await loadMessages(active.id, true);
-        void loadConversations(true);
+        if (data.queued) {
+          setQueuedRequestId(data.data?.requestId ?? null);
+          void loadConversations(true);
+          window.setTimeout(() => void loadMessages(active.id, true), 1500);
+        } else {
+          await loadMessages(active.id, true);
+          void loadConversations(true);
+        }
       } else {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
         setDraft(text);
@@ -289,33 +305,43 @@ export default function InboxPage() {
                 <span className="truncate">@{active.contact.username ?? "unknown"}</span>
               </div>
 
-              <div className="min-h-0 flex flex-1 flex-col lg:flex-row">
-                <div ref={scrollRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
-                  {threadLoading && messages.length === 0 ? (
-                    <p className="text-sm text-muted">Loading…</p>
-                  ) : messages.length === 0 ? (
-                    <p className="text-sm text-muted">No messages.</p>
-                  ) : (
-                    messages.map((m) => (
-                      <div key={m.id} className={`flex ${m.fromMe ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${m.fromMe ? "bg-accent text-white" : "bg-surface text-foreground border border-border"}`}>
-                          <p className="whitespace-pre-wrap break-words">{m.text}</p>
-                          <p className={`mt-1 text-[10px] ${m.fromMe ? "text-white/70" : "text-zinc-500"}`}>{formatTime(m.createdTime)}</p>
-                        </div>
+              <div ref={scrollRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
+                {threadLoading && messages.length === 0 ? (
+                  <p className="text-sm text-muted">Loading…</p>
+                ) : messages.length === 0 ? (
+                  <p className="text-sm text-muted">No messages.</p>
+                ) : (
+                  messages.map((m) => (
+                    <div key={m.id} className={`flex ${m.fromMe ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${m.fromMe ? "bg-accent text-white" : "bg-surface text-foreground border border-border"}`}>
+                        <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                        <p className={`mt-1 text-[10px] ${m.fromMe ? "text-white/70" : "text-zinc-500"}`}>{formatTime(m.createdTime)}</p>
                       </div>
-                    ))
-                  )}
-                </div>
-                <InboxFanContext data={fanContext} loading={fanLoading} />
+                    </div>
+                  ))
+                )}
               </div>
 
               <div className="shrink-0 border-t border-border p-3">
+                {queuedRequestId && (
+                  <p className="mb-2 text-xs text-amber-400">Reply queued for delivery. The Inbox will refresh when Meta confirms it.</p>
+                )}
                 {sendError && <p className="mb-2 text-xs text-error">{sendError}</p>}
                 <div className="flex items-end gap-2">
-                  <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={handleKeyDown} rows={1} placeholder="Write a reply…  (Enter to send, Shift+Enter for a new line)" className="max-h-32 min-h-[40px] flex-1 resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none" />
-                  <button type="button" onClick={() => void handleSend()} disabled={sending || !draft.trim()} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50">{sending ? "Sending…" : "Send"}</button>
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    rows={1}
+                    placeholder="Write a reply…  (Enter to send, Shift+Enter for a new line)"
+                    className="max-h-32 min-h-[40px] flex-1 resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none"
+                  />
+                  <button type="button" onClick={() => void handleSend()} disabled={sending || !draft.trim()} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50">
+                    {sending ? "Queuing…" : "Send"}
+                  </button>
                 </div>
               </div>
+              <InboxFanContext data={fanContext} loading={fanLoading} />
             </>
           )}
         </div>
