@@ -10,6 +10,7 @@ import { usePathname } from "next/navigation";
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: "📊" },
   { label: "Overview & Growth", href: "/overview", icon: "📈" },
+  { label: "Analytics", href: "/analytics", icon: "📉" },
   { label: "Fans & Audience", href: "/fans", icon: "👥" },
   { label: "Live Comment Tester", href: "/tester", icon: "🧪" },
   { label: "Instagram Inbox", href: "/inbox", icon: "💬" },
