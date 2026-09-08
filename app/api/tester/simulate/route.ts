@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentWorkspaceId } from "@/lib/auth";
-import { prisma } from "@/lib/db/client";
+import { LiveDataStore } from "@/lib/db/live-store";
 import { matchKeywords } from "@/lib/utils/keyword-matcher";
+import { generateAntiSpamPublicReply } from "@/lib/utils/anti-spam-reply";
+import { formatBrandedArtistDM } from "@/lib/utils/artist-dm";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const workspaceId = (await getCurrentWorkspaceId()) || "cmtsgdm010001wmnzbs3o4dx2";
-
     const body = await request.json();
     const {
       commentText,
@@ -20,19 +21,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Comment text is required" }, { status: 400 });
     }
 
-    // Find active automations in this workspace
-    const automations = await prisma.automation.findMany({
-      where: {
-        workspaceId,
-        isActive: true,
-      },
-      include: {
-        instagramAccount: true,
-        trackedLinks: true,
-      },
-    });
+    const automations = LiveDataStore.getCampaigns().filter((a) => a.isActive);
 
-    let matchedAutomation = null;
+    let matchedAutomation: any = null;
     let matchedKeyword: string | null = null;
 
     for (const auto of automations) {
@@ -56,53 +47,49 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Determine public reply variation
-    let publicReply = matchedAutomation.publicReplyMessage;
-    if (
-      matchedAutomation.publicReplyMessages &&
-      matchedAutomation.publicReplyMessages.length > 0
-    ) {
-      const randomIndex = Math.floor(
-        Math.random() * matchedAutomation.publicReplyMessages.length
+    // Determine anti-spam randomized public reply
+    let publicReply: string | null = null;
+    if (matchedAutomation.publicReplyEnabled) {
+      publicReply = generateAntiSpamPublicReply(
+        matchedAutomation.publicReplyMessages,
+        matchedAutomation.publicReplyMessage,
+        commenterName
       );
-      publicReply = matchedAutomation.publicReplyMessages[randomIndex];
     }
 
     // Follow-gating logic
     const requiresFollowGate = matchedAutomation.requireFollow && !isFollowing;
 
-    let dmMessageToSend = matchedAutomation.dmMessage;
-    let buttonLabelToSend = matchedAutomation.linkButtonLabel;
-    let isFollowGatedPrompt = false;
+    const primaryLink = matchedAutomation.trackedLinks?.[0]?.destinationUrl || "https://v3njamusic.web.app";
+    const brandedDmMessage = formatBrandedArtistDM({
+      rawMessage: matchedAutomation.dmMessage,
+      commenterName,
+      campaignTitle: matchedAutomation.name,
+      smartLinkUrl: primaryLink,
+      followGated: requiresFollowGate,
+      followPrompt: matchedAutomation.followPromptMessage || "Please follow @v3nja2.0 on Instagram to unlock this link!",
+    });
 
-    if (requiresFollowGate) {
-      isFollowGatedPrompt = true;
-      dmMessageToSend =
-        matchedAutomation.followPromptMessage ||
-        `Yo @${commenterName.replace(/^@/, "")}! 🔥 Thanks for showing love on the track. To unlock the exclusive smart link, make sure you hit Follow on @v3nja2.0!`;
-      buttonLabelToSend =
-        matchedAutomation.followPromptButtonLabel || "✅ I Follow @v3nja2.0 — Unlock Link";
-    }
+    const fullDmMessageUnlocked = formatBrandedArtistDM({
+      rawMessage: matchedAutomation.dmMessage,
+      commenterName,
+      campaignTitle: matchedAutomation.name,
+      smartLinkUrl: primaryLink,
+      followGated: false,
+    });
 
-    // Create DmLog in DB
-    const log = await prisma.dmLog.create({
-      data: {
-        workspaceId,
-        automationId: matchedAutomation.id,
-        instagramAccountId: matchedAutomation.instagramAccountId,
-        commenterId: `sim_${Date.now()}`,
-        commenterName: commenterName.replace(/^@/, ""),
-        commentText: commentText,
-        commentId: `sim_comment_${Date.now()}`,
-        matchedKeyword: matchedKeyword || matchedAutomation.keywords[0],
-        status: "SENT",
-        attempts: 1,
-        dmSentAt: new Date(),
-        publicReplySentAt:
-          triggerType === "COMMENT" && matchedAutomation.publicReplyEnabled
-            ? new Date()
-            : null,
-      },
+    // Record live event in Data Store
+    const newLog = LiveDataStore.recordDmEvent({
+      commenterId: `sim_${Date.now()}`,
+      commenterName,
+      commentText,
+      commentId: `sim_comment_${Date.now()}`,
+      matchedKeyword: matchedKeyword || matchedAutomation.keywords[0],
+      automationId: matchedAutomation.id,
+      automationName: matchedAutomation.name,
+      automationKeywords: matchedAutomation.keywords,
+      status: "SENT",
+      publicReplyText: triggerType === "COMMENT" ? publicReply : null,
     });
 
     return NextResponse.json({
@@ -110,7 +97,7 @@ export async function POST(request: NextRequest) {
       matched: true,
       triggerType,
       isFollowing,
-      isFollowGatedPrompt,
+      isFollowGatedPrompt: requiresFollowGate,
       campaign: {
         id: matchedAutomation.id,
         name: matchedAutomation.name,
@@ -120,19 +107,18 @@ export async function POST(request: NextRequest) {
         followUpEnabled: matchedAutomation.followUpEnabled,
         followUpMessage: matchedAutomation.followUpMessage,
       },
-      publicReply:
-        triggerType === "COMMENT" && matchedAutomation.publicReplyEnabled
-          ? publicReply
-          : null,
-      dmMessage: dmMessageToSend,
-      linkButtonLabel: buttonLabelToSend,
-      fullDmMessageUnlocked: matchedAutomation.dmMessage,
-      fullLinkButtonLabelUnlocked: matchedAutomation.linkButtonLabel,
-      logId: log.id,
-      timestamp: log.createdAt,
+      publicReply: triggerType === "COMMENT" ? publicReply : null,
+      dmMessage: brandedDmMessage,
+      linkButtonLabel: requiresFollowGate
+        ? matchedAutomation.followPromptButtonLabel || "✅ I Follow @v3nja2.0 — Unlock Link"
+        : matchedAutomation.linkButtonLabel || "Stream Track 🎧",
+      fullDmMessageUnlocked,
+      fullLinkButtonLabelUnlocked: matchedAutomation.linkButtonLabel || "Stream Track 🎧",
+      logId: newLog.id,
+      timestamp: newLog.createdAt,
     });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+  } catch (err: any) {
+    console.error("[Tester Simulate Error]:", err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

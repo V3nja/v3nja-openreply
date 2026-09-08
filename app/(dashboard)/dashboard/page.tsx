@@ -1,10 +1,4 @@
-import { getCurrentUserId, getCurrentWorkspaceId } from "@/lib/auth";
-import { prisma } from "@/lib/db/client";
-import {
-  calculateCtr,
-  normalizeTopKeywords,
-  summarizeDmStatuses,
-} from "@/lib/tracking/analytics";
+import { LiveDataStore } from "@/lib/db/live-store";
 import StatCard from "@/components/stat-card";
 import StatusBadge from "@/components/status-badge";
 import Link from "next/link";
@@ -12,136 +6,19 @@ import Link from "next/link";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const workspaceId = (await getCurrentWorkspaceId()) || "cmtsgdm010001wmnzbs3o4dx2";
-  const userId = await getCurrentUserId();
+  const stats = LiveDataStore.getAggregatedStats();
 
-  let activeAutomations = 6;
-  let dmsSentMonth = 23;
-  let skippedCount = 0;
-  let failedCount = 0;
-  let clicksThisMonth = 0;
-  let contactCount = 8;
-  let firstName = "V3NJA";
-
-  let dailyDMs: { date: string; count: number }[] = [
-    { date: "Wed", count: 2 },
-    { date: "Thu", count: 4 },
-    { date: "Fri", count: 5 },
-    { date: "Sat", count: 7 },
-    { date: "Sun", count: 3 },
-    { date: "Mon", count: 1 },
-    { date: "Tue", count: 1 },
-  ];
-
-  let topKeywords: { keyword: string; count: number }[] = [
-    { keyword: "NJALA", count: 11 },
-    { keyword: "WAYULOMI", count: 6 },
-    { keyword: "ZANGA", count: 3 },
-    { keyword: "MERCH", count: 2 },
-    { keyword: "VIP", count: 1 },
-  ];
-
-  let recentLogs: any[] = [
-    {
-      id: "log_1",
-      commenterName: "music_fan_265",
-      commentText: "WAYULOMI is a hit! Send link ❤️",
-      status: "SENT",
-    },
-    {
-      id: "log_2",
-      commenterName: "vibes_mw",
-      commentText: "Send NJALA please!",
-      status: "SENT",
-    },
-    {
-      id: "log_3",
-      commenterName: "blantyre_fan_2026",
-      commentText: "NJALA out now!!",
-      status: "SENT",
-    },
-  ];
-
-  try {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const [
-      activeAutoCount,
-      dmsSentCount,
-      dmStatusCounts,
-      clicksCount,
-      topKeywordRows,
-      logs,
-      user,
-      contactRows,
-    ] = await Promise.all([
-      prisma.automation.count({ where: { workspaceId, isActive: true } }),
-      prisma.dmLog.count({
-        where: { workspaceId, status: "SENT", createdAt: { gte: monthStart } },
-      }),
-      prisma.dmLog.groupBy({
-        by: ["status"],
-        where: { workspaceId, createdAt: { gte: monthStart } },
-        _count: { _all: true },
-      }),
-      prisma.linkClick.count({
-        where: { workspaceId, createdAt: { gte: monthStart } },
-      }),
-      prisma.dmLog.groupBy({
-        by: ["matchedKeyword"],
-        where: { workspaceId, matchedKeyword: { not: null } },
-        _count: { _all: true },
-      }),
-      prisma.dmLog.findMany({
-        where: { workspaceId },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-      }),
-      userId
-        ? prisma.user.findUnique({
-            where: { id: userId },
-            select: { name: true, email: true },
-          })
-        : Promise.resolve(null),
-      prisma.dmLog.findMany({
-        where: { workspaceId },
-        distinct: ["commenterId"],
-        select: { commenterId: true },
-      }),
-    ]);
-
-    if (activeAutoCount > 0) activeAutomations = activeAutoCount;
-    if (dmsSentCount > 0) dmsSentMonth = dmsSentCount;
-    if (clicksCount > 0) clicksThisMonth = clicksCount;
-    if (contactRows && contactRows.length > 0) contactCount = contactRows.length;
-    if (user?.name) firstName = user.name;
-
-    const monthlyStatusSummary = summarizeDmStatuses(
-      dmStatusCounts.map((row) => ({
-        status: row.status,
-        _count: row._count._all,
-      }))
-    );
-    skippedCount = monthlyStatusSummary.skipped;
-    failedCount = monthlyStatusSummary.failed;
-
-    if (topKeywordRows && topKeywordRows.length > 0) {
-      topKeywords = normalizeTopKeywords(
-        topKeywordRows.map((row) => ({
-          matchedKeyword: row.matchedKeyword,
-          _count: row._count._all,
-        }))
-      );
-    }
-
-    if (logs && logs.length > 0) {
-      recentLogs = logs;
-    }
-  } catch (err) {
-    console.warn("[DashboardPage] Using resilient fallback data:", err);
-  }
+  const activeAutomations = stats.activeAutomations;
+  const dmsSentMonth = stats.dmsSentMonth;
+  const skippedCount = stats.dmsSkippedMonth;
+  const failedCount = stats.dmsFailedMonth;
+  const clicksThisMonth = stats.clicksThisMonth;
+  const contactCount = stats.contactsCount;
+  const firstName = stats.userName;
+  const dailyDMs = stats.dailyDMs;
+  const topKeywords = stats.topKeywords;
+  const recentLogs = stats.recentLogs;
+  const ctr = stats.ctrThisMonth;
 
   const maxDM = Math.max(...dailyDMs.map((d) => d.count), 1);
 
@@ -169,6 +46,12 @@ export default async function DashboardPage() {
           >
             🧪 Test Comment Triggers
           </Link>
+          <Link
+            href="/campaigns/new"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface hover:bg-surface-hover border border-border text-foreground font-semibold text-xs transition-all"
+          >
+            + New Campaign
+          </Link>
         </div>
       </div>
 
@@ -179,7 +62,7 @@ export default async function DashboardPage() {
         <StatCard label="Skipped" value={skippedCount} />
         <StatCard label="Failed" value={failedCount} />
         <StatCard label="Smart Link Clicks" value={clicksThisMonth} />
-        <StatCard label="CTR" value={`${calculateCtr(clicksThisMonth, dmsSentMonth)}%`} />
+        <StatCard label="CTR" value={`${ctr}%`} />
       </div>
 
       {/* Chart + Recent Activity */}
@@ -195,8 +78,8 @@ export default async function DashboardPage() {
               <div key={day.date} className="min-w-0 flex-1 flex flex-col items-center gap-2">
                 <span className="text-xs text-muted font-medium">{day.count}</span>
                 <div
-                  className="w-full rounded-md bg-gradient-to-t from-orange-600 to-amber-500 min-h-[6px]"
-                  style={{ height: `${Math.max((day.count / maxDM) * 100, 6)}%` }}
+                  className="w-full rounded-md bg-gradient-to-t from-orange-600 to-amber-500 min-h-[6px] transition-all"
+                  style={{ height: `${Math.max((day.count / maxDM) * 100, 8)}%` }}
                 />
                 <span className="w-full truncate text-center text-[11px] text-zinc-500 font-medium">
                   {day.date}
@@ -230,7 +113,7 @@ export default async function DashboardPage() {
         <div className="lg:col-span-2 panel rounded-xl p-4 sm:p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground">Recent DM Dispatches</h2>
-            <Link href="/logs" className="text-xs text-orange-500 hover:underline">
+            <Link href="/logs" className="text-xs text-orange-500 hover:underline font-medium">
               View all
             </Link>
           </div>
@@ -251,7 +134,7 @@ export default async function DashboardPage() {
                     {log.commentText}
                   </p>
                 </div>
-                <StatusBadge status={log.status} />
+                <StatusBadge status={log.status as any} />
               </div>
             ))}
           </div>
