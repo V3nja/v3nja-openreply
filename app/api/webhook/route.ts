@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     const instagramAccount = await prisma.instagramAccount.findUnique({
-      where: { instagramUserId },
+      where: { instagramId: instagramUserId },
       select: { id: true, workspaceId: true },
     });
 
@@ -80,16 +80,19 @@ export async function POST(request: NextRequest) {
       create: {
         id: webhookEventId,
         workspaceId: instagramAccount.workspaceId,
+        object: typeof (payload as { object?: unknown }).object === "string"
+          ? (payload as { object: string }).object
+          : undefined,
         payload: payload as object,
-        status: "RECEIVED",
+        status: "PENDING",
       },
       update: {},
     });
 
     const queue = getDMQueue();
-    const commentEvents = parseCommentEvents(payload);
-    const messageEvents = parseMessageEvents(payload);
-    const postbackEvents = parsePostbackEvents(payload);
+    const commentEvents = parseCommentEvents(payload as Parameters<typeof parseCommentEvents>[0]);
+    const messageEvents = parseMessageEvents(payload as Parameters<typeof parseMessageEvents>[0]);
+    const postbackEvents = parsePostbackEvents(payload as Parameters<typeof parsePostbackEvents>[0]);
     let queued = 0;
 
     for (const event of commentEvents) {
@@ -125,7 +128,6 @@ export async function POST(request: NextRequest) {
     }
 
     for (const event of postbackEvents) {
-      const key = event.mid || JSON.stringify(event.payload);
       await queue.add(
         "process-postback",
         {
@@ -133,16 +135,23 @@ export async function POST(request: NextRequest) {
           userId: event.userId,
           payload: event.payload,
           mid: event.mid,
-          fallbackMessage: event.fallbackMessage,
         },
-        { jobId: `postback_${instagramAccount.id}_${deterministicId("event", key)}` },
+        {
+          jobId: `postback_${instagramAccount.id}_${deterministicId(
+            "event",
+            event.mid || event.payload,
+          )}`,
+        },
       );
       queued += 1;
     }
 
     await prisma.webhookEvent.update({
       where: { id: webhookEventId },
-      data: { status: "QUEUED" },
+      data: {
+        status: "PROCESSED",
+        processedAt: new Date(),
+      },
     });
 
     console.info("[Webhook] Accepted and queued", {
