@@ -6,7 +6,7 @@ import {
 } from "@/lib/workspace-access";
 import { generateTrackedLinkSlug } from "@/lib/tracking/server";
 import { buildTrackedUrl } from "@/lib/tracking/message";
-import { generateReportShareSlug } from "@/lib/reports/share";
+import { buildReportUrl, generateReportShareSlug } from "@/lib/reports/share";
 
 export const dynamic = "force-dynamic";
 
@@ -119,9 +119,7 @@ async function campaignForResponse(id: string, workspaceId: string) {
         .filter((group) => group.matchedKeyword)
         .map((group) => ({ keyword: group.matchedKeyword, count: group._count._all })),
     },
-    reportUrl: campaign.reportShareSlug
-      ? `${process.env.NEXTAUTH_URL?.replace(/\/$/, "") ?? "http://localhost:3000"}/report/${campaign.reportShareSlug}`
-      : null,
+    reportUrl: campaign.reportShareSlug ? buildReportUrl(campaign.reportShareSlug) : null,
     trackedLinks: campaign.trackedLinks.map((link) => ({
       ...link,
       trackedUrl: buildTrackedUrl(link.slug),
@@ -286,8 +284,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = (await request.json()) as Record<string, unknown>;
-    const requestedAccountId =
-      text(body.instagramAccountId) || text(body.instagramAccount);
+    const requestedAccountId = text(body.instagramAccountId) || text(body.instagramAccount);
 
     let instagramAccountId = requestedAccountId;
     if (!instagramAccountId) {
