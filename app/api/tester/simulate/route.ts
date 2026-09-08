@@ -69,11 +69,10 @@ export async function POST(request: NextRequest) {
     let matchedKeyword: string | null = null;
 
     for (const automation of automations) {
-      const matchRes = matchKeywords(
-        commentText,
-        automation.keywords,
-        automation.wholeWordMatch
-      );
+      const matchRes = automation.matchAnyWord
+        ? { matched: true, matchedKeyword: null }
+        : matchKeywords(commentText, automation.keywords, automation.wholeWordMatch);
+
       if (matchRes.matched) {
         matchedAutomation = automation;
         matchedKeyword = matchRes.matchedKeyword;
@@ -85,12 +84,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         dryRun: true,
+        sent: false,
+        persisted: false,
         matched: false,
         message: "No active automation matched this keyword.",
         availableCampaigns: automations.map((automation) => ({
           id: automation.id,
           name: automation.name,
           keywords: automation.keywords,
+          matchAnyWord: automation.matchAnyWord,
         })),
       });
     }
@@ -105,7 +107,9 @@ export async function POST(request: NextRequest) {
     }
 
     const requiresFollowGate = matchedAutomation.requireFollow && !isFollowing;
-    const primaryLink = matchedAutomation.trackedLinks[0]?.destinationUrl || "https://v3nja-official.web.app";
+    const primaryLink =
+      matchedAutomation.trackedLinks[0]?.destinationUrl ||
+      "https://v3nja-official.web.app";
 
     const dmMessage = formatBrandedArtistDM({
       rawMessage: matchedAutomation.dmMessage,
@@ -145,6 +149,7 @@ export async function POST(request: NextRequest) {
         goal: matchedAutomation.goal,
         matchedKeyword,
         keywords: matchedAutomation.keywords,
+        matchAnyWord: matchedAutomation.matchAnyWord,
         requireFollow: matchedAutomation.requireFollow,
         followUpEnabled: matchedAutomation.followUpEnabled,
         followUpMessage: matchedAutomation.followUpMessage,
@@ -152,10 +157,12 @@ export async function POST(request: NextRequest) {
       publicReply: triggerType === "COMMENT" ? publicReply : null,
       dmMessage,
       linkButtonLabel: requiresFollowGate
-        ? matchedAutomation.followPromptButtonLabel || "✅ I Follow @v3nja2.0 — Unlock Link"
+        ? matchedAutomation.followPromptButtonLabel ||
+          "✅ I Follow @v3nja2.0 — Unlock Link"
         : matchedAutomation.linkButtonLabel || "Stream Track 🎧",
       fullDmMessageUnlocked: unlockedMessage,
-      fullLinkButtonLabelUnlocked: matchedAutomation.linkButtonLabel || "Stream Track 🎧",
+      fullLinkButtonLabelUnlocked:
+        matchedAutomation.linkButtonLabel || "Stream Track 🎧",
       trackedLinks: matchedAutomation.trackedLinks,
     });
   } catch (error) {
