@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 
 export default function TesterPage() {
@@ -12,6 +12,7 @@ export default function TesterPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [isUnlocked, setIsUnlocked] = useState(false);
+  const [activeKeywordLabel, setActiveKeywordLabel] = useState("🎶 WAYULOMI (Video)");
 
   const quickKeywords = [
     { label: "🎶 WAYULOMI (Video)", text: "WAYULOMI is fire! Send link 🔥", post: "WAYULOMI Visuals & Music Video" },
@@ -22,32 +23,58 @@ export default function TesterPage() {
     { label: "👑 VIP (Inner Circle)", text: "JOIN the VIP squad", post: "V3NJA WRLD Fan Club Announcement" },
   ];
 
-  async function handleSimulate(overrideFollowing?: boolean) {
-    setLoading(true);
-    setResult(null);
-    setIsUnlocked(false);
+  const handleSimulate = useCallback(
+    async (
+      overrideComment?: string,
+      overrideUser?: string,
+      overrideFollowing?: boolean,
+      overrideType?: "COMMENT" | "STORY_REPLY" | "STORY_MENTION"
+    ) => {
+      setLoading(true);
 
-    const followingStatus = overrideFollowing !== undefined ? overrideFollowing : isFollowing;
+      const targetText = overrideComment || commentText;
+      const targetUser = overrideUser || username;
+      const targetFollowing = overrideFollowing !== undefined ? overrideFollowing : isFollowing;
+      const targetType = overrideType || triggerType;
 
-    try {
-      const res = await fetch("/api/tester/simulate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          commentText,
-          commenterName: username,
-          mediaTitle: postTitle,
-          triggerType,
-          isFollowing: followingStatus,
-        }),
-      });
-      const data = await res.json();
-      setResult(data);
-    } catch (err: any) {
-      setResult({ success: false, error: err.message });
-    } finally {
-      setLoading(false);
-    }
+      try {
+        const res = await fetch("/api/tester/simulate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            commentText: targetText,
+            commenterName: targetUser,
+            mediaTitle: postTitle,
+            triggerType: targetType,
+            isFollowing: targetFollowing,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setResult(data);
+          setIsUnlocked(false);
+        } else {
+          setResult({ success: false, error: data.error || "Simulation failed" });
+        }
+      } catch (err: any) {
+        setResult({ success: false, error: err.message });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [commentText, username, isFollowing, triggerType, postTitle]
+  );
+
+  // Auto-run on first load so the live flow is always active immediately!
+  useEffect(() => {
+    void handleSimulate("WAYULOMI is fire! Send link 🔥", "music_fan_265", true, "COMMENT");
+  }, []);
+
+  function handleSelectQuick(item: { label: string; text: string; post: string }) {
+    setActiveKeywordLabel(item.label);
+    setCommentText(item.text);
+    setPostTitle(item.post);
+    void handleSimulate(item.text, username, isFollowing, triggerType);
   }
 
   function handleUnlockFollowGate() {
@@ -105,22 +132,26 @@ export default function TesterPage() {
             {/* Quick Trigger Chips */}
             <div>
               <label className="block text-xs font-semibold text-zinc-400 mb-2">
-                Quick Preset Music Triggers:
+                Select Track / Preset (Instant Trigger):
               </label>
               <div className="flex flex-wrap gap-2">
-                {quickKeywords.map((k) => (
-                  <button
-                    key={k.label}
-                    type="button"
-                    onClick={() => {
-                      setCommentText(k.text);
-                      setPostTitle(k.post);
-                    }}
-                    className="px-3 py-1.5 text-xs rounded-xl border border-white/10 bg-white/[0.03] hover:border-orange-500/50 hover:bg-orange-500/10 hover:text-orange-300 text-zinc-300 transition-all font-medium active:scale-95"
-                  >
-                    {k.label}
-                  </button>
-                ))}
+                {quickKeywords.map((k) => {
+                  const isSelected = activeKeywordLabel === k.label;
+                  return (
+                    <button
+                      key={k.label}
+                      type="button"
+                      onClick={() => handleSelectQuick(k)}
+                      className={`px-3 py-1.5 text-xs rounded-xl border transition-all font-semibold active:scale-95 ${
+                        isSelected
+                          ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 shadow-md shadow-orange-500/25 scale-[1.03]"
+                          : "border-white/10 bg-white/[0.03] hover:border-orange-500/40 text-zinc-300 hover:text-white"
+                      }`}
+                    >
+                      {k.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -128,7 +159,10 @@ export default function TesterPage() {
             <div className="grid grid-cols-3 gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => setTriggerType("COMMENT")}
+                onClick={() => {
+                  setTriggerType("COMMENT");
+                  void handleSimulate(commentText, username, isFollowing, "COMMENT");
+                }}
                 className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
                   triggerType === "COMMENT"
                     ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 shadow-md shadow-orange-500/20 scale-[1.02]"
@@ -139,7 +173,10 @@ export default function TesterPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setTriggerType("STORY_REPLY")}
+                onClick={() => {
+                  setTriggerType("STORY_REPLY");
+                  void handleSimulate(commentText, username, isFollowing, "STORY_REPLY");
+                }}
                 className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
                   triggerType === "STORY_REPLY"
                     ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 shadow-md shadow-orange-500/20 scale-[1.02]"
@@ -150,7 +187,10 @@ export default function TesterPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setTriggerType("STORY_MENTION")}
+                onClick={() => {
+                  setTriggerType("STORY_MENTION");
+                  void handleSimulate(commentText, username, isFollowing, "STORY_MENTION");
+                }}
                 className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
                   triggerType === "STORY_MENTION"
                     ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 shadow-md shadow-orange-500/20 scale-[1.02]"
@@ -168,12 +208,15 @@ export default function TesterPage() {
                   <span>🔒</span>
                   <span>Follow-to-Unlock Gate Status</span>
                 </div>
-                <div className="text-[11px] text-zinc-400">Simulate follower verification logic</div>
+                <div className="text-[11px] text-zinc-400">Test follow gate lock/unlock response</div>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsFollowing(true)}
+                  onClick={() => {
+                    setIsFollowing(true);
+                    void handleSimulate(commentText, username, true, triggerType);
+                  }}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
                     isFollowing
                       ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20"
@@ -184,14 +227,17 @@ export default function TesterPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsFollowing(false)}
+                  onClick={() => {
+                    setIsFollowing(false);
+                    void handleSimulate(commentText, username, false, triggerType);
+                  }}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
                     !isFollowing
                       ? "bg-amber-500 text-black shadow-md shadow-amber-500/20"
                       : "bg-white/[0.05] text-zinc-400 hover:text-white border border-white/10"
                   }`}
                 >
-                  ✕ Not Following (Locked)
+                  ✕ Locked (Gate Active)
                 </button>
               </div>
             </div>
@@ -199,7 +245,7 @@ export default function TesterPage() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                handleSimulate();
+                void handleSimulate();
               }}
               className="space-y-4 pt-1"
             >
@@ -239,8 +285,9 @@ export default function TesterPage() {
 
               <button
                 type="submit"
+                onClick={() => void handleSimulate()}
                 disabled={loading}
-                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-500 via-amber-500 to-rose-500 hover:opacity-95 text-white font-extrabold text-sm transition-all shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2 active:scale-98"
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-500 via-amber-500 to-rose-500 hover:opacity-95 text-white font-extrabold text-sm transition-all shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
@@ -270,7 +317,7 @@ export default function TesterPage() {
               )}
             </h3>
 
-            {/* Comment Block */}
+            {/* Inbound Comment Block */}
             <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-2">
               <div className="text-[11px] text-zinc-400 font-medium flex items-center justify-between">
                 <span>REEL: {postTitle}</span>
@@ -297,7 +344,7 @@ export default function TesterPage() {
 
             {/* Interactive DM Card */}
             <div className="rounded-2xl bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border border-white/15 overflow-hidden shadow-2xl">
-              {/* Header */}
+              {/* Card Header */}
               <div className="p-3 bg-white/[0.04] border-b border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center font-bold text-[10px] text-white shadow-md">
@@ -327,7 +374,7 @@ export default function TesterPage() {
                       <button
                         type="button"
                         onClick={handleUnlockFollowGate}
-                        className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 font-bold text-xs text-black shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-95 transition-all"
+                        className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 font-bold text-xs text-black shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
                       >
                         {result.linkButtonLabel}
                       </button>
@@ -339,7 +386,7 @@ export default function TesterPage() {
                           ✓ Follow verified on @v3nja2.0! Smart link unlocked:
                         </div>
                       )}
-                      
+
                       <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-zinc-200 whitespace-pre-wrap leading-relaxed">
                         {isUnlocked ? result.fullDmMessageUnlocked : result.dmMessage}
                       </div>
@@ -366,7 +413,7 @@ export default function TesterPage() {
                 </div>
               ) : (
                 <div className="py-8 text-center text-xs text-zinc-500">
-                  Click <strong>Run Automation</strong> above to preview the interactive flow!
+                  Loading automation flow...
                 </div>
               )}
             </div>
