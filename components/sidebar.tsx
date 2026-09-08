@@ -10,6 +10,7 @@ import { usePathname } from "next/navigation";
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: "📊" },
   { label: "Overview & Growth", href: "/overview", icon: "📈" },
+  { label: "Fans & Audience", href: "/fans", icon: "👥" },
   { label: "Live Comment Tester", href: "/tester", icon: "🧪" },
   { label: "Instagram Inbox", href: "/inbox", icon: "💬" },
   { label: "Campaigns & Triggers", href: "/campaigns", icon: "⚡" },
@@ -33,7 +34,6 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Mobile overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/60 lg:hidden"
@@ -92,7 +92,6 @@ export default function Sidebar({
           })}
         </nav>
 
-        {/* Live Instagram Connected Status */}
         <div className="px-4 py-3 mx-3 mb-2 rounded-xl border border-border/80 bg-surface-hover/50">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
