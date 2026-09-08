@@ -1,167 +1,418 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LiveDataStore } from "@/lib/db/live-store";
 import { prisma } from "@/lib/db/client";
+import {
+  canManageWorkspace,
+  getCurrentWorkspaceContext,
+} from "@/lib/workspace-access";
+import { generateTrackedLinkSlug } from "@/lib/tracking/server";
+import { buildTrackedUrl } from "@/lib/tracking/message";
+import { generateReportShareSlug } from "@/lib/reports/share";
 
 export const dynamic = "force-dynamic";
 
+const MAX_NAME = 100;
+const MAX_MESSAGE = 5000;
+const MAX_KEYWORDS = 100;
+const MAX_KEYWORD = 100;
+const MAX_FOLLOW_UP_DELAY = 7 * 24 * 60;
+
+function text(value: unknown, fallback = "") {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
+function boundedText(value: unknown, max: number, fallback = "") {
+  return text(value, fallback).slice(0, max);
+}
+
+function keywords(value: unknown) {
+  if (!Array.isArray(value)) return ["MUSIC"];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim().slice(0, MAX_KEYWORD))
+    .filter(Boolean)
+    .slice(0, MAX_KEYWORDS);
+}
+
+function parseDelay(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(MAX_FOLLOW_UP_DELAY, Math.max(0, Math.floor(parsed)));
+}
+
+function parseDestination(value: unknown) {
+  const raw = text(value);
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function errorResponse(message: string, status: number) {
+  return NextResponse.json({ success: false, error: message }, { status });
+}
+
+async function ownedAccount(workspaceId: string, instagramAccountId: string) {
+  return prisma.instagramAccount.findFirst({
+    where: { id: instagramAccountId, workspaceId },
+    select: { id: true, username: true, instagramId: true },
+  });
+}
+
+async function campaignForResponse(id: string, workspaceId: string) {
+  const campaign = await prisma.automation.findFirst({
+    where: { id, workspaceId },
+    include: {
+      instagramAccount: {
+        select: { username: true, instagramId: true },
+      },
+      trackedLinks: {
+        include: { _count: { select: { clicks: true } } },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+
+  if (!campaign) return null;
+
+  const [statusGroups, clickCount, keywordGroups] = await Promise.all([
+    prisma.dmLog.groupBy({
+      by: ["status"],
+      where: { automationId: campaign.id, workspaceId },
+      _count: { _all: true },
+    }),
+    prisma.linkClick.count({
+      where: { automationId: campaign.id, workspaceId },
+    }),
+    prisma.dmLog.groupBy({
+      by: ["matchedKeyword"],
+      where: {
+        automationId: campaign.id,
+        workspaceId,
+        matchedKeyword: { not: null },
+      },
+      _count: { _all: true },
+      orderBy: { _count: { matchedKeyword: "desc" } },
+      take: 5,
+    }),
+  ]);
+
+  const sent = statusGroups.find((group) => String(group.status) === "SENT")?._count._all ?? 0;
+  const skipped = statusGroups
+    .filter((group) => String(group.status).startsWith("SKIPPED_"))
+    .reduce((sum, group) => sum + group._count._all, 0);
+  const failed = statusGroups.find((group) => String(group.status) === "FAILED")?._count._all ?? 0;
+
+  return {
+    ...campaign,
+    instagramAccountUsername: campaign.instagramAccount.username,
+    analytics: {
+      sent,
+      skipped,
+      failed,
+      clicks: clickCount,
+      ctr: sent > 0 ? Number(((clickCount / sent) * 100).toFixed(1)) : 0,
+      topKeywords: keywordGroups
+        .filter((group) => group.matchedKeyword)
+        .map((group) => ({ keyword: group.matchedKeyword, count: group._count._all })),
+    },
+    reportUrl: campaign.reportShareSlug
+      ? `${process.env.NEXTAUTH_URL?.replace(/\/$/, "") ?? "http://localhost:3000"}/report/${campaign.reportShareSlug}`
+      : null,
+    trackedLinks: campaign.trackedLinks.map((link) => ({
+      ...link,
+      trackedUrl: buildTrackedUrl(link.slug),
+    })),
+  };
+}
+
+async function campaignsForResponse(ids: string[], workspaceId: string) {
+  return Promise.all(ids.map((id) => campaignForResponse(id, workspaceId)));
+}
+
+const createData = (body: Record<string, unknown>, instagramAccountId: string, workspaceId: string) => ({
+  workspaceId,
+  instagramAccountId,
+  name: boundedText(body.name, MAX_NAME, "Untitled Campaign"),
+  goal: boundedText(body.goal, MAX_MESSAGE) || null,
+  postId: boundedText(body.postId, 500) || null,
+  postUrl: boundedText(body.postUrl, 2000) || null,
+  pendingNextReel: Boolean(body.pendingNextReel),
+  matchAnyPost: Boolean(body.matchAnyPost),
+  keywords: keywords(body.keywords),
+  matchAnyWord: Boolean(body.matchAnyWord),
+  dmTriggerEnabled: Boolean(body.dmTriggerEnabled),
+  dmMessage: boundedText(body.dmMessage, MAX_MESSAGE, "Thanks for commenting! Here is the link:"),
+  openingDmEnabled: Boolean(body.openingDmEnabled),
+  openingDmMessage: boundedText(body.openingDmMessage, MAX_MESSAGE) || null,
+  openingDmButtonLabel: boundedText(body.openingDmButtonLabel, 100) || null,
+  linkButtonLabel: boundedText(body.linkButtonLabel, 100, "Open link") || "Open link",
+  requireFollow: Boolean(body.requireFollow),
+  followPromptMessage: boundedText(body.followPromptMessage, MAX_MESSAGE) || null,
+  followPromptButtonLabel: boundedText(body.followPromptButtonLabel, 100) || null,
+  followUpEnabled: Boolean(body.followUpEnabled),
+  followUpMessage: boundedText(body.followUpMessage, MAX_MESSAGE) || null,
+  followUpDelayMinutes: parseDelay(body.followUpDelayMinutes),
+  publicReplyEnabled: Boolean(body.publicReplyEnabled),
+  publicReplyMessages:
+    Array.isArray(body.publicReplyMessages) && body.publicReplyMessages.length > 0
+      ? body.publicReplyMessages
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => item.trim().slice(0, MAX_MESSAGE))
+          .filter(Boolean)
+          .slice(0, 20)
+      : ["Check your DMs @{username} 🔥"],
+  isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
+  wholeWordMatch: body.wholeWordMatch !== undefined ? Boolean(body.wholeWordMatch) : true,
+  reportShareSlug: generateReportShareSlug(),
+});
+
+const allowedUpdateKeys = [
+  "name",
+  "goal",
+  "postId",
+  "postUrl",
+  "pendingNextReel",
+  "matchAnyPost",
+  "keywords",
+  "matchAnyWord",
+  "dmTriggerEnabled",
+  "dmMessage",
+  "openingDmEnabled",
+  "openingDmMessage",
+  "openingDmButtonLabel",
+  "linkButtonLabel",
+  "requireFollow",
+  "followPromptMessage",
+  "followPromptButtonLabel",
+  "followUpEnabled",
+  "followUpMessage",
+  "followUpDelayMinutes",
+  "publicReplyEnabled",
+  "publicReplyMessages",
+  "isActive",
+  "wholeWordMatch",
+  "reportShareEnabled",
+] as const;
+
+function updateData(body: Record<string, unknown>) {
+  const data: Record<string, unknown> = {};
+  for (const key of allowedUpdateKeys) {
+    if (body[key] === undefined) continue;
+    switch (key) {
+      case "name":
+        data[key] = boundedText(body[key], MAX_NAME, "Untitled Campaign");
+        break;
+      case "goal":
+      case "dmMessage":
+      case "openingDmMessage":
+      case "followPromptMessage":
+      case "followUpMessage":
+        data[key] = boundedText(body[key], MAX_MESSAGE) || null;
+        if (key === "dmMessage" && !data[key]) data[key] = "Thanks for commenting! Here is the link:";
+        break;
+      case "postId":
+        data[key] = boundedText(body[key], 500) || null;
+        break;
+      case "postUrl":
+        data[key] = boundedText(body[key], 2000) || null;
+        break;
+      case "openingDmButtonLabel":
+      case "linkButtonLabel":
+      case "followPromptButtonLabel":
+        data[key] = boundedText(body[key], 100) || null;
+        break;
+      case "keywords":
+        data[key] = keywords(body[key]);
+        break;
+      case "publicReplyMessages":
+        data[key] = Array.isArray(body[key])
+          ? body[key]
+              .filter((item): item is string => typeof item === "string")
+              .map((item) => item.trim().slice(0, MAX_MESSAGE))
+              .filter(Boolean)
+              .slice(0, 20)
+          : [];
+        break;
+      case "followUpDelayMinutes":
+        data[key] = parseDelay(body[key]);
+        break;
+      default:
+        data[key] = Boolean(body[key]);
+    }
+  }
+  return data;
+}
+
 export async function GET(request: NextRequest) {
+  const context = await getCurrentWorkspaceContext();
+  if (!context) return errorResponse("Unauthorized", 401);
+
   try {
     const accountId = request.nextUrl.searchParams.get("instagramAccountId");
-    let automations = LiveDataStore.getCampaigns();
-
     if (accountId && accountId !== "all") {
-      automations = automations.filter((a) => a.instagramAccountId === accountId);
+      const account = await ownedAccount(context.workspaceId, accountId);
+      if (!account) return errorResponse("Instagram account not found", 404);
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: automations,
+    const automations = await prisma.automation.findMany({
+      where: {
+        workspaceId: context.workspaceId,
+        ...(accountId && accountId !== "all" ? { instagramAccountId: accountId } : {}),
       },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true },
+    });
+
+    const data = (await campaignsForResponse(automations.map((item) => item.id), context.workspaceId)).filter(Boolean);
+
+    return NextResponse.json(
+      { success: true, data },
       { headers: { "Cache-Control": "no-store" } }
     );
-  } catch (err: any) {
-    console.error("[Automations GET Error]:", err);
-    return NextResponse.json({ success: true, data: LiveDataStore.getCampaigns() });
+  } catch (error) {
+    console.error("[Automations GET Error]", error);
+    return errorResponse("Failed to load campaigns", 500);
   }
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
+  const context = await getCurrentWorkspaceContext();
+  if (!context) return errorResponse("Unauthorized", 401);
+  if (!canManageWorkspace(context.role)) return errorResponse("Forbidden", 403);
 
-    const newCampaign = LiveDataStore.saveCampaign({
-      name: body.name || "Untitled Campaign",
-      goal: body.goal || null,
-      postId: body.postId || null,
-      postUrl: body.postUrl || null,
-      pendingNextReel: Boolean(body.pendingNextReel),
-      matchAnyPost: Boolean(body.matchAnyPost),
-      keywords: Array.isArray(body.keywords) ? body.keywords : ["MUSIC"],
-      matchAnyWord: Boolean(body.matchAnyWord),
-      dmTriggerEnabled: Boolean(body.dmTriggerEnabled),
-      dmMessage: body.dmMessage || "Thanks for commenting! Here is the link:",
-      openingDmEnabled: Boolean(body.openingDmEnabled),
-      openingDmMessage: body.openingDmMessage || null,
-      openingDmButtonLabel: body.openingDmButtonLabel || null,
-      linkButtonLabel: body.linkButtonLabel || "Open link",
-      requireFollow: Boolean(body.requireFollow),
-      followPromptMessage: body.followPromptMessage || null,
-      followPromptButtonLabel: body.followPromptButtonLabel || null,
-      followUpEnabled: Boolean(body.followUpEnabled),
-      followUpMessage: body.followUpMessage || null,
-      followUpDelayMinutes: Number(body.followUpDelayMinutes) || 0,
-      publicReplyEnabled: Boolean(body.publicReplyEnabled),
-      publicReplyMessages: Array.isArray(body.publicReplyMessages) && body.publicReplyMessages.length > 0
-        ? body.publicReplyMessages
-        : ["Check your DMs @{username} 🔥"],
-      isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
-      wholeWordMatch: body.wholeWordMatch !== undefined ? Boolean(body.wholeWordMatch) : true,
-      trackedLinks: body.trackedDestinationUrl
-        ? [
-            {
-              id: `tl_${Date.now()}`,
-              slug: `link-${Date.now()}`,
-              label: body.linkButtonLabel || "Open link",
-              destinationUrl: body.trackedDestinationUrl,
-              trackedUrl: body.trackedDestinationUrl,
-              _count: { clicks: 0 },
-            },
-          ]
-        : [],
+  try {
+    const body = (await request.json()) as Record<string, unknown>;
+    const requestedAccountId =
+      text(body.instagramAccountId) || text(body.instagramAccount);
+
+    let instagramAccountId = requestedAccountId;
+    if (!instagramAccountId) {
+      const account = await prisma.instagramAccount.findFirst({
+        where: { workspaceId: context.workspaceId },
+        orderBy: { connectedAt: "asc" },
+        select: { id: true },
+      });
+      instagramAccountId = account?.id ?? "";
+    }
+
+    if (!instagramAccountId) return errorResponse("Connect an Instagram account first", 400);
+    if (!(await ownedAccount(context.workspaceId, instagramAccountId))) {
+      return errorResponse("Instagram account not found", 404);
+    }
+
+    const destinationUrl = parseDestination(body.trackedDestinationUrl);
+    const created = await prisma.automation.create({
+      data: {
+        ...createData(body, instagramAccountId, context.workspaceId),
+        ...(destinationUrl
+          ? {
+              trackedLinks: {
+                create: {
+                  workspaceId: context.workspaceId,
+                  slug: generateTrackedLinkSlug(),
+                  label: boundedText(body.linkButtonLabel, 100, "Open link") || "Open link",
+                  destinationUrl,
+                },
+              },
+            }
+          : {}),
+      },
+      select: { id: true },
     });
 
-    // Attempt Prisma database create in background
-    try {
-      prisma.automation
-        .create({
-          data: {
-            workspaceId: "cmtsgdm010001wmnzbs3o4dx2",
-            instagramAccountId: "acc_v3nja",
-            name: newCampaign.name,
-            goal: newCampaign.goal,
-            postId: newCampaign.postId,
-            postUrl: newCampaign.postUrl,
-            pendingNextReel: newCampaign.pendingNextReel,
-            matchAnyPost: newCampaign.matchAnyPost,
-            keywords: newCampaign.keywords,
-            matchAnyWord: newCampaign.matchAnyWord,
-            dmTriggerEnabled: newCampaign.dmTriggerEnabled,
-            dmMessage: newCampaign.dmMessage,
-            openingDmEnabled: newCampaign.openingDmEnabled,
-            openingDmMessage: newCampaign.openingDmMessage,
-            openingDmButtonLabel: newCampaign.openingDmButtonLabel,
-            linkButtonLabel: newCampaign.linkButtonLabel,
-            requireFollow: newCampaign.requireFollow,
-            followPromptMessage: newCampaign.followPromptMessage,
-            followPromptButtonLabel: newCampaign.followPromptButtonLabel,
-            followUpEnabled: newCampaign.followUpEnabled,
-            followUpMessage: newCampaign.followUpMessage,
-            followUpDelayMinutes: newCampaign.followUpDelayMinutes,
-            publicReplyEnabled: newCampaign.publicReplyEnabled,
-            publicReplyMessages: newCampaign.publicReplyMessages,
-            isActive: newCampaign.isActive,
-            wholeWordMatch: newCampaign.wholeWordMatch,
-          },
-        })
-        .catch((e) => console.warn("[Prisma Automation Create Warning]:", e.message));
-    } catch {}
-
-    return NextResponse.json({ success: true, data: newCampaign });
-  } catch (err: any) {
-    console.error("[Automations POST Error]:", err);
-    return NextResponse.json(
-      { success: false, error: err.message || "Failed to create campaign" },
-      { status: 500 }
-    );
+    const data = await campaignForResponse(created.id, context.workspaceId);
+    return NextResponse.json({ success: true, data }, { status: 201 });
+  } catch (error) {
+    console.error("[Automations POST Error]", error);
+    return errorResponse("Failed to create campaign", 500);
   }
 }
 
 export async function PATCH(request: NextRequest) {
+  const context = await getCurrentWorkspaceContext();
+  if (!context) return errorResponse("Unauthorized", 401);
+  if (!canManageWorkspace(context.role)) return errorResponse("Forbidden", 403);
+
   try {
     const id = request.nextUrl.searchParams.get("id");
-    const body = await request.json();
+    if (!id) return errorResponse("Campaign ID is required", 400);
 
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: "Campaign ID is required" },
-        { status: 400 }
-      );
+    const body = (await request.json()) as Record<string, unknown>;
+    const existing = await prisma.automation.findFirst({
+      where: { id, workspaceId: context.workspaceId },
+      select: { id: true },
+    });
+    if (!existing) return errorResponse("Campaign not found", 404);
+
+    const updated = await prisma.automation.update({
+      where: { id },
+      data: updateData(body),
+      select: { id: true },
+    });
+
+    const destinationUrl = body.trackedDestinationUrl === undefined
+      ? undefined
+      : parseDestination(body.trackedDestinationUrl);
+
+    if (destinationUrl !== undefined) {
+      const link = await prisma.trackedLink.findFirst({
+        where: { automationId: id, workspaceId: context.workspaceId },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+
+      if (link) {
+        await prisma.trackedLink.update({
+          where: { id: link.id },
+          data: {
+            destinationUrl,
+            label: boundedText(body.linkButtonLabel, 100, "Open link") || "Open link",
+          },
+        });
+      } else if (destinationUrl) {
+        await prisma.trackedLink.create({
+          data: {
+            workspaceId: context.workspaceId,
+            automationId: id,
+            slug: generateTrackedLinkSlug(),
+            label: boundedText(body.linkButtonLabel, 100, "Open link") || "Open link",
+            destinationUrl,
+          },
+        });
+      }
     }
 
-    if (body.isActive !== undefined) {
-      LiveDataStore.toggleCampaign(id, body.isActive);
-    } else {
-      LiveDataStore.saveCampaign({ id, ...body });
-    }
-
-    return NextResponse.json({ success: true, data: LiveDataStore.getCampaignById(id) });
-  } catch (err: any) {
-    console.error("[Automations PATCH Error]:", err);
-    return NextResponse.json(
-      { success: false, error: err.message || "Failed to update campaign" },
-      { status: 500 }
-    );
+    const data = await campaignForResponse(updated.id, context.workspaceId);
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    console.error("[Automations PATCH Error]", error);
+    return errorResponse("Failed to update campaign", 500);
   }
 }
 
 export async function DELETE(request: NextRequest) {
+  const context = await getCurrentWorkspaceContext();
+  if (!context) return errorResponse("Unauthorized", 401);
+  if (!canManageWorkspace(context.role)) return errorResponse("Forbidden", 403);
+
   try {
     const id = request.nextUrl.searchParams.get("id");
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: "Campaign ID is required" },
-        { status: 400 }
-      );
-    }
+    if (!id) return errorResponse("Campaign ID is required", 400);
 
-    LiveDataStore.deleteCampaign(id);
+    const existing = await prisma.automation.findFirst({
+      where: { id, workspaceId: context.workspaceId },
+      select: { id: true },
+    });
+    if (!existing) return errorResponse("Campaign not found", 404);
+
+    await prisma.automation.delete({ where: { id } });
     return NextResponse.json({ success: true, data: { deleted: true } });
-  } catch (err: any) {
-    console.error("[Automations DELETE Error]:", err);
-    return NextResponse.json(
-      { success: false, error: err.message || "Failed to delete campaign" },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error("[Automations DELETE Error]", error);
+    return errorResponse("Failed to delete campaign", 500);
   }
 }
