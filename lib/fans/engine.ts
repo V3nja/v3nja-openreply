@@ -18,11 +18,6 @@ function fanId(instagramAccountId: string, instagramUserId: string): string {
   return `fan_${digest}`;
 }
 
-/**
- * Upsert a fan without requiring the generated Prisma client to know about the
- * feature yet. The migration creates the table and this helper keeps the write
- * path compatible while the generated client catches up on the next build.
- */
 export async function recordFanInteraction(input: FanInteractionInput): Promise<void> {
   const id = fanId(input.instagramAccountId, input.instagramUserId);
   const username = input.username?.trim() || null;
@@ -31,30 +26,11 @@ export async function recordFanInteraction(input: FanInteractionInput): Promise<
 
   await prisma.$executeRaw`
     INSERT INTO "Fan" (
-      "id",
-      "workspaceId",
-      "instagramAccountId",
-      "instagramUserId",
-      "username",
-      "firstName",
-      "tags",
-      "interactionCount",
-      "lastInteractionAt",
-      "createdAt",
-      "updatedAt"
-    )
-    VALUES (
-      ${id},
-      ${input.workspaceId},
-      ${input.instagramAccountId},
-      ${input.instagramUserId},
-      ${username},
-      ${firstName},
-      ${tag ? [tag] : []},
-      1,
-      CURRENT_TIMESTAMP,
-      CURRENT_TIMESTAMP,
-      CURRENT_TIMESTAMP
+      "id", "workspaceId", "instagramAccountId", "instagramUserId", "username", "firstName",
+      "tags", "interactionCount", "lastInteractionAt", "createdAt", "updatedAt"
+    ) VALUES (
+      ${id}, ${input.workspaceId}, ${input.instagramAccountId}, ${input.instagramUserId}, ${username}, ${firstName},
+      ${tag ? [tag] : []}, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     )
     ON CONFLICT ("instagramAccountId", "instagramUserId")
     DO UPDATE SET
@@ -83,20 +59,36 @@ export interface FanSummary {
 
 export async function listFans(
   workspaceId: string,
-  limit = 50
+  limit = 50,
+  search = ""
 ): Promise<FanSummary[]> {
   const safeLimit = Math.min(Math.max(limit, 1), 100);
+  const query = search.trim();
+
+  if (!query) {
+    return prisma.$queryRaw<FanSummary[]>`
+      SELECT "id", "instagramUserId", "username", "firstName", "tags", "interactionCount", "lastInteractionAt"
+      FROM "Fan"
+      WHERE "workspaceId" = ${workspaceId}
+      ORDER BY "lastInteractionAt" DESC
+      LIMIT ${safeLimit};
+    `;
+  }
+
+  const pattern = `%${query}%`;
   return prisma.$queryRaw<FanSummary[]>`
-    SELECT
-      "id",
-      "instagramUserId",
-      "username",
-      "firstName",
-      "tags",
-      "interactionCount",
-      "lastInteractionAt"
+    SELECT "id", "instagramUserId", "username", "firstName", "tags", "interactionCount", "lastInteractionAt"
     FROM "Fan"
     WHERE "workspaceId" = ${workspaceId}
+      AND (
+        COALESCE("username", '') ILIKE ${pattern}
+        OR COALESCE("firstName", '') ILIKE ${pattern}
+        OR "instagramUserId" ILIKE ${pattern}
+        OR EXISTS (
+          SELECT 1 FROM unnest("tags") AS tag(value)
+          WHERE tag.value ILIKE ${pattern}
+        )
+      )
     ORDER BY "lastInteractionAt" DESC
     LIMIT ${safeLimit};
   `;
