@@ -4,14 +4,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  experimental: {
-    serverActions: {
-      allowedOrigins: ["*"],
-    },
-  },
 };
 
 export default nextConfig;
