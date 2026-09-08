@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   parseCommentEvents,
   parseMessageEvents,
+  verifyWebhookSignature,
 } from "@/lib/meta/webhook";
 import { matchKeywords } from "@/lib/utils/keyword-matcher";
 import { generateAntiSpamPublicReply } from "@/lib/utils/anti-spam-reply";
@@ -53,6 +54,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const signature = request.headers.get("x-hub-signature-256");
+    let signatureValid = false;
+    try {
+      signatureValid = verifyWebhookSignature(rawBody, signature);
+    } catch (error: any) {
+      console.error("[Webhook] Signature verification is not configured:", error?.message || "unknown error");
+      return NextResponse.json(
+        { success: false, error: "Webhook signature verification is not configured" },
+        { status: 503 }
+      );
+    }
+
+    if (!signatureValid) {
+      console.warn("[Webhook] Rejected request with invalid signature");
+      return NextResponse.json(
+        { success: false, error: "Invalid webhook signature" },
+        { status: 401 }
+      );
+    }
+
     const payload = JSON.parse(rawBody);
 
     // Never log the raw Meta payload: it can contain user and message data.
@@ -79,7 +100,6 @@ export async function POST(request: NextRequest) {
       if (matchedAutomation) {
         console.log(`[Webhook] Matched campaign "${matchedAutomation.name}"`);
 
-        // Format rich V3NJA WRLD artist DM
         const primaryLink = matchedAutomation.trackedLinks?.[0]?.destinationUrl || "https://v3nja-official.web.app";
         const brandedDmText = formatBrandedArtistDM({
           rawMessage: matchedAutomation.dmMessage,
@@ -90,7 +110,6 @@ export async function POST(request: NextRequest) {
           followPrompt: matchedAutomation.followPromptMessage,
         });
 
-        // 1. Send Private Reply DM via Meta Graph API Page messaging endpoint
         const dmUrl = `https://graph.facebook.com/${GRAPH_API_VERSION}/${PAGE_ID}/messages?access_token=${LIVE_TOKEN}`;
         let dmSuccess = false;
         let dmErrorMessage: string | null = null;
@@ -120,7 +139,6 @@ export async function POST(request: NextRequest) {
           dmErrorMessage = e?.message || "unknown error";
         }
 
-        // 2. Send Anti-Spam Randomized Public Reply on Instagram Comment
         let publicReplyText: string | null = null;
         if (matchedAutomation.publicReplyEnabled) {
           publicReplyText = generateAntiSpamPublicReply(
@@ -149,7 +167,6 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // 3. Record Live DM Event in Data Store & Database
         LiveDataStore.recordDmEvent({
           commenterId: commenterId || `fan_${Date.now()}`,
           commenterName: commenterName || "music_fan",
