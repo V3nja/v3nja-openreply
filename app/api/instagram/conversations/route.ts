@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentWorkspaceContext } from "@/lib/workspace-access";
 import { prisma } from "@/lib/db/client";
 import { getWorkspaceInstagramAccount } from "@/lib/instagram-accounts";
-import { getConversations, sendDirectMessage, MetaApiError } from "@/lib/meta/client";
+import { getConversations, MetaApiError } from "@/lib/meta/client";
+import { getDMQueue, MANUAL_MESSAGE_JOB_NAME } from "@/lib/queue/client";
 import { decryptToken } from "@/lib/meta/oauth";
 
 export interface ConversationListItem {
@@ -110,13 +112,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Instagram account not found" }, { status: 404 });
   }
 
+  const requestId = request.headers.get("x-request-id")?.trim() || randomUUID();
+
   try {
-    const accessToken = decryptToken(account.accessToken);
-    const result = await sendDirectMessage(accessToken, account.instagramId, recipientId, text);
-    return NextResponse.json({ success: true, data: result }, { status: 202 });
+    await getDMQueue().add(
+      MANUAL_MESSAGE_JOB_NAME,
+      {
+        workspaceId: context.workspaceId,
+        instagramAccountId: account.id,
+        recipientId,
+        text,
+        requestId,
+      },
+      { jobId: `manual_${requestId}` }
+    );
+
+    return NextResponse.json(
+      {
+        success: true,
+        queued: true,
+        data: { requestId },
+      },
+      { status: 202 }
+    );
   } catch (error) {
     console.error("[Conversations POST]", error instanceof Error ? error.message : "unknown error");
-    const message = error instanceof MetaApiError ? error.message : "Failed to send message";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to queue message" }, { status: 500 });
   }
 }
