@@ -58,8 +58,11 @@ export async function POST(request: NextRequest) {
       return jsonError("Webhook queue is not enabled", 503);
     }
 
-    const body = payload as { entry?: Array<{ id?: string }> };
-    const instagramUserId = body.entry?.[0]?.id;
+    const parsed = payload as {
+      object?: unknown;
+      entry?: Array<{ id?: string }>;
+    };
+    const instagramUserId = parsed.entry?.[0]?.id;
     if (!instagramUserId) {
       return NextResponse.json({ ok: true, ignored: true });
     }
@@ -75,18 +78,28 @@ export async function POST(request: NextRequest) {
     }
 
     const webhookEventId = deterministicId("webhook", rawBody);
+    const existingEvent = await prisma.webhookEvent.findUnique({
+      where: { id: webhookEventId },
+      select: { status: true },
+    });
+
+    if (existingEvent?.status === "PROCESSED") {
+      return NextResponse.json({ ok: true, duplicate: true, queued: 0 });
+    }
+
     await prisma.webhookEvent.upsert({
       where: { id: webhookEventId },
       create: {
         id: webhookEventId,
         workspaceId: instagramAccount.workspaceId,
-        object: typeof (payload as { object?: unknown }).object === "string"
-          ? (payload as { object: string }).object
-          : undefined,
+        object: typeof parsed.object === "string" ? parsed.object : undefined,
         payload: payload as object,
         status: "PENDING",
       },
-      update: {},
+      update: {
+        status: "PENDING",
+        errorMessage: null,
+      },
     });
 
     const queue = getDMQueue();
@@ -95,55 +108,67 @@ export async function POST(request: NextRequest) {
     const postbackEvents = parsePostbackEvents(payload as Parameters<typeof parsePostbackEvents>[0]);
     let queued = 0;
 
-    for (const event of commentEvents) {
-      await queue.add(
-        "process-comment",
-        {
-          instagramAccountId: instagramAccount.id,
-          commentId: event.commentId,
-          commentText: event.commentText,
-          commenterId: event.commenterId,
-          commenterName: event.commenterName,
-          mediaId: event.mediaId,
-          originalMediaId: event.originalMediaId,
-          source: "webhook",
-        },
-        { jobId: `comment_${instagramAccount.id}_${event.commentId}` },
-      );
-      queued += 1;
-    }
+    try {
+      for (const event of commentEvents) {
+        await queue.add(
+          "process-comment",
+          {
+            instagramAccountId: instagramAccount.id,
+            commentId: event.commentId,
+            commentText: event.commentText,
+            commenterId: event.commenterId,
+            commenterName: event.commenterName,
+            mediaId: event.mediaId,
+            originalMediaId: event.originalMediaId,
+            source: "webhook",
+          },
+          { jobId: `comment_${instagramAccount.id}_${event.commentId}` },
+        );
+        queued += 1;
+      }
 
-    for (const event of messageEvents) {
-      await queue.add(
-        "process-message",
-        {
-          instagramAccountId: instagramAccount.id,
-          messageId: event.messageId,
-          messageText: event.messageText,
-          senderId: event.senderId,
-        },
-        { jobId: `message_${instagramAccount.id}_${event.messageId}` },
-      );
-      queued += 1;
-    }
+      for (const event of messageEvents) {
+        await queue.add(
+          "process-message",
+          {
+            instagramAccountId: instagramAccount.id,
+            messageId: event.messageId,
+            messageText: event.messageText,
+            senderId: event.senderId,
+          },
+          { jobId: `message_${instagramAccount.id}_${event.messageId}` },
+        );
+        queued += 1;
+      }
 
-    for (const event of postbackEvents) {
-      await queue.add(
-        "process-postback",
-        {
-          instagramAccountId: instagramAccount.id,
-          userId: event.userId,
-          payload: event.payload,
-          mid: event.mid,
+      for (const event of postbackEvents) {
+        await queue.add(
+          "process-postback",
+          {
+            instagramAccountId: instagramAccount.id,
+            userId: event.userId,
+            payload: event.payload,
+            mid: event.mid,
+          },
+          {
+            jobId: `postback_${instagramAccount.id}_${deterministicId(
+              "event",
+              event.mid || event.payload,
+            )}`,
+          },
+        );
+        queued += 1;
+      }
+    } catch (queueError) {
+      await prisma.webhookEvent.update({
+        where: { id: webhookEventId },
+        data: {
+          status: "FAILED",
+          errorMessage:
+            queueError instanceof Error ? queueError.message.slice(0, 1000) : "Queue enqueue failed",
         },
-        {
-          jobId: `postback_${instagramAccount.id}_${deterministicId(
-            "event",
-            event.mid || event.payload,
-          )}`,
-        },
-      );
-      queued += 1;
+      });
+      throw queueError;
     }
 
     await prisma.webhookEvent.update({
@@ -151,6 +176,7 @@ export async function POST(request: NextRequest) {
       data: {
         status: "PROCESSED",
         processedAt: new Date(),
+        errorMessage: null,
       },
     });
 
