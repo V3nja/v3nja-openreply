@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
       10
     );
     const limit = Number.isFinite(rawLimit) ? rawLimit : 50;
-    const fans = await listFans(workspaceId, limit);
+    const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
+    const fans = await listFans(workspaceId, limit, search);
 
     return NextResponse.json(
       {
