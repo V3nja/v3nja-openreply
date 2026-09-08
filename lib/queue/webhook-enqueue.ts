@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/db/client";
 import { getDMQueue } from "@/lib/queue/client";
+import { recordFanInteraction } from "@/lib/fans/engine";
 import {
   parseCommentEvents,
   parseMessageEvents,
@@ -10,10 +11,9 @@ import {
 /**
  * Persist a verified Meta webhook and enqueue its actionable events.
  *
- * The webhook route remains responsible for signature verification and the
- * legacy direct-delivery path remains available behind WEBHOOK_QUEUE_ENABLED.
- * Once enabled, this module becomes the hand-off point and the worker is the
- * only component that sends Instagram messages.
+ * The webhook route remains responsible for signature verification.
+ * This module persists the event, records fan interactions, and hands all
+ * actionable delivery work to BullMQ so the worker remains the only sender.
  */
 export async function enqueueVerifiedWebhook(
   rawBody: string,
@@ -30,12 +30,12 @@ export async function enqueueVerifiedWebhook(
     return { eventId, queued: 0, duplicate: true };
   }
 
+  const commentEvents = parseCommentEvents(payload);
+  const messageEvents = parseMessageEvents(payload);
+  const postbackEvents = parsePostbackEvents(payload);
   const accountIds = new Set<string>();
-  for (const event of [
-    ...parseCommentEvents(payload),
-    ...parseMessageEvents(payload),
-    ...parsePostbackEvents(payload),
-  ]) {
+
+  for (const event of [...commentEvents, ...messageEvents, ...postbackEvents]) {
     accountIds.add(event.instagramAccountId);
   }
 
@@ -65,9 +65,16 @@ export async function enqueueVerifiedWebhook(
   let queued = 0;
 
   try {
-    for (const event of parseCommentEvents(payload)) {
+    for (const event of commentEvents) {
       const account = accountMap.get(event.instagramAccountId);
       if (!account) continue;
+
+      await recordFanInteraction({
+        workspaceId: account.workspaceId,
+        instagramAccountId: account.id,
+        instagramUserId: event.commenterId,
+        username: event.commenterName,
+      });
 
       await queue.add(
         "process-comment",
@@ -88,9 +95,15 @@ export async function enqueueVerifiedWebhook(
       queued += 1;
     }
 
-    for (const event of parseMessageEvents(payload)) {
+    for (const event of messageEvents) {
       const account = accountMap.get(event.instagramAccountId);
       if (!account) continue;
+
+      await recordFanInteraction({
+        workspaceId: account.workspaceId,
+        instagramAccountId: account.id,
+        instagramUserId: event.senderId,
+      });
 
       await queue.add(
         "process-message",
@@ -107,9 +120,15 @@ export async function enqueueVerifiedWebhook(
       queued += 1;
     }
 
-    for (const event of parsePostbackEvents(payload)) {
+    for (const event of postbackEvents) {
       const account = accountMap.get(event.instagramAccountId);
       if (!account) continue;
+
+      await recordFanInteraction({
+        workspaceId: account.workspaceId,
+        instagramAccountId: account.id,
+        instagramUserId: event.userId,
+      });
 
       await queue.add(
         "process-postback",
