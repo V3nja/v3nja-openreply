@@ -28,7 +28,7 @@ import {
   sendPrivateReplyWithLinkButton,
 } from "@/lib/meta/client";
 import { decryptToken } from "@/lib/meta/oauth";
-import { matchKeywords } from "@/lib/utils/keyword-matcher";
+import { evaluateAutomationRule } from "@/lib/automation/rules";
 import { reserveDMSlot } from "@/lib/utils/rate-limiter";
 import {
   releaseWorkspaceDMReservation,
@@ -218,7 +218,6 @@ async function processManualMessage(job: Job<ProcessManualMessageJob>): Promise<
   }
 }
 
-// NOTE: existing automated comment/postback/message processing continues below.
 async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
   const {
     instagramAccountId,
@@ -245,7 +244,11 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
       instagramAccount: true,
       workspace: true,
       trackedLinks: {
-        select: { slug: true, label: true, destinationUrl: true },
+        select: {
+          slug: true,
+          label: true,
+          destinationUrl: true,
+        },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -253,10 +256,23 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
   });
 
   for (const automation of automations) {
-    const matchResult = automation.matchAnyWord
-      ? { matched: true, matchedKeyword: null }
-      : matchKeywords(commentText, automation.keywords, automation.wholeWordMatch);
-    if (!matchResult.matched) continue;
+    const decision = evaluateAutomationRule(
+      {
+        postId: automation.postId,
+        matchAnyPost: automation.matchAnyPost,
+        pendingNextReel: automation.pendingNextReel,
+        keywords: automation.keywords,
+        matchAnyWord: automation.matchAnyWord,
+        wholeWordMatch: automation.wholeWordMatch,
+      },
+      {
+        text: commentText,
+        mediaId,
+        originalMediaId,
+      }
+    );
+    if (!decision.matched) continue;
+    const matchResult = decision;
     const existingLog = await prisma.dmLog.findUnique({
       where: { automationId_commentId: { automationId: automation.id, commentId } },
     });
@@ -268,7 +284,11 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
 
     if (!automation.instagramAccount.accessToken) continue;
     let accessToken: string;
-    try { accessToken = decryptToken(automation.instagramAccount.accessToken); } catch { continue; }
+    try {
+      accessToken = decryptToken(automation.instagramAccount.accessToken);
+    } catch {
+      continue;
+    }
 
     if (!existingLog) {
       await prisma.dmLog.create({
@@ -314,16 +334,24 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     }
 
     let rateLimit;
-    try { rateLimit = await reserveDMSlot(instagramAccountId, requeueAttempt); }
-    catch (error) {
+    try {
+      rateLimit = await reserveDMSlot(instagramAccountId, requeueAttempt);
+    } catch (error) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
       await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "FAILED", attempts: job.attemptsMade + 1, errorMessage: formatError(error) } });
       throw error;
     }
     if (!rateLimit.allowed) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-      if (rateLimit.shouldSkip) { await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "SKIPPED_RATE_LIMIT", errorMessage: "Hourly Instagram DM rate limit reached" } }); continue; }
-      if (rateLimit.shouldRequeue) { await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "PENDING", errorMessage: "Hourly rate limit hit; retry scheduled" } }); await getDMQueue().add("process-comment", { ...job.data, requeueAttempt: requeueAttempt + 1 }, { delay: rateLimit.requeueDelayMs, jobId: `comment_${instagramAccountId}_${commentId}_retry_${requeueAttempt + 1}` }); continue; }
+      if (rateLimit.shouldSkip) {
+        await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "SKIPPED_RATE_LIMIT", errorMessage: "Hourly Instagram DM rate limit reached" } });
+        continue;
+      }
+      if (rateLimit.shouldRequeue) {
+        await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "PENDING", errorMessage: "Hourly rate limit hit; retry scheduled" } });
+        await getDMQueue().add("process-comment", { ...job.data, requeueAttempt: requeueAttempt + 1 }, { delay: rateLimit.requeueDelayMs, jobId: `comment_${instagramAccountId}_${commentId}_retry_${requeueAttempt + 1}` });
+        continue;
+      }
     }
 
     const useOpeningDm = automation.openingDmEnabled && Boolean(automation.openingDmMessage) && Boolean(automation.openingDmButtonLabel);
@@ -343,8 +371,9 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
       } else if (automation.trackedLinks.length > 0) {
         const bodyText = renderMessageWithoutLink({ message: automation.dmMessage, commenterName }) || "Here's your link:";
         const buttons = buildLinkButtons(automation.trackedLinks, automation.linkButtonLabel);
-        try { await sendPrivateReplyWithLinkButton(accessToken, automation.instagramAccount.instagramId, commentId, bodyText, buttons); }
-        catch (buttonError) {
+        try {
+          await sendPrivateReplyWithLinkButton(accessToken, automation.instagramAccount.instagramId, commentId, bodyText, buttons);
+        } catch (buttonError) {
           if (!isTemplateRejection(buttonError)) throw buttonError;
           await sendPrivateReply(accessToken, automation.instagramAccount.instagramId, commentId, buildInlineLinkFallback(automation.dmMessage, commenterName, automation.trackedLinks, bodyText));
         }
@@ -403,8 +432,19 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
   const automations = await prisma.automation.findMany({ where: { dmTriggerEnabled: true, isActive: true, instagramAccount: { instagramId: instagramAccountId } }, include: { instagramAccount: true, workspace: true, trackedLinks: { select: { slug: true, label: true, destinationUrl: true }, orderBy: { createdAt: "asc" } } }, orderBy: { createdAt: "asc" } });
   const dedupeId = `dm:${messageId}`;
   for (const automation of automations) {
-    const matchResult = automation.matchAnyWord ? { matched: true, matchedKeyword: null } : matchKeywords(messageText, automation.keywords, automation.wholeWordMatch);
-    if (!matchResult.matched) continue;
+    const decision = evaluateAutomationRule(
+      {
+        postId: null,
+        matchAnyPost: true,
+        pendingNextReel: false,
+        keywords: automation.keywords,
+        matchAnyWord: automation.matchAnyWord,
+        wholeWordMatch: automation.wholeWordMatch,
+      },
+      { text: messageText }
+    );
+    if (!decision.matched) continue;
+    const matchResult = decision;
     const existingLog = await prisma.dmLog.findUnique({ where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } } });
     if (existingLog?.status === "SENT" || existingLog?.status === "SKIPPED_PLAN_LIMIT") continue;
     if (!automation.instagramAccount.accessToken) continue;
