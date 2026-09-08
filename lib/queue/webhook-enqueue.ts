@@ -26,8 +26,15 @@ export async function enqueueVerifiedWebhook(
     select: { id: true, status: true },
   });
 
-  if (existing) {
+  if (existing?.status === "PROCESSED" || existing?.status === "PENDING") {
     return { eventId, queued: 0, duplicate: true };
+  }
+
+  if (existing?.status === "FAILED") {
+    await prisma.webhookEvent.update({
+      where: { id: eventId },
+      data: { status: "PENDING", errorMessage: null, processedAt: null },
+    });
   }
 
   const commentEvents = parseCommentEvents(payload);
@@ -51,15 +58,17 @@ export async function enqueueVerifiedWebhook(
   const workspaceIds = new Set(accounts.map((account) => account.workspaceId));
   const workspaceId = workspaceIds.size === 1 ? [...workspaceIds][0] : null;
 
-  await prisma.webhookEvent.create({
-    data: {
-      id: eventId,
-      workspaceId,
-      object: payload.object,
-      payload,
-      status: "PENDING",
-    },
-  });
+  if (!existing) {
+    await prisma.webhookEvent.create({
+      data: {
+        id: eventId,
+        workspaceId,
+        object: payload.object,
+        payload,
+        status: "PENDING",
+      },
+    });
+  }
 
   const queue = getDMQueue();
   let queued = 0;
