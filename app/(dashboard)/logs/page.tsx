@@ -1,197 +1,171 @@
 "use client";
 
-/**
- * DM Logs — Luxury Glass Activity Stream
- */
-
-import { useEffect, useState, useCallback } from "react";
-import StatusBadge from "@/components/status-badge";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-
-interface DmLog {
-  id: string;
-  commenterId: string;
-  commenterName: string | null;
-  commentText: string;
-  status: string;
-  matchedKeyword?: string | null;
-  errorMessage: string | null;
-  createdAt: string;
-  automation: { name: string; keywords: string[] };
-  instagramAccount: { username: string };
-}
-
-interface Pagination {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
-
-const STATUS_FILTERS = [
-  "ALL",
-  "SENT",
-  "FAILED",
-  "PENDING",
-  "SKIPPED_DEDUP",
-  "SKIPPED_RATE_LIMIT",
-];
+import StatusBadge from "@/components/status-badge";
+import type { LiveDmLog } from "@/lib/db/live-store";
 
 export default function LogsPage() {
-  const [logs, setLogs] = useState<DmLog[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [logs, setLogs] = useState<LiveDmLog[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(0);
+  const limit = 25;
 
   const fetchLogs = useCallback(async () => {
+    setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page), limit: "20" });
-      if (statusFilter !== "ALL") params.set("status", statusFilter);
-
+      const params = new URLSearchParams({
+        status: statusFilter,
+        limit: String(limit),
+        offset: String(page * limit),
+      });
       const res = await fetch(`/api/logs?${params}`);
       const data = await res.json();
       if (data.success) {
-        setLogs(data.data.logs);
-        setPagination(data.data.pagination);
+        setLogs(data.data.logs || []);
+        setTotal(data.data.total || 0);
       }
     } catch (err) {
       console.error("Failed to fetch logs:", err);
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [statusFilter, page]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void fetchLogs();
-    }, 0);
-    return () => window.clearTimeout(timer);
+    void fetchLogs();
+    const interval = setInterval(fetchLogs, 8000);
+    return () => clearInterval(interval);
   }, [fetchLogs]);
 
-  function handleFilterChange(status: string) {
-    setLoading(true);
-    setStatusFilter(status);
-    setPage(1);
-  }
+  const filterTabs = [
+    { label: "All Activity", value: "ALL" },
+    { label: "SENT", value: "SENT" },
+    { label: "FAILED", value: "FAILED" },
+    { label: "PENDING", value: "PENDING" },
+    { label: "Skipped: DEDUP", value: "SKIPPED_DEDUP" },
+    { label: "Skipped: RATE_LIMIT", value: "SKIPPED_RATE_LIMIT" },
+  ];
 
   return (
-    <div className="space-y-6 max-w-7xl">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2">
+          <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
             Real-Time DM Logs &amp; Activity
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Live telemetry of all comment triggers, anti-spam replies, and direct messages sent on{" "}
-            <span className="text-orange-400 font-bold">@v3nja2.0</span>
+          <p className="text-xs sm:text-sm text-zinc-400">
+            Live telemetry of verified comment triggers, anti-spam replies, and direct messages sent on{" "}
+            <span className="text-amber-400 font-bold">@v3nja2.0</span>
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
-            onClick={() => {
-              setLoading(true);
-              void fetchLogs();
-            }}
-            className="px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 text-xs font-semibold text-zinc-300 hover:text-white transition-all flex items-center gap-1.5"
+            onClick={() => void fetchLogs()}
+            className="px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-zinc-300 hover:text-white font-semibold text-xs flex items-center gap-1.5 transition-all"
           >
-            <span>🔄 Refresh</span>
+            <span>🔄</span>
+            <span>Refresh</span>
           </button>
           <Link
             href="/tester"
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-xs shadow-md shadow-orange-500/20 hover:opacity-95 transition-all"
+            className="v3nja-gold-button px-4 py-2 text-xs uppercase tracking-wider flex items-center gap-1.5"
           >
-            🧪 Test Triggers
+            <span>🧪</span>
+            <span>Test Triggers</span>
           </Link>
         </div>
       </div>
 
-      {/* Filter Chips */}
+      {/* Filter Tabs */}
       <div className="flex flex-wrap gap-2">
-        {STATUS_FILTERS.map((status) => (
-          <button
-            key={status}
-            onClick={() => handleFilterChange(status)}
-            className={`
-              px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all
-              ${
-                statusFilter === status
-                  ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/20 scale-105"
-                  : "bg-white/[0.03] text-zinc-400 border border-white/10 hover:border-white/20 hover:text-white"
-              }
-            `}
-          >
-            {status === "ALL" ? "All Activity" : status.replace("SKIPPED_", "Skipped: ")}
-          </button>
-        ))}
+        {filterTabs.map((tab) => {
+          const isSelected = statusFilter === tab.value;
+          return (
+            <button
+              key={tab.value}
+              onClick={() => {
+                setStatusFilter(tab.value);
+                setPage(0);
+              }}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-xl border transition-all ${
+                isSelected
+                  ? "bg-gradient-to-r from-amber-500 to-yellow-500 text-black border-amber-400 shadow-md shadow-amber-500/20"
+                  : "bg-white/[0.03] border-white/10 text-zinc-400 hover:text-white hover:border-white/20"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Luxury Glass Table */}
-      <div className="glass-card rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+      {/* Logs Table with Liquid Glass Styling */}
+      <div className="glass-card rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead>
-              <tr className="border-b border-white/[0.08] bg-white/[0.02] text-left">
-                <th className="px-5 py-3.5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Commenter</th>
-                <th className="px-5 py-3.5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Comment / Trigger</th>
-                <th className="px-5 py-3.5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Matched Campaign</th>
-                <th className="px-5 py-3.5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Target IG</th>
-                <th className="px-5 py-3.5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Status</th>
-                <th className="px-5 py-3.5 text-xs font-bold text-zinc-400 uppercase tracking-wider">Time</th>
+          <table className="w-full text-left text-xs">
+            <thead className="border-b border-white/[0.08] bg-white/[0.02] text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+              <tr>
+                <th className="py-3.5 px-4">Commenter</th>
+                <th className="py-3.5 px-4">Comment / Trigger</th>
+                <th className="py-3.5 px-4">Matched Campaign</th>
+                <th className="py-3.5 px-4">Target IG</th>
+                <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4 text-right">Time</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.06]">
-              {loading && (
-                <>
-                  {[...Array(4)].map((_, i) => (
-                    <tr key={i} className="animate-pulse">
-                      <td colSpan={6} className="px-5 py-4">
-                        <div className="h-4 bg-white/[0.05] rounded-lg" />
-                      </td>
-                    </tr>
-                  ))}
-                </>
-              )}
-              {!loading && logs.length === 0 && (
+            <tbody className="divide-y divide-white/[0.05]">
+              {loading && logs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-zinc-500">
-                    No activity logs found for this filter.
+                  <td colSpan={6} className="py-12 text-center text-zinc-500">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                      <span>Loading real-time DM records...</span>
+                    </div>
                   </td>
                 </tr>
-              )}
-              {!loading &&
+              ) : logs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-zinc-500">
+                    No DM events recorded for this filter.
+                  </td>
+                </tr>
+              ) : (
                 logs.map((log) => (
                   <tr key={log.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-5 py-4">
+                    <td className="py-3 px-4 font-bold text-white">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500/30 to-orange-500/30 border border-orange-500/30 flex items-center justify-center text-xs font-bold text-orange-300">
+                        <span className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-500 text-black font-black text-[10px] flex items-center justify-center">
                           @
-                        </div>
-                        <span className="font-bold text-white">
-                          @{log.commenterName ?? "fan"}
                         </span>
+                        <span className="text-white">@{log.commenterName || "fan"}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-4 max-w-[220px]">
-                      <span className="text-zinc-200 block truncate font-medium">
-                        &ldquo;{log.commentText}&rdquo;
+                    <td className="py-3 px-4 max-w-xs truncate text-zinc-300">
+                      &ldquo;{log.commentText}&rdquo;
+                      {log.publicReplyText && (
+                        <span className="block text-[10px] text-amber-400/80 truncate">
+                          ↳ Replied: {log.publicReplyText}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="px-2 py-0.5 rounded-md bg-white/[0.05] border border-white/10 text-[10px] font-bold text-amber-300">
+                        {log.automation?.name || "Official Drop"}
                       </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-orange-300">
-                        {log.automation.name}
-                      </span>
+                    <td className="py-3 px-4 font-mono text-zinc-400">
+                      @{log.instagramAccount?.username || "v3nja2.0"}
                     </td>
-                    <td className="px-5 py-4">
-                      <span className="text-xs text-zinc-400 font-mono">@{log.instagramAccount.username}</span>
-                    </td>
-                    <td className="px-5 py-4">
+                    <td className="py-3 px-4">
                       <StatusBadge status={log.status} />
                     </td>
-                    <td className="px-5 py-4 text-xs text-zinc-400 whitespace-nowrap font-mono">
-                      {new Date(log.createdAt).toLocaleString("en-US", {
+                    <td className="py-3 px-4 text-right text-zinc-500 font-mono text-[11px]">
+                      {new Date(log.createdAt).toLocaleDateString(undefined, {
                         month: "short",
                         day: "numeric",
                         hour: "2-digit",
@@ -199,40 +173,30 @@ export default function LogsPage() {
                       })}
                     </td>
                   </tr>
-                ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination */}
-        {pagination && pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-4 border-t border-white/[0.08] bg-white/[0.01]">
-            <p className="text-xs text-zinc-400">
-              Showing {(pagination.page - 1) * pagination.limit + 1}–
-              {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
-              {pagination.total} events
-            </p>
+        {/* Pagination footer */}
+        {total > limit && (
+          <div className="p-4 border-t border-white/[0.06] flex items-center justify-between text-xs text-zinc-400">
+            <span>
+              Showing {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total} events
+            </span>
             <div className="flex items-center gap-2">
               <button
-                disabled={page <= 1}
-                onClick={() => {
-                  setLoading(true);
-                  setPage(page - 1);
-                }}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-300 bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] disabled:opacity-30 disabled:pointer-events-none transition-all"
+                disabled={page === 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/[0.02] disabled:opacity-40"
               >
                 Previous
               </button>
-              <span className="text-xs text-zinc-400 px-2 font-mono">
-                {page} / {pagination.totalPages}
-              </span>
               <button
-                disabled={page >= pagination.totalPages}
-                onClick={() => {
-                  setLoading(true);
-                  setPage(page + 1);
-                }}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-300 bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] disabled:opacity-30 disabled:pointer-events-none transition-all"
+                disabled={(page + 1) * limit >= total}
+                onClick={() => setPage((p) => p + 1)}
+                className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/[0.02] disabled:opacity-40"
               >
                 Next
               </button>
