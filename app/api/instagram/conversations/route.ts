@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       contact: { id: "user_265", username: "music_fan_265" },
       updatedTime: new Date().toISOString(),
       lastMessage: {
-        text: "Yo! 🔥 Here is the NJALA smart link you asked for: https://v3njamusic.web.app/njala",
+        text: "Yo! 🔥 Here is the NJALA smart link you asked for: https://v3nja-official.web.app/njala",
         fromMe: true,
         createdTime: new Date().toISOString(),
       },
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       contact: { id: "user_mw", username: "vibes_mw" },
       updatedTime: new Date(Date.now() - 3600000).toISOString(),
       lastMessage: {
-        text: "Here is the official smart link for WAYULOMI: https://v3njamusic.web.app/wayulomi 🚀",
+        text: "Here is the official smart link for WAYULOMI: https://v3nja-official.web.app/wayulomi 🚀",
         fromMe: true,
         createdTime: new Date(Date.now() - 3600000).toISOString(),
       },
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       contact: { id: "user_dj", username: "alex_dj_mw" },
       updatedTime: new Date(Date.now() - 7200000).toISOString(),
       lastMessage: {
-        text: "ZANGA is out now! Stream via official link: https://v3njamusic.web.app/zanga ⚡",
+        text: "ZANGA is out now! Stream via official link: https://v3nja-official.web.app/zanga ⚡",
         fromMe: true,
         createdTime: new Date(Date.now() - 7200000).toISOString(),
       },

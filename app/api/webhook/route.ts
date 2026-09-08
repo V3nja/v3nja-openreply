@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
         console.log(`[Webhook] Matched campaign "${matchedAutomation.name}" for comment "${commentText}"`);
 
         // Format rich V3NJA WRLD artist DM
-        const primaryLink = matchedAutomation.trackedLinks?.[0]?.destinationUrl || "https://v3njamusic.web.app";
+        const primaryLink = matchedAutomation.trackedLinks?.[0]?.destinationUrl || "https://v3nja-official.web.app";
         const brandedDmText = formatBrandedArtistDM({
           rawMessage: matchedAutomation.dmMessage,
           commenterName: commenterName || "fam",
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (matchedAutomation) {
-        const primaryLink = matchedAutomation.trackedLinks?.[0]?.destinationUrl || "https://v3njamusic.web.app";
+        const primaryLink = matchedAutomation.trackedLinks?.[0]?.destinationUrl || "https://v3nja-official.web.app";
         const brandedDmText = formatBrandedArtistDM({
           rawMessage: matchedAutomation.dmMessage,
           commenterName: "fam",

@@ -392,7 +392,7 @@ export default function TesterPage() {
                       </div>
 
                       <a
-                        href="https://v3njamusic.web.app/wayulomi"
+                        href="https://v3nja-official.web.app/wayulomi"
                         target="_blank"
                         rel="noreferrer"
                         className="block text-center w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-orange-500 via-amber-500 to-rose-500 font-bold text-xs text-white hover:opacity-95 shadow-lg shadow-orange-500/25 active:scale-95 transition-all"

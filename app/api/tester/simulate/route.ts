@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     // Follow-gating logic
     const requiresFollowGate = matchedAutomation.requireFollow && !isFollowing;
 
-    const primaryLink = matchedAutomation.trackedLinks?.[0]?.destinationUrl || "https://v3njamusic.web.app";
+    const primaryLink = matchedAutomation.trackedLinks?.[0]?.destinationUrl || "https://v3nja-official.web.app";
     const brandedDmMessage = formatBrandedArtistDM({
       rawMessage: matchedAutomation.dmMessage,
       commenterName,

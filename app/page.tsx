@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "V3NJA WRLD - Instagram DM Automation Hub",
   description:
-    "Official Instagram Comment-to-DM automation engine for @v3nja2.0 and v3njamusic.web.app smart links.",
+    "Official Instagram Comment-to-DM automation engine for @v3nja2.0 and v3nja-official.web.app smart links.",
 };
 
 export default function Home() {
@@ -12,42 +12,42 @@ export default function Home() {
     {
       keyword: "NJALA",
       title: "NJALA Streaming Campaign",
-      link: "https://v3njamusic.web.app/njala",
+      link: "https://v3nja-official.web.app/njala",
       badge: "Lead Single",
       color: "from-amber-500 to-orange-500",
     },
     {
       keyword: "WAYULOMI",
       title: "WAYULOMI Visuals & Audio",
-      link: "https://v3njamusic.web.app/wayulomi",
+      link: "https://v3nja-official.web.app/wayulomi",
       badge: "Music Video",
       color: "from-orange-500 to-red-500",
     },
     {
       keyword: "ZANGA",
       title: "ZANGA Viral Reel Drop",
-      link: "https://v3njamusic.web.app/zanga",
+      link: "https://v3nja-official.web.app/zanga",
       badge: "Viral Drop",
       color: "from-red-500 to-pink-500",
     },
     {
       keyword: "MOTO",
       title: "MOTO Single Release",
-      link: "https://v3njamusic.web.app/moto",
+      link: "https://v3nja-official.web.app/moto",
       badge: "Single",
       color: "from-amber-600 to-red-600",
     },
     {
       keyword: "MERCH",
       title: "Exclusive Merch & Tees",
-      link: "https://v3njamusic.web.app/merch",
+      link: "https://v3nja-official.web.app/merch",
       badge: "Store / 10% Off",
       color: "from-purple-500 to-indigo-500",
     },
     {
       keyword: "VIP / WRLD",
       title: "V3NJA WRLD Fan Club",
-      link: "https://v3njamusic.web.app",
+      link: "https://v3nja-official.web.app",
       badge: "Inner Circle",
       color: "from-emerald-500 to-teal-500",
     },
@@ -106,7 +106,7 @@ export default function Home() {
             </h1>
 
             <p className="mt-4 text-base text-zinc-300 sm:text-lg leading-relaxed max-w-2xl">
-              When fans comment <strong className="text-orange-400">NJALA</strong>, <strong className="text-orange-400">WAYULOMI</strong>, or <strong className="text-orange-400">MERCH</strong> on your Instagram reels, they instantly receive your official smart link from <strong className="text-white">v3njamusic.web.app</strong> directly in their DMs.
+              When fans comment <strong className="text-orange-400">NJALA</strong>, <strong className="text-orange-400">WAYULOMI</strong>, or <strong className="text-orange-400">MERCH</strong> on your Instagram reels, they instantly receive your official smart link from <strong className="text-white">v3nja-official.web.app</strong> directly in their DMs.
             </p>
 
             {/* Main Action CTAs */}
