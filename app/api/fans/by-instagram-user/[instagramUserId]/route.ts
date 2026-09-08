@@ -9,39 +9,40 @@ export async function GET(
   { params }: { params: Promise<{ instagramUserId: string }> }
 ) {
   const context = await getCurrentWorkspaceContext();
-  if (!context) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  if (!context) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
 
   try {
     const { instagramUserId } = await params;
     const accountId = request.nextUrl.searchParams.get("instagramAccountId");
-
     if (!instagramUserId.trim()) {
       return NextResponse.json({ success: false, error: "Instagram user ID is required" }, { status: 400 });
     }
 
-    const fan = await prisma.$queryRaw<{
-      id: string;
-      instagramUserId: string;
-      username: string | null;
-      firstName: string | null;
-      tags: string[];
-      interactionCount: number;
-      lastInteractionAt: Date;
-    }[]>`
-      SELECT "id", "instagramUserId", "username", "firstName", "tags", "interactionCount", "lastInteractionAt"
-      FROM "Fan"
-      WHERE "workspaceId" = ${context.workspaceId}
-        AND "instagramUserId" = ${instagramUserId}
-        ${accountId ? prisma.$queryRaw`AND "instagramAccountId" = ${accountId}` : prisma.$queryRaw``}
-      ORDER BY "lastInteractionAt" DESC
-      LIMIT 1;
-    `;
+    const fan = accountId
+      ? await prisma.$queryRaw<{
+          id: string; instagramUserId: string; username: string | null; firstName: string | null;
+          tags: string[]; interactionCount: number; lastInteractionAt: Date;
+        }[]>`
+          SELECT "id", "instagramUserId", "username", "firstName", "tags", "interactionCount", "lastInteractionAt"
+          FROM "Fan"
+          WHERE "workspaceId" = ${context.workspaceId}
+            AND "instagramAccountId" = ${accountId}
+            AND "instagramUserId" = ${instagramUserId}
+          LIMIT 1;
+        `
+      : await prisma.$queryRaw<{
+          id: string; instagramUserId: string; username: string | null; firstName: string | null;
+          tags: string[]; interactionCount: number; lastInteractionAt: Date;
+        }[]>`
+          SELECT "id", "instagramUserId", "username", "firstName", "tags", "interactionCount", "lastInteractionAt"
+          FROM "Fan"
+          WHERE "workspaceId" = ${context.workspaceId}
+            AND "instagramUserId" = ${instagramUserId}
+          ORDER BY "lastInteractionAt" DESC
+          LIMIT 1;
+        `;
 
-    if (!fan[0]) {
-      return NextResponse.json({ success: true, data: null }, { headers: { "Cache-Control": "no-store" } });
-    }
+    if (!fan[0]) return NextResponse.json({ success: true, data: null }, { headers: { "Cache-Control": "no-store" } });
 
     const profile = fan[0];
     const interactions = await prisma.dmLog.findMany({
@@ -49,12 +50,7 @@ export async function GET(
       orderBy: { createdAt: "desc" },
       take: 8,
       select: {
-        id: true,
-        commentId: true,
-        commentText: true,
-        matchedKeyword: true,
-        status: true,
-        createdAt: true,
+        id: true, commentId: true, commentText: true, matchedKeyword: true, status: true, createdAt: true,
         automation: { select: { id: true, name: true } },
       },
     });
@@ -77,10 +73,7 @@ export async function GET(
       {
         success: true,
         data: {
-          fan: {
-            ...profile,
-            lastInteractionAt: profile.lastInteractionAt.toISOString(),
-          },
+          fan: { ...profile, lastInteractionAt: profile.lastInteractionAt.toISOString() },
           interactions: interactions.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() })),
           campaigns: campaigns.map((campaign) => ({ ...campaign, interactions: counts.get(campaign.id) ?? 0 })).sort((a, b) => b.interactions - a.interactions),
         },
