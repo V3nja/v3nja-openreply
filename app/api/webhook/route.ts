@@ -1,253 +1,164 @@
+import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db/client";
+import { getDMQueue } from "@/lib/queue/client";
 import {
   parseCommentEvents,
   parseMessageEvents,
+  parsePostbackEvents,
   verifyWebhookSignature,
 } from "@/lib/meta/webhook";
-import { matchKeywords } from "@/lib/utils/keyword-matcher";
-import { generateAntiSpamPublicReply } from "@/lib/utils/anti-spam-reply";
-import { formatBrandedArtistDM } from "@/lib/utils/artist-dm";
-import { LiveDataStore } from "@/lib/db/live-store";
 
-const LIVE_TOKEN =
-  process.env.PAGE_ACCESS_TOKEN || process.env.INSTAGRAM_ACCESS_TOKEN;
+const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN;
+const QUEUE_ENABLED = process.env.WEBHOOK_QUEUE_ENABLED === "true";
 
-const PAGE_ID = process.env.INSTAGRAM_PAGE_ID || "100148156116636";
-const GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION || "v25.0";
+function jsonError(message: string, status = 500) {
+  return NextResponse.json({ ok: false, error: message }, { status });
+}
+
+function deterministicId(prefix: string, value: string) {
+  const hash = createHash("sha256").update(value).digest("hex").slice(0, 32);
+  return `${prefix}_${hash}`;
+}
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const mode = searchParams.get("hub.mode");
-  const token = searchParams.get("hub.verify_token");
-  const challenge = searchParams.get("hub.challenge");
+  const mode = request.nextUrl.searchParams.get("hub.mode");
+  const token = request.nextUrl.searchParams.get("hub.verify_token");
+  const challenge = request.nextUrl.searchParams.get("hub.challenge");
 
-  const expectedToken = process.env.WEBHOOK_VERIFY_TOKEN;
-
-  if (!expectedToken) {
-    console.error("[Webhook] WEBHOOK_VERIFY_TOKEN is not configured");
-    return NextResponse.json(
-      { success: false, error: "Webhook verification is not configured" },
-      { status: 500 }
-    );
+  if (mode === "subscribe" && VERIFY_TOKEN && token === VERIFY_TOKEN && challenge) {
+    return new Response(challenge, { status: 200 });
   }
 
-  if (mode === "subscribe" && token === expectedToken) {
-    console.log("[Webhook] Verified successfully by Meta!");
-    return new NextResponse(challenge, { status: 200 });
-  }
-
-  return NextResponse.json(
-    { success: false, error: "Verification failed" },
-    { status: 403 }
-  );
+  return new Response("Forbidden", { status: 403 });
 }
 
 export async function POST(request: NextRequest) {
-  const rawBody = await request.text();
-
   try {
-    if (!LIVE_TOKEN) {
-      console.error("[Webhook] Meta access token is not configured");
-      return NextResponse.json(
-        { success: false, error: "Webhook delivery is not configured" },
-        { status: 503 }
-      );
-    }
-
+    const rawBody = await request.text();
     const signature = request.headers.get("x-hub-signature-256");
-    let signatureValid = false;
+
+    if (!signature || !verifyWebhookSignature(rawBody, signature)) {
+      return jsonError("Invalid webhook signature", 403);
+    }
+
+    let payload: unknown;
     try {
-      signatureValid = verifyWebhookSignature(rawBody, signature);
-    } catch (error: any) {
-      console.error("[Webhook] Signature verification is not configured:", error?.message || "unknown error");
-      return NextResponse.json(
-        { success: false, error: "Webhook signature verification is not configured" },
-        { status: 503 }
-      );
+      payload = JSON.parse(rawBody);
+    } catch {
+      return jsonError("Invalid JSON payload", 400);
     }
 
-    if (!signatureValid) {
-      console.warn("[Webhook] Rejected request with invalid signature");
-      return NextResponse.json(
-        { success: false, error: "Invalid webhook signature" },
-        { status: 401 }
-      );
+    if (!payload || typeof payload !== "object") {
+      return jsonError("Invalid webhook payload", 400);
     }
 
-    const payload = JSON.parse(rawBody);
+    if (!QUEUE_ENABLED) {
+      console.error("[Webhook] Queue mode is disabled; refusing webhook delivery");
+      return jsonError("Webhook queue is not enabled", 503);
+    }
 
-    // Never log the raw Meta payload: it can contain user and message data.
+    const body = payload as { entry?: Array<{ id?: string }> };
+    const instagramUserId = body.entry?.[0]?.id;
+    if (!instagramUserId) {
+      return NextResponse.json({ ok: true, ignored: true });
+    }
+
+    const instagramAccount = await prisma.instagramAccount.findUnique({
+      where: { instagramUserId },
+      select: { id: true, workspaceId: true },
+    });
+
+    if (!instagramAccount) {
+      console.warn("[Webhook] Unregistered Instagram account", { instagramUserId });
+      return NextResponse.json({ ok: true, ignored: true });
+    }
+
+    const webhookEventId = deterministicId("webhook", rawBody);
+    await prisma.webhookEvent.upsert({
+      where: { id: webhookEventId },
+      create: {
+        id: webhookEventId,
+        workspaceId: instagramAccount.workspaceId,
+        payload: payload as object,
+        status: "RECEIVED",
+      },
+      update: {},
+    });
+
+    const queue = getDMQueue();
     const commentEvents = parseCommentEvents(payload);
     const messageEvents = parseMessageEvents(payload);
-    const activeCampaigns = LiveDataStore.getCampaigns().filter((c) => c.isActive);
+    const postbackEvents = parsePostbackEvents(payload);
+    let queued = 0;
 
-    // 1. Process Inbound Comments
     for (const event of commentEvents) {
-      const { commentId, commentText, commenterName, commenterId } = event;
-
-      let matchedAutomation: any = null;
-      let matchedKeyword: string | null = null;
-
-      for (const auto of activeCampaigns) {
-        const res = matchKeywords(commentText, auto.keywords, auto.wholeWordMatch);
-        if (res.matched) {
-          matchedAutomation = auto;
-          matchedKeyword = res.matchedKeyword;
-          break;
-        }
-      }
-
-      if (matchedAutomation) {
-        console.log(`[Webhook] Matched campaign "${matchedAutomation.name}"`);
-
-        const primaryLink = matchedAutomation.trackedLinks?.[0]?.destinationUrl || "https://v3nja-official.web.app";
-        const brandedDmText = formatBrandedArtistDM({
-          rawMessage: matchedAutomation.dmMessage,
-          commenterName: commenterName || "fam",
-          campaignTitle: matchedAutomation.name,
-          smartLinkUrl: primaryLink,
-          followGated: matchedAutomation.requireFollow,
-          followPrompt: matchedAutomation.followPromptMessage,
-        });
-
-        const dmUrl = `https://graph.facebook.com/${GRAPH_API_VERSION}/${PAGE_ID}/messages?access_token=${LIVE_TOKEN}`;
-        let dmSuccess = false;
-        let dmErrorMessage: string | null = null;
-
-        try {
-          const dmRes = await fetch(dmUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              recipient: { comment_id: commentId },
-              message: { text: brandedDmText },
-            }),
-          });
-          const dmJson = await dmRes.json();
-          console.log("[Webhook] Direct message delivery completed", {
-            success: Boolean(dmJson.recipient_id || dmJson.message_id),
-          });
-          if (dmJson.recipient_id || dmJson.message_id) {
-            dmSuccess = true;
-          } else if (dmJson.error) {
-            dmErrorMessage = dmJson.error.message;
-          }
-        } catch (e: any) {
-          console.warn("[Webhook] Direct message send error:", e?.message || "unknown error");
-          dmErrorMessage = e?.message || "unknown error";
-        }
-
-        let publicReplyText: string | null = null;
-        if (matchedAutomation.publicReplyEnabled) {
-          publicReplyText = generateAntiSpamPublicReply(
-            matchedAutomation.publicReplyMessages,
-            matchedAutomation.publicReplyMessage,
-            commenterName
-          );
-
-          const replyUrl = `https://graph.facebook.com/${GRAPH_API_VERSION}/${commentId}/replies?access_token=${LIVE_TOKEN}`;
-          try {
-            const replyRes = await fetch(replyUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                message: publicReplyText,
-              }),
-            });
-            const replyJson = await replyRes.json();
-            console.log("[Webhook] Public comment reply delivery completed", {
-              success: Boolean(replyJson.id || replyJson.message_id),
-            });
-          } catch (e: any) {
-            console.warn("[Webhook] Public reply error:", e?.message || "unknown error");
-          }
-        }
-
-        LiveDataStore.recordDmEvent({
-          commenterId: commenterId || `fan_${Date.now()}`,
-          commenterName: commenterName || "music_fan",
-          commentText,
-          commentId,
-          matchedKeyword: matchedKeyword || matchedAutomation.keywords[0] || "MUSIC",
-          automationId: matchedAutomation.id,
-          automationName: matchedAutomation.name,
-          automationKeywords: matchedAutomation.keywords,
-          status: dmSuccess ? "SENT" : "FAILED",
-          publicReplyText,
-          errorMessage: dmErrorMessage,
-        });
-      }
+      await queue.add(
+        "process-comment",
+        {
+          instagramAccountId: instagramAccount.id,
+          commentId: event.commentId,
+          commentText: event.commentText,
+          commenterId: event.commenterId,
+          commenterName: event.commenterName,
+          mediaId: event.mediaId,
+          originalMediaId: event.originalMediaId,
+          source: "webhook",
+        },
+        { jobId: `comment_${instagramAccount.id}_${event.commentId}` },
+      );
+      queued += 1;
     }
 
-    // 2. Process Inbound Direct Messages
     for (const event of messageEvents) {
-      const { messageText, senderId } = event;
-
-      let matchedAutomation: any = null;
-      let matchedKeyword: string | null = null;
-
-      for (const auto of activeCampaigns) {
-        if (!auto.dmTriggerEnabled) continue;
-        const res = matchKeywords(messageText, auto.keywords, auto.wholeWordMatch);
-        if (res.matched) {
-          matchedAutomation = auto;
-          matchedKeyword = res.matchedKeyword;
-          break;
-        }
-      }
-
-      if (matchedAutomation) {
-        const primaryLink = matchedAutomation.trackedLinks?.[0]?.destinationUrl || "https://v3nja-official.web.app";
-        const brandedDmText = formatBrandedArtistDM({
-          rawMessage: matchedAutomation.dmMessage,
-          commenterName: "fam",
-          campaignTitle: matchedAutomation.name,
-          smartLinkUrl: primaryLink,
-        });
-
-        const dmUrl = `https://graph.facebook.com/${GRAPH_API_VERSION}/${PAGE_ID}/messages?access_token=${LIVE_TOKEN}`;
-        try {
-          const dmRes = await fetch(dmUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              recipient: { id: senderId },
-              message: { text: brandedDmText },
-            }),
-          });
-          const dmJson = await dmRes.json();
-          console.log("[Webhook] Inbound DM reply delivery completed", {
-            success: Boolean(dmJson.message_id),
-          });
-
-          LiveDataStore.recordDmEvent({
-            commenterId: senderId,
-            commenterName: "instagram_user",
-            commentText: messageText,
-            commentId: `dm_${Date.now()}`,
-            matchedKeyword: matchedKeyword || "DM",
-            automationId: matchedAutomation.id,
-            automationName: matchedAutomation.name,
-            automationKeywords: matchedAutomation.keywords,
-            status: dmJson.message_id ? "SENT" : "FAILED",
-            publicReplyText: null,
-            errorMessage: dmJson.error?.message || null,
-          });
-        } catch (e: any) {
-          console.warn("[Webhook] Inbound DM reply error:", e?.message || "unknown error");
-        }
-      }
+      await queue.add(
+        "process-message",
+        {
+          instagramAccountId: instagramAccount.id,
+          messageId: event.messageId,
+          messageText: event.messageText,
+          senderId: event.senderId,
+        },
+        { jobId: `message_${instagramAccount.id}_${event.messageId}` },
+      );
+      queued += 1;
     }
 
-    return NextResponse.json({ success: true }, { status: 200 });
-  } catch (err: any) {
-    console.error("[Webhook Error]:", err?.message || "unknown error");
-    return NextResponse.json({ success: false, error: "Webhook processing failed" }, { status: 200 });
+    for (const event of postbackEvents) {
+      const key = event.mid || JSON.stringify(event.payload);
+      await queue.add(
+        "process-postback",
+        {
+          instagramAccountId: instagramAccount.id,
+          userId: event.userId,
+          payload: event.payload,
+          mid: event.mid,
+          fallbackMessage: event.fallbackMessage,
+        },
+        { jobId: `postback_${instagramAccount.id}_${deterministicId("event", key)}` },
+      );
+      queued += 1;
+    }
+
+    await prisma.webhookEvent.update({
+      where: { id: webhookEventId },
+      data: { status: "QUEUED" },
+    });
+
+    console.info("[Webhook] Accepted and queued", {
+      instagramUserId,
+      comments: commentEvents.length,
+      messages: messageEvents.length,
+      postbacks: postbackEvents.length,
+      queued,
+    });
+
+    return NextResponse.json({ ok: true, queued }, { status: 200 });
+  } catch (error) {
+    console.error("[Webhook] Processing failed", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return jsonError("Webhook processing failed", 500);
   }
 }
