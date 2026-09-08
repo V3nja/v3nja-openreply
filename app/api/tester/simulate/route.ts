@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { getCurrentWorkspaceContext } from "@/lib/workspace-access";
-import { matchKeywords } from "@/lib/utils/keyword-matcher";
+import { evaluateAutomationRule } from "@/lib/automation/rules";
 import { generateAntiSpamPublicReply } from "@/lib/utils/anti-spam-reply";
 import { formatBrandedArtistDM } from "@/lib/utils/artist-dm";
 
@@ -24,6 +24,8 @@ export async function POST(request: NextRequest) {
     const isFollowing = body.isFollowing !== undefined ? Boolean(body.isFollowing) : true;
     const triggerType = text(body.triggerType, "COMMENT");
     const requestedAccountId = text(body.instagramAccountId);
+    const mediaId = text(body.mediaId) || null;
+    const originalMediaId = text(body.originalMediaId) || null;
 
     if (!commentText) {
       return NextResponse.json(
@@ -67,15 +69,29 @@ export async function POST(request: NextRequest) {
 
     let matchedAutomation: (typeof automations)[number] | null = null;
     let matchedKeyword: string | null = null;
+    let ruleReason: string | null = null;
 
     for (const automation of automations) {
-      const matchRes = automation.matchAnyWord
-        ? { matched: true, matchedKeyword: null }
-        : matchKeywords(commentText, automation.keywords, automation.wholeWordMatch);
+      const decision = evaluateAutomationRule(
+        {
+          postId: automation.postId,
+          matchAnyPost: automation.matchAnyPost,
+          pendingNextReel: automation.pendingNextReel,
+          keywords: automation.keywords,
+          matchAnyWord: automation.matchAnyWord,
+          wholeWordMatch: automation.wholeWordMatch,
+        },
+        {
+          text: commentText,
+          mediaId,
+          originalMediaId,
+        }
+      );
 
-      if (matchRes.matched) {
+      if (decision.matched) {
         matchedAutomation = automation;
-        matchedKeyword = matchRes.matchedKeyword;
+        matchedKeyword = decision.matchedKeyword;
+        ruleReason = decision.reason;
         break;
       }
     }
@@ -87,10 +103,12 @@ export async function POST(request: NextRequest) {
         sent: false,
         persisted: false,
         matched: false,
-        message: "No active automation matched this keyword.",
+        message: "No active automation matched the current Smart Rules.",
         availableCampaigns: automations.map((automation) => ({
           id: automation.id,
           name: automation.name,
+          postId: automation.postId,
+          matchAnyPost: automation.matchAnyPost,
           keywords: automation.keywords,
           matchAnyWord: automation.matchAnyWord,
         })),
@@ -138,6 +156,7 @@ export async function POST(request: NextRequest) {
       triggerType,
       isFollowing,
       isFollowGatedPrompt: requiresFollowGate,
+      ruleReason,
       account: {
         id: account.id,
         instagramId: account.instagramId,
@@ -150,6 +169,8 @@ export async function POST(request: NextRequest) {
         matchedKeyword,
         keywords: matchedAutomation.keywords,
         matchAnyWord: matchedAutomation.matchAnyWord,
+        matchAnyPost: matchedAutomation.matchAnyPost,
+        postId: matchedAutomation.postId,
         requireFollow: matchedAutomation.requireFollow,
         followUpEnabled: matchedAutomation.followUpEnabled,
         followUpMessage: matchedAutomation.followUpMessage,
