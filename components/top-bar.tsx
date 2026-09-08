@@ -10,13 +10,16 @@ import { usePathname } from "next/navigation";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
-  "/campaigns": "Campaigns",
+  "/overview": "Overview & Growth",
+  "/tester": "Live Comment & Story Tester",
+  "/inbox": "Instagram Inbox",
+  "/campaigns": "Campaigns & Triggers",
   "/campaigns/new": "New Campaign",
   "/automations": "Campaigns",
   "/automations/new": "New Campaign",
-  "/logs": "DM Logs",
-  "/settings": "Settings",
-  "/diagnostics": "Diagnostics",
+  "/logs": "Live DM Activity Logs",
+  "/settings": "Settings & API Keys",
+  "/diagnostics": "System Diagnostics & Telemetry",
 };
 
 interface TopBarProps {
