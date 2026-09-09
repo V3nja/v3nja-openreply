@@ -30,6 +30,7 @@ vi.stubEnv("REDIS_URL", "redis://localhost:6379");
 import {
   checkRateLimit,
   incrementDMCounter,
+  releaseDMSlot,
   reserveDMSlot,
   RATE_LIMIT_MAX,
 } from "../lib/utils/rate-limiter";
@@ -121,6 +122,34 @@ describe("reserveDMSlot", () => {
     expect(result.allowed).toBe(false);
     expect(result.shouldRequeue).toBe(false);
     expect(result.shouldSkip).toBe(true);
+  });
+});
+
+describe("releaseDMSlot", () => {
+  it("should atomically decrement the account bucket", async () => {
+    mockEval.mockResolvedValue(4);
+
+    await releaseDMSlot("account_123");
+
+    expect(mockEval).toHaveBeenCalledWith(
+      expect.stringContaining('redis.call("DECR", KEYS[1])'),
+      1,
+      "rate:dm:account_123"
+    );
+    expect(mockGet).not.toHaveBeenCalled();
+    expect(mockDel).not.toHaveBeenCalled();
+  });
+
+  it("should delete the bucket when releasing the final reservation", async () => {
+    mockEval.mockResolvedValue(0);
+
+    await releaseDMSlot("account_123");
+
+    expect(mockEval).toHaveBeenCalledWith(
+      expect.stringContaining('redis.call("DEL", KEYS[1])'),
+      1,
+      "rate:dm:account_123"
+    );
   });
 });
 
