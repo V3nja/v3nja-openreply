@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockRedis, mockPrisma, mockSendPrivateReply, mockDecryptToken, mockReserveWorkspaceDMSend, mockReleaseWorkspaceDMReservation } = vi.hoisted(() => ({
+const { mockRedis, mockPrisma, mockSendPrivateReply, mockDecryptToken, mockReserveWorkspaceDMSend, mockReleaseWorkspaceDMReservation, mockGetUserFollowStatus } = vi.hoisted(() => ({
   mockRedis: { set: vi.fn(), del: vi.fn(), eval: vi.fn() },
   mockPrisma: {
     automation: { findMany: vi.fn(), findFirst: vi.fn() },
@@ -12,6 +12,7 @@ const { mockRedis, mockPrisma, mockSendPrivateReply, mockDecryptToken, mockReser
   mockDecryptToken: vi.fn(),
   mockReserveWorkspaceDMSend: vi.fn(),
   mockReleaseWorkspaceDMReservation: vi.fn(),
+  mockGetUserFollowStatus: vi.fn(),
 }));
 
 vi.mock("@/lib/db/client", () => ({ prisma: mockPrisma }));
@@ -40,7 +41,7 @@ vi.mock("@/lib/meta/client", () => ({
   sendDirectMessageWithButton: vi.fn(),
   sendDirectMessageWithLinkButton: vi.fn(),
   sendCommentReply: vi.fn(),
-  getUserFollowStatus: vi.fn().mockResolvedValue(true),
+  getUserFollowStatus: mockGetUserFollowStatus,
   MetaApiError: class MetaApiError extends Error { code = 0; },
   RateLimitError: class RateLimitError extends Error {},
   TokenExpiredError: class TokenExpiredError extends Error {},
@@ -116,6 +117,7 @@ beforeEach(() => {
   mockPrisma.instagramAccount.findUnique.mockResolvedValue({ workspaceId: "workspace_1" });
   mockPrisma.operationalEvent.create.mockResolvedValue({});
   mockDecryptToken.mockReturnValue("decrypted");
+  mockGetUserFollowStatus.mockResolvedValue(true);
   mockReserveWorkspaceDMSend.mockResolvedValue({ allowed: true, periodStart: new Date("2026-09-09T00:00:00.000Z") });
   mockReleaseWorkspaceDMReservation.mockResolvedValue({ count: 1 });
   mockSendPrivateReply.mockResolvedValue({ message_id: "msg_1" });
@@ -158,5 +160,25 @@ describe("DM worker hardened delivery wiring", () => {
     expect(key).toContain("dm:idempotency:workspace_1:automation:auto_1:comment:comment_1:dm");
     expect(typeof token).toBe("string");
     expect(token).not.toBe("");
+  });
+
+  it("releases the quota reservation and delivery lease when follower-status lookup fails after reservation", async () => {
+    const failure = new Error("Meta follow-status failed");
+    mockGetUserFollowStatus.mockRejectedValueOnce(failure);
+    const job = commentJob();
+    job.data.commentId = "comment_follow_status_failure";
+    automation.requireFollow = true;
+
+    try {
+      await expect(getProcessor()(job)).rejects.toThrow("Meta follow-status failed");
+    } finally {
+      automation.requireFollow = false;
+    }
+
+    expect(mockReleaseWorkspaceDMReservation).toHaveBeenCalledWith(
+      "workspace_1",
+      new Date("2026-09-09T00:00:00.000Z")
+    );
+    expect(mockRedis.eval).toHaveBeenCalledTimes(1);
   });
 });
