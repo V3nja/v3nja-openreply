@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockRedis, mockPrisma, mockSendPrivateReply, mockDecryptToken, mockReserveWorkspaceDMSend, mockReleaseWorkspaceDMReservation } = vi.hoisted(() => ({
-  mockRedis: { set: vi.fn(), del: vi.fn() },
+  mockRedis: { set: vi.fn(), del: vi.fn(), eval: vi.fn() },
   mockPrisma: {
     automation: { findMany: vi.fn(), findFirst: vi.fn() },
     dmLog: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), upsert: vi.fn() },
@@ -105,6 +105,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockRedis.set.mockResolvedValue("OK");
   mockRedis.del.mockResolvedValue(1);
+  mockRedis.eval.mockResolvedValue(1);
   mockPrisma.automation.findMany.mockResolvedValue([automation]);
   mockPrisma.dmLog.findUnique.mockResolvedValue(null);
   mockPrisma.dmLog.findFirst.mockResolvedValue(null);
@@ -127,10 +128,13 @@ describe("DM worker hardened delivery wiring", () => {
     expect(mockPrisma.dmLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ automationId: "auto_1", commentId: "comment_1", status: "PENDING" }),
     });
-    expect(mockRedis.set).toHaveBeenCalledWith(
-      expect.stringContaining("dm:idempotency:workspace_1:automation:auto_1:comment:comment_1:dm"),
-      "1", "EX", 180, "NX"
-    );
+
+    const lockCalls = mockRedis.set.mock.calls;
+    expect(lockCalls).toHaveLength(1);
+    expect(lockCalls[0][0]).toContain("dm:idempotency:workspace_1:automation:auto_1:comment:comment_1:dm");
+    expect(lockCalls[0][1]).toEqual(expect.any(String));
+    expect(lockCalls[0].slice(2)).toEqual(["EX", 180, "NX"]);
+
     expect(mockSendPrivateReply).toHaveBeenCalledTimes(1);
     expect(mockPrisma.dmLog.updateMany).toHaveBeenCalledWith({
       where: { automationId: "auto_1", commentId: "comment_1", status: { not: "SENT" } },
@@ -138,7 +142,7 @@ describe("DM worker hardened delivery wiring", () => {
     });
   });
 
-  it("records FAILED and releases the Redis delivery lock when Meta send fails", async () => {
+  it("records FAILED and atomically releases only the owned Redis delivery lock when Meta send fails", async () => {
     mockSendPrivateReply.mockRejectedValue(new Error("Meta send failed"));
 
     await expect(getProcessor()(commentJob())).rejects.toThrow("Meta send failed");
@@ -147,8 +151,12 @@ describe("DM worker hardened delivery wiring", () => {
       where: { automationId: "auto_1", commentId: "comment_1", status: { not: "SENT" } },
       data: expect.objectContaining({ status: "FAILED", errorMessage: "Meta send failed" }),
     });
-    expect(mockRedis.del).toHaveBeenCalledWith(
-      expect.stringContaining("dm:idempotency:workspace_1:automation:auto_1:comment:comment_1:dm")
-    );
+
+    expect(mockRedis.eval).toHaveBeenCalledTimes(1);
+    const [, , key, token] = mockRedis.eval.mock.calls[0];
+    expect(typeof key).toBe("string");
+    expect(key).toContain("dm:idempotency:workspace_1:automation:auto_1:comment:comment_1:dm");
+    expect(typeof token).toBe("string");
+    expect(token).not.toBe("");
   });
 });
