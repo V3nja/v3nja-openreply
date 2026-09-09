@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { prisma } from "@/lib/db/client";
 import { getDMQueue } from "@/lib/queue/client";
 import { recordFanInteraction } from "@/lib/fans/engine";
+import { evaluateAutomationRule } from "@/lib/automation/rules";
 import {
   parseCommentEvents,
   parseMessageEvents,
@@ -85,6 +86,61 @@ export async function enqueueVerifiedWebhook(
         username: event.commenterName,
         tag: "comment",
       });
+
+      if (event.mediaId) {
+        const pendingAutomations = await prisma.automation.findMany({
+          where: {
+            workspaceId: account.workspaceId,
+            instagramAccountId: account.id,
+            isActive: true,
+            pendingNextReel: true,
+            postId: null,
+          },
+          select: {
+            id: true,
+            postId: true,
+            matchAnyPost: true,
+            pendingNextReel: true,
+            keywords: true,
+            matchAnyWord: true,
+            wholeWordMatch: true,
+          },
+        });
+
+        for (const automation of pendingAutomations) {
+          const decision = evaluateAutomationRule(
+            {
+              postId: automation.postId,
+              matchAnyPost: automation.matchAnyPost,
+              pendingNextReel: automation.pendingNextReel,
+              keywords: automation.keywords,
+              matchAnyWord: automation.matchAnyWord,
+              wholeWordMatch: automation.wholeWordMatch,
+            },
+            {
+              text: event.commentText,
+              mediaId: event.mediaId,
+              originalMediaId: event.originalMediaId,
+            }
+          );
+          if (!decision.matched) continue;
+
+          await prisma.automation.updateMany({
+            where: {
+              id: automation.id,
+              workspaceId: account.workspaceId,
+              instagramAccountId: account.id,
+              isActive: true,
+              pendingNextReel: true,
+              postId: null,
+            },
+            data: {
+              postId: event.mediaId,
+              pendingNextReel: false,
+            },
+          });
+        }
+      }
 
       await queue.add(
         "process-comment",
