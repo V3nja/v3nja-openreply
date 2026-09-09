@@ -29,7 +29,7 @@ import {
 } from "@/lib/meta/client";
 import { decryptToken } from "@/lib/meta/oauth";
 import { evaluateAutomationRule } from "@/lib/automation/rules";
-import { reserveDMSlot } from "@/lib/utils/rate-limiter";
+import { releaseDMSlot, reserveDMSlot } from "@/lib/utils/rate-limiter";
 import {
   releaseWorkspaceDMReservation,
   reserveWorkspaceDMSend,
@@ -380,6 +380,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
       }
     } catch (error) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
+      await releaseDMSlot(instagramAccountId);
       await deliveryLease.release().catch(() => {});
       await markDmLogFailed({ automationId: automation.id, commentId }, formatError(error), job.attemptsMade + 1);
       throw error;
@@ -429,18 +430,90 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
   if (isFollowCheck && automation.requireFollow) {
     const follows = await getUserFollowStatus(accessToken, userId);
     if (follows === false) {
+      const promptDedupeId = `followcheck:${userId}`;
+      const existingPrompt = await prisma.dmLog.findUnique({
+        where: { automationId_commentId: { automationId: automation.id, commentId: promptDedupeId } },
+        select: { status: true },
+      });
+      if (existingPrompt?.status === "SENT") return;
+
+      const promptDeliveryKey = `${automation.workspaceId}:automation:${automation.id}:postback:${promptDedupeId}`;
+      const promptLease = await acquireDeliveryLease(promptDeliveryKey);
+      if (!promptLease) return;
+
+      const usage = await reserveWorkspaceDMSend(automation.workspaceId);
+      if (!usage.allowed) {
+        await promptLease.release().catch(() => {});
+        return;
+      }
+
+      let rateLimit;
       try {
-        const promptLock = await withDeliveryLock(
-          `${automation.workspaceId}:automation:${automation.id}:postback:${mid || userId}:follow-prompt`,
-          () => sendDirectMessageWithButton(accessToken, automation.instagramAccount.instagramId, userId, renderMessageWithoutLink({ message: automation.followPromptMessage || "Follow me and tap the button once you're following.", commenterName }), automation.followPromptButtonLabel || "I'm following", `followcheck:${automation.id}`)
-        );
-        if (!promptLock.acquired) return;
+        rateLimit = await reserveDMSlot(instagramAccountId, job.attemptsMade);
       } catch (error) {
+        await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
+        await promptLease.release().catch(() => {});
+        throw error;
+      }
+      if (!rateLimit.allowed) {
+        await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
+        await promptLease.release().catch(() => {});
+        if (rateLimit.shouldSkip) return;
+        if (rateLimit.shouldRequeue) {
+          await getDMQueue().add(
+            POSTBACK_JOB_NAME,
+            { ...job.data },
+            {
+              delay: rateLimit.requeueDelayMs,
+              jobId: `postback_${automation.id}_${promptDedupeId}_retry_${job.attemptsMade + 1}`,
+            }
+          );
+          return;
+        }
+        throw new Error("Instagram messaging rate limit reached");
+      }
+
+      try {
+        await prisma.dmLog.upsert({
+          where: { automationId_commentId: { automationId: automation.id, commentId: promptDedupeId } },
+          create: {
+            workspaceId: automation.workspaceId,
+            automationId: automation.id,
+            instagramAccountId: automation.instagramAccountId,
+            commenterId: userId,
+            commenterName,
+            commentText: "(follow check)",
+            commentId: promptDedupeId,
+            status: "PENDING",
+            attempts: job.attemptsMade + 1,
+            errorMessage: null,
+          },
+          update: {
+            status: "PENDING",
+            attempts: job.attemptsMade + 1,
+            commenterName,
+            errorMessage: null,
+          },
+        });
+        await sendDirectMessageWithButton(
+          accessToken,
+          automation.instagramAccount.instagramId,
+          userId,
+          renderMessageWithoutLink({ message: automation.followPromptMessage || "Follow me and tap the button once you're following.", commenterName }),
+          automation.followPromptButtonLabel || "I'm following",
+          `followcheck:${automation.id}`
+        );
+        await markDmLogSent({ automationId: automation.id, commentId: promptDedupeId });
+      } catch (error) {
+        await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
+        await promptLease.release().catch(() => {});
+        await markDmLogFailed({ automationId: automation.id, commentId: promptDedupeId }, formatError(error), job.attemptsMade + 1);
         throw error;
       }
       return;
     }
   }
+
   const revealDedupeId = `reveal:${userId}`;
   const existingReveal = await prisma.dmLog.findUnique({ where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } }, select: { status: true } });
   if (existingReveal?.status === "SENT") return;
@@ -468,6 +541,17 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
     await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
     await deliveryLease.release().catch(() => {});
     if (rateLimit.shouldSkip) return;
+    if (rateLimit.shouldRequeue) {
+      await getDMQueue().add(
+        POSTBACK_JOB_NAME,
+        { ...job.data },
+        {
+          delay: rateLimit.requeueDelayMs,
+          jobId: `postback_${automation.id}_${revealDedupeId}_retry_${job.attemptsMade + 1}`,
+        }
+      );
+      return;
+    }
     throw new Error("Hourly Instagram DM rate limit reached");
   }
 
