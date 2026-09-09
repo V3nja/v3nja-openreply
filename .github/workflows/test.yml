@@ -20,4 +20,4 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run idempotency regression tests
-        run: npx vitest run __tests__/queue-idempotency.test.ts __tests__/dm-worker-idempotency-wiring.test.ts __tests__/dm-worker-postback-wiring.test.ts __tests__/webhook-enqueue-idempotency.test.ts
+        run: npx vitest run __tests__/queue-idempotency.test.ts __tests__/dm-worker-idempotency-wiring.test.ts __tests__/dm-worker-postback-wiring.test.ts __tests__/dm-worker-manual-wiring.test.ts __tests__/webhook-enqueue-idempotency.test.ts
