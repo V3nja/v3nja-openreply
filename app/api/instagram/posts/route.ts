@@ -1,36 +1,89 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentWorkspaceId } from "@/lib/auth";
+import { getWorkspaceInstagramAccount } from "@/lib/instagram-accounts";
+import { decryptToken } from "@/lib/meta/oauth";
+import { getMetaGraphApiVersion } from "@/lib/env";
 
-const LIVE_TOKEN =
-  process.env.PAGE_ACCESS_TOKEN ||
-  process.env.INSTAGRAM_ACCESS_TOKEN ||
-  "EAASO6H4IszIBSctXA6UtP2RRagFz8VcyDruAZBuKVvlvDbhftvRA5z2MXB9A377v4WHSE1UvKXfHWU2dxpZAyz3RuIV7gcyg16HzHyDZBXVSQFIlbWa5fb5kW52JLwWFnkoHFj1INsR07RDLoj39rg5x8ZB1duIRcBraj672XUWJaXqxCIAEZAzqja5Wk5CZADkOQfGU6T8ybtNlJgNaK59LBaa7D9C9YS7hnEPAZDZD";
-
-const INSTAGRAM_ACCOUNT_ID = "17841450944703637";
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const workspaceId = await getCurrentWorkspaceId();
+  if (!workspaceId) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  const account = await getWorkspaceInstagramAccount(
+    workspaceId,
+    request.nextUrl.searchParams.get("instagramAccountId")
+  );
+
+  if (!account) {
+    return NextResponse.json(
+      { success: false, error: "Instagram account not connected" },
+      { status: 400 }
+    );
+  }
+
   try {
-    const url = new URL(`https://graph.facebook.com/v22.0/${INSTAGRAM_ACCOUNT_ID}/media`);
+    const token = decryptToken(account.accessToken);
+    const url = new URL(
+      `https://graph.facebook.com/${getMetaGraphApiVersion()}/${account.instagramId}/media`
+    );
     url.searchParams.set(
       "fields",
       "id,caption,media_type,media_product_type,media_url,thumbnail_url,timestamp,permalink,like_count,comments_count"
     );
     url.searchParams.set("limit", "50");
-    url.searchParams.set("access_token", LIVE_TOKEN);
+    url.searchParams.set("access_token", token);
 
-    const res = await fetch(url.toString(), { cache: "no-store" });
-    const data = await res.json();
+    const response = await fetch(url.toString(), { cache: "no-store" });
+    const data = await response.json();
 
-    if (data.data && Array.isArray(data.data)) {
-      return NextResponse.json({ success: true, data: data.data });
+    if (!response.ok || data?.error) {
+      const error = data?.error;
+      console.error("[Instagram Posts] Meta API error", {
+        status: response.status,
+        code: error?.code,
+        subcode: error?.error_subcode,
+        message: error?.message,
+        trace: error?.fbtrace_id,
+        accountId: account.instagramId,
+      });
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Instagram posts could not be loaded",
+          code: error?.code ?? response.status,
+        },
+        { status: response.status >= 400 ? response.status : 502 }
+      );
     }
 
-    if (data.error) {
-      console.warn("[Instagram Posts] Meta API returned error:", data.error);
-    }
+    return NextResponse.json(
+      {
+        success: true,
+        data: Array.isArray(data?.data) ? data.data : [],
+        account: {
+          id: account.id,
+          instagramId: account.instagramId,
+          username: account.username,
+        },
+      },
+      { headers: { "Cache-Control": "private, no-store" } }
+    );
+  } catch (error) {
+    console.error("[Instagram Posts] Fetch error", {
+      error: error instanceof Error ? error.message : String(error),
+      accountId: account.instagramId,
+    });
 
-    return NextResponse.json({ success: true, data: [] });
-  } catch (err: any) {
-    console.error("[Instagram Posts] Fetch error:", err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "Failed to load Instagram posts" },
+      { status: 500 }
+    );
   }
 }
