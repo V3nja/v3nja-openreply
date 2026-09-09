@@ -9,13 +9,6 @@ import {
   parsePostbackEvents,
 } from "@/lib/meta/webhook";
 
-/**
- * Persist a verified Meta webhook and enqueue its actionable events.
- *
- * The webhook route remains responsible for signature verification.
- * This module persists the event, records fan interactions, and hands all
- * actionable delivery work to BullMQ so the worker remains the only sender.
- */
 export async function enqueueVerifiedWebhook(
   rawBody: string,
   payload: Parameters<typeof parseCommentEvents>[0]
@@ -27,9 +20,6 @@ export async function enqueueVerifiedWebhook(
     select: { id: true, status: true },
   });
 
-  // PROCESSED is terminal. PENDING is explicitly retryable because a process
-  // crash can happen after some queue jobs are added but before the webhook is
-  // marked PROCESSED. Deterministic BullMQ job IDs make those retries safe.
   if (existing?.status === "PROCESSED") {
     return { eventId, queued: 0, duplicate: true };
   }
@@ -50,13 +40,12 @@ export async function enqueueVerifiedWebhook(
     accountIds.add(event.instagramAccountId);
   }
 
-  const accounts =
-    accountIds.size > 0
-      ? await prisma.instagramAccount.findMany({
-          where: { instagramId: { in: [...accountIds] } },
-          select: { id: true, instagramId: true, workspaceId: true },
-        })
-      : [];
+  const accounts = accountIds.size > 0
+    ? await prisma.instagramAccount.findMany({
+        where: { instagramId: { in: [...accountIds] } },
+        select: { id: true, instagramId: true, workspaceId: true },
+      })
+    : [];
 
   const accountMap = new Map(accounts.map((account) => [account.instagramId, account]));
   const workspaceIds = new Set(accounts.map((account) => account.workspaceId));
@@ -88,6 +77,9 @@ export async function enqueueVerifiedWebhook(
         instagramUserId: event.commenterId,
         username: event.commenterName,
         tag: "comment",
+        webhookEventId: eventId,
+        dedupeKey: `webhook:${eventId}:comment:${event.commentId}`,
+        interactionType: "comment",
       });
 
       if (event.mediaId) {
@@ -137,10 +129,7 @@ export async function enqueueVerifiedWebhook(
               pendingNextReel: true,
               postId: null,
             },
-            data: {
-              postId: event.mediaId,
-              pendingNextReel: false,
-            },
+            data: { postId: event.mediaId, pendingNextReel: false },
           });
         }
       }
@@ -157,9 +146,7 @@ export async function enqueueVerifiedWebhook(
           originalMediaId: event.originalMediaId,
           source: "WEBHOOK",
         },
-        {
-          jobId: `comment_${event.instagramAccountId}_${event.commentId}`,
-        }
+        { jobId: `comment_${event.instagramAccountId}_${event.commentId}` }
       );
       queued += 1;
     }
@@ -173,6 +160,9 @@ export async function enqueueVerifiedWebhook(
         instagramAccountId: account.id,
         instagramUserId: event.senderId,
         tag: "dm",
+        webhookEventId: eventId,
+        dedupeKey: `webhook:${eventId}:message:${event.messageId}`,
+        interactionType: "dm",
       });
 
       await queue.add(
@@ -183,9 +173,7 @@ export async function enqueueVerifiedWebhook(
           messageText: event.messageText,
           senderId: event.senderId,
         },
-        {
-          jobId: `message_${event.instagramAccountId}_${event.messageId}`,
-        }
+        { jobId: `message_${event.instagramAccountId}_${event.messageId}` }
       );
       queued += 1;
     }
@@ -194,11 +182,15 @@ export async function enqueueVerifiedWebhook(
       const account = accountMap.get(event.instagramAccountId);
       if (!account) continue;
 
+      const postbackKey = event.mid ?? `${event.userId}:${event.payload}`;
       await recordFanInteraction({
         workspaceId: account.workspaceId,
         instagramAccountId: account.id,
         instagramUserId: event.userId,
         tag: "button-tap",
+        webhookEventId: eventId,
+        dedupeKey: `webhook:${eventId}:postback:${postbackKey}`,
+        interactionType: "button-tap",
       });
 
       await queue.add(
@@ -209,9 +201,7 @@ export async function enqueueVerifiedWebhook(
           payload: event.payload,
           mid: event.mid,
         },
-        {
-          jobId: `postback_${event.instagramAccountId}_${event.mid ?? event.userId}_${event.payload}`,
-        }
+        { jobId: `postback_${event.instagramAccountId}_${event.mid ?? event.userId}_${event.payload}` }
       );
       queued += 1;
     }
