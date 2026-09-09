@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/client";
 
 const LOCK_TTL_SECONDS = 180;
 const LOCK_RENEW_INTERVAL_MS = 60_000;
+const LOCK_RENEW_MAX_MS = (LOCK_TTL_SECONDS - 5) * 1000;
 const RELEASE_SCRIPT = `
 if redis.call("get", KEYS[1]) == ARGV[1] then
   return redis.call("del", KEYS[1])
@@ -45,6 +46,10 @@ async function renewDeliveryLock(key: string, token: string): Promise<boolean> {
 /**
  * Claims an owner-safe Redis delivery lease before any quota/rate reservation.
  * Competing workers fail here and therefore consume no outbound budget.
+ *
+ * Renewal is deliberately bounded to slightly less than the lock TTL. A
+ * successful caller can keep the key through the database transition window,
+ * but the lease can never renew indefinitely if a worker forgets to release it.
  */
 export async function acquireDeliveryLease(
   key: string
@@ -65,12 +70,14 @@ export async function acquireDeliveryLease(
     if (released) return;
     void renewDeliveryLock(key, token).catch(() => {});
   }, LOCK_RENEW_INTERVAL_MS);
+  const renewalStop = setTimeout(() => clearInterval(renewal), LOCK_RENEW_MAX_MS);
 
   return {
     release: async () => {
       if (released) return;
       released = true;
       clearInterval(renewal);
+      clearTimeout(renewalStop);
       await redis.eval(RELEASE_SCRIPT, 1, lockKey(key), token);
     },
   };
@@ -112,7 +119,7 @@ export async function releaseDeliveryLock(
 
 /**
  * Runs one automated outbound delivery behind an owner-safe Redis lease.
- * A successful send intentionally keeps the lease until TTL expiry so the
+ * A successful send keeps the lock for the bounded lease lifetime so the
  * database transition can complete without reopening the duplicate window.
  */
 export async function withDeliveryLock<T>(
