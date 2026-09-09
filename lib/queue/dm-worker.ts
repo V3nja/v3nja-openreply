@@ -373,9 +373,16 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
 
     const useOpeningDm = automation.openingDmEnabled && Boolean(automation.openingDmMessage) && Boolean(automation.openingDmButtonLabel);
     let sendFollowPrompt = false;
-    if (automation.requireFollow && !useOpeningDm) {
-      const alreadyFollows = await getUserFollowStatus(accessToken, commenterId);
-      sendFollowPrompt = alreadyFollows !== true;
+    try {
+      if (automation.requireFollow && !useOpeningDm) {
+        const alreadyFollows = await getUserFollowStatus(accessToken, commenterId);
+        sendFollowPrompt = alreadyFollows !== true;
+      }
+    } catch (error) {
+      await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
+      await deliveryLease.release().catch(() => {});
+      await markDmLogFailed({ automationId: automation.id, commentId }, formatError(error), job.attemptsMade + 1);
+      throw error;
     }
 
     try {
