@@ -45,8 +45,11 @@ export const authConfig = {
     signIn: "/login",
     verifyRequest: "/verify-request",
   },
+  // The application already uses Prisma-backed sessions (including the
+  // /api/auth/dev-login path). Keep Auth.js on the same session strategy so
+  // the session cookie and database session record are interpreted consistently.
   session: {
-    strategy: "jwt",
+    strategy: "database",
   },
   trustHost: true,
   secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
