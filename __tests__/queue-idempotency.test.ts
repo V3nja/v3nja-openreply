@@ -14,6 +14,7 @@ vi.mock("@/lib/db/client", () => ({
 }));
 
 import {
+  acquireDeliveryLease,
   acquireDeliveryLock,
   markDmLogFailed,
   markDmLogSent,
@@ -38,6 +39,26 @@ describe("queue delivery idempotency", () => {
       "EX",
       180,
       "NX"
+    );
+  });
+
+  it("acquires an owner-safe renewable delivery lease", async () => {
+    const lease = await acquireDeliveryLease("same-key");
+
+    expect(lease).not.toBeNull();
+    expect(mockRedis.set).toHaveBeenCalledWith(
+      "dm:idempotency:same-key",
+      expect.any(String),
+      "EX",
+      180,
+      "NX"
+    );
+    await lease!.release();
+    expect(mockRedis.eval).toHaveBeenCalledWith(
+      expect.stringContaining('redis.call("get", KEYS[1]) == ARGV[1]'),
+      1,
+      "dm:idempotency:same-key",
+      expect.any(String)
     );
   });
 
