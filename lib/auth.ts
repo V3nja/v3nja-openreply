@@ -46,7 +46,7 @@ export const authConfig = {
     verifyRequest: "/verify-request",
   },
   session: {
-    strategy: "jwt",
+    strategy: "database",
   },
   trustHost: true,
   secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
