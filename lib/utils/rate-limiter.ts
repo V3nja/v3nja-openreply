@@ -59,6 +59,17 @@ end
 return {1, next_count, max - next_count}
 `;
 
+const RELEASE_DM_SLOT_SCRIPT = `
+local current = tonumber(redis.call("GET", KEYS[1]) or "0")
+if current <= 1 then
+  redis.call("DEL", KEYS[1])
+  return 0
+end
+
+local next_count = redis.call("DECR", KEYS[1])
+return next_count
+`;
+
 function toScriptNumber(value: unknown): number {
   if (typeof value === "number") return value;
   if (typeof value === "string") return Number.parseInt(value, 10);
@@ -186,6 +197,17 @@ export async function reserveDMSlot(
     shouldSkip: false,
     reserved: true,
   };
+}
+
+/**
+ * Release a previously reserved DM slot when the message was never sent.
+ * This is used when a concurrent delivery wins the outbound idempotency lock
+ * after this worker has already reserved its account-level slot.
+ */
+export async function releaseDMSlot(instagramAccountId: string): Promise<void> {
+  const client = getRedis();
+  const key = `rate:dm:${instagramAccountId}`;
+  await client.eval(RELEASE_DM_SLOT_SCRIPT, 1, key);
 }
 
 /**

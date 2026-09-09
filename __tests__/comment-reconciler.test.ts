@@ -1,8 +1,5 @@
 /**
- * Comment reconciliation — ad copies of a boosted post.
- *
- * Comments left on an ad carry the ad's own media id, so the sweep has to look
- * at those media too or a webhook Meta never delivers is lost for good.
+ * Comment reconciliation — polling safety and ad-copy coverage.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

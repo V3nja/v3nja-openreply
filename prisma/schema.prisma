@@ -84,6 +84,8 @@ model Workspace {
   linkClicks        LinkClick[]
   webhookEvents     WebhookEvent[]
   operationalEvents OperationalEvent[]
+  fans              Fan[]
+  fanInteractions   FanInteraction[]
 
   @@index([ownerId])
 }
@@ -141,21 +143,17 @@ model InstagramAccount {
   dmLogs      DmLog[]
   linkClicks  LinkClick[]
   followerSnapshots FollowerSnapshot[]
+  fans        Fan[]
+  fanInteractions FanInteraction[]
 
   @@index([workspaceId])
 }
 
-/// Daily follower total for one account. Instagram only retains ~30 days of
-/// account insights, so history beyond that window exists only because we
-/// record it here. One row per account per day.
 model FollowerSnapshot {
   id                 String   @id @default(cuid())
   instagramAccountId String
-  /// Midnight UTC of the day this count belongs to.
   date               DateTime @db.Date
   followersCount     Int
-  /// True when the row was reconstructed from follower_count insight deltas
-  /// rather than observed directly, so it can be corrected later.
   backfilled         Boolean  @default(false)
   createdAt          DateTime @default(now())
 
@@ -178,9 +176,6 @@ model Automation {
   matchAnyPost   Boolean @default(false)
   keywords       String[]
   matchAnyWord   Boolean @default(false)
-  // Also fire this campaign when someone sends a DM whose text matches the
-  // keywords above. Independent of the post trigger — a DM has no media, so
-  // postId / matchAnyPost do not apply to it.
   dmTriggerEnabled Boolean @default(false)
   dmMessage      String
   openingDmEnabled     Boolean @default(false)
@@ -192,8 +187,6 @@ model Automation {
   followPromptButtonLabel String?
   followUpEnabled Boolean @default(false)
   followUpMessage String?
-  // Minutes to wait after the link is delivered before sending the follow-up.
-  // 0 sends it right away.
   followUpDelayMinutes Int @default(0)
   publicReplyEnabled Boolean @default(false)
   publicReplyMessage String?
@@ -232,10 +225,6 @@ model DmLog {
   attempts      Int      @default(0)
   dmSentAt      DateTime?
   errorMessage  String?
-
-  // The public comment reply is delivered independently of the DM, so its
-  // outcome is tracked separately. publicReplySentAt makes it idempotent across
-  // retries; a DM failure never blocks or re-posts the public reply.
   publicReplySentAt DateTime?
   publicReplyError  String?
 
@@ -253,14 +242,53 @@ model DmLog {
   @@index([status])
 }
 
-// Legacy reconciliation model; currently unwired. Runtime code does not read
-// or write ProcessedComment. Current reconciliation dedup uses owner-reply
-// checks and DmLog guards instead.
+model Fan {
+  id                 String   @id
+  workspaceId        String
+  instagramAccountId String
+  instagramUserId    String
+  username           String?
+  firstName          String?
+  tags               String[] @default([])
+  interactionCount   Int      @default(0)
+  lastInteractionAt  DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  instagramAccount InstagramAccount @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
+  interactions     FanInteraction[]
+
+  @@unique([instagramAccountId, instagramUserId])
+  @@index([workspaceId])
+  @@index([instagramAccountId])
+  @@index([lastInteractionAt])
+}
+
+model FanInteraction {
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  fanId              String
+  instagramAccountId String
+  webhookEventId     String
+  dedupeKey          String   @unique
+  interactionType    String
+  createdAt          DateTime @default(now())
+
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fan              Fan              @relation(fields: [fanId], references: [id], onDelete: Cascade)
+  instagramAccount InstagramAccount @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
+  webhookEvent     WebhookEvent     @relation(fields: [webhookEventId], references: [id], onDelete: Cascade)
+
+  @@index([fanId, createdAt])
+  @@index([webhookEventId])
+}
+
 model ProcessedComment {
   id                 String   @id @default(cuid())
   instagramAccountId String
   commentId          String   @unique
-  source             String // "WEBHOOK" | "POLLING"
+  source             String
   seenAt             DateTime @default(now())
 
   @@index([instagramAccountId])
@@ -318,7 +346,8 @@ model WebhookEvent {
   createdAt   DateTime      @default(now())
   processedAt DateTime?
 
-  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  workspace      Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  fanInteractions FanInteraction[]
 
   @@index([workspaceId])
   @@index([status])

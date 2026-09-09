@@ -36,13 +36,8 @@ import {
 import { decryptToken } from "@/lib/meta/oauth";
 import { matchKeywords } from "@/lib/utils/keyword-matcher";
 
-// Only consider comments from the last few days — older ones are outside
-// Instagram's private-reply window anyway, so a DM to them would just fail.
 const LOOKBACK_HOURS = Number(process.env.COMMENT_POLL_LOOKBACK_HOURS ?? 72);
-// Hard cap on how many new comments a single campaign can enqueue per sweep, so
-// a viral post drains gradually instead of bursting into the comment API.
 const MAX_NEW_PER_SWEEP = Number(process.env.COMMENT_POLL_MAX_PER_SWEEP ?? 30);
-// For "any post" campaigns, how many recent posts to scan.
 const RECENT_MEDIA_LIMIT = 10;
 
 interface SweepStat {
@@ -60,7 +55,6 @@ function errMessage(error: unknown): string {
   return "Unknown error";
 }
 
-/** One reconciliation pass across every active campaign. */
 export async function reconcileComments(): Promise<void> {
   const automations = await prisma.automation.findMany({
     where: { isActive: true },
@@ -113,6 +107,7 @@ async function sweepCampaign(
     keywords: string[];
     wholeWordMatch: boolean;
     publicReplyEnabled: boolean;
+    workspaceId: string;
     instagramAccount: {
       id: string;
       instagramId: string;
@@ -126,16 +121,13 @@ async function sweepCampaign(
   const account = automation.instagramAccount;
   const stat: SweepStat = {
     campaign: automation.name,
-    keywords: automation.matchAnyWord
-      ? "(any word)"
-      : automation.keywords.join(","),
+    keywords: automation.matchAnyWord ? "(any word)" : automation.keywords.join(","),
     matched: 0,
     alreadyReplied: 0,
     enqueued: 0,
     errors: [],
   };
 
-  // Decrypt the account token once per sweep.
   let accessToken = tokenCache.get(account.id);
   if (accessToken === undefined) {
     try {
@@ -150,8 +142,6 @@ async function sweepCampaign(
     return stat;
   }
 
-  // Which media this campaign covers: its own post, or the recent feed if it
-  // matches any post.
   const mediaIds: string[] = [];
   if (automation.postId) {
     mediaIds.push(automation.postId);
@@ -167,8 +157,11 @@ async function sweepCampaign(
   if (mediaIds.length === 0) return stat;
 
   const queue = getDMQueue();
+  let remaining = Math.max(0, MAX_NEW_PER_SWEEP);
 
   for (const mediaId of mediaIds) {
+    if (remaining === 0) break;
+
     let comments: InstagramComment[];
     try {
       comments = await getRecentMediaComments(accessToken, mediaId, sinceMs);
@@ -177,16 +170,13 @@ async function sweepCampaign(
       continue;
     }
 
-    // Keep only comments that (a) aren't the account's own, (b) match the
-    // keyword, and (c) have no reply from the account owner yet.
     const needsAction = comments.filter((c) => {
       const authorId = c.from?.id;
       if (!authorId || authorId === account.instagramId) return false;
 
       const matched = automation.matchAnyWord
         ? true
-        : matchKeywords(c.text ?? "", automation.keywords, automation.wholeWordMatch)
-            .matched;
+        : matchKeywords(c.text ?? "", automation.keywords, automation.wholeWordMatch).matched;
       if (!matched) return false;
       stat.matched += 1;
 
@@ -201,12 +191,6 @@ async function sweepCampaign(
     });
     if (needsAction.length === 0) continue;
 
-    // Second guard against races: skip comments this campaign has already fully
-    // handled. "Fully handled" depends on the campaign: if it posts a public
-    // reply, the completion signal is publicReplySentAt (a DM alone is not
-    // enough — the reply still has to land); otherwise a SENT DM is enough. This
-    // is what lets a comment whose DM sent but whose public reply failed come
-    // back and retry the reply.
     const handled = await prisma.dmLog.findMany({
       where: {
         automationId: automation.id,
@@ -219,18 +203,12 @@ async function sweepCampaign(
     });
     const handledSet = new Set(handled.map((h) => h.commentId));
 
-    // Oldest first, so whoever commented earliest gets answered first, capped.
     const fresh = needsAction
       .filter((c) => !handledSet.has(c.id))
       .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
-      .slice(0, MAX_NEW_PER_SWEEP);
+      .slice(0, remaining);
 
     for (const c of fresh) {
-      // No deterministic jobId here: a retained completed/failed job from an
-      // earlier sweep would otherwise be treated as a duplicate and silently
-      // drop this add, so the comment would never be retried. Dedup is handled
-      // above (owner-reply + DmLog guards) and the worker is idempotent
-      // (publicReplySentAt / SENT), so re-processing a comment is safe.
       await queue.add("process-comment", {
         instagramAccountId: account.instagramId,
         commentId: c.id,
@@ -238,38 +216,18 @@ async function sweepCampaign(
         commenterId: c.from!.id,
         commenterName: c.from?.username,
         mediaId,
-        // When the sweep is looking at an ad, the campaign is bound to the post
-        // the ad was made from: without this the worker matches nothing and
-        // drops the comment, so the sweep would enqueue it again every five
-        // minutes and never deliver it.
         originalMediaId:
-          automation.postId && mediaId !== automation.postId
-            ? automation.postId
-            : undefined,
+          automation.postId && mediaId !== automation.postId ? automation.postId : undefined,
         source: "POLLING",
       });
       stat.enqueued += 1;
+      remaining -= 1;
     }
   }
 
   return stat;
 }
 
-/**
- * Ad copies of a post, as seen in webhooks already received.
- *
- * Boosting a post gives it a second media id: comments left on the ad arrive
- * with the ad's `media.id` and the post's id in `original_media_id`. The sweep
- * would otherwise only ever look at the post itself, so a comment Meta fails to
- * deliver on the ad is lost for good — exactly the case this safety net exists
- * for, and the one where volume is highest.
- *
- * The ad ids are recovered from the webhooks themselves rather than from the
- * ads API, which would need ads_management on top of the permissions the app
- * already asks for. The trade-off: an ad becomes visible to the sweep only once
- * a single comment on it has arrived. That is enough for the failure being
- * covered here, where some webhooks arrive and others do not.
- */
 export async function adMediaFor(postId: string): Promise<string[]> {
   try {
     const rows = await prisma.$queryRaw<{ mediaId: string | null }[]>`
@@ -285,16 +243,11 @@ export async function adMediaFor(postId: string): Promise<string[]> {
       .map((r) => r.mediaId)
       .filter((id): id is string => Boolean(id) && id !== postId);
   } catch {
-    // A failure here must not stop the sweep: the post itself is still checked.
     return [];
   }
 }
 
-async function recordSweep(
-  workspaceId: string,
-  stat: SweepStat
-): Promise<void> {
-  // Only log when something happened or something went wrong.
+async function recordSweep(workspaceId: string, stat: SweepStat): Promise<void> {
   if (stat.enqueued === 0 && stat.errors.length === 0) return;
 
   await prisma.operationalEvent

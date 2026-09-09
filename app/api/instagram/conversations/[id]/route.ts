@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentWorkspaceId } from "@/lib/auth";
+import { getCurrentWorkspaceContext } from "@/lib/workspace-access";
 import { getWorkspaceInstagramAccount } from "@/lib/instagram-accounts";
 import { getConversationMessages, MetaApiError } from "@/lib/meta/client";
 import { decryptToken } from "@/lib/meta/oauth";
@@ -18,20 +18,19 @@ export interface ThreadResponse {
 
 type RouteProps = { params: Promise<{ id: string }> };
 
-// Message history for a single conversation (20 most recent, chronological).
 export async function GET(request: NextRequest, { params }: RouteProps) {
-  const workspaceId = await getCurrentWorkspaceId();
-  if (!workspaceId) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 }
-    );
+  const context = await getCurrentWorkspaceContext();
+  if (!context) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const { id: conversationId } = await params;
+  if (!conversationId) {
+    return NextResponse.json({ success: false, error: "Conversation ID is required" }, { status: 400 });
+  }
 
   const account = await getWorkspaceInstagramAccount(
-    workspaceId,
+    context.workspaceId,
     request.nextUrl.searchParams.get("instagramAccountId")
   );
   if (!account) {
@@ -44,8 +43,6 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
   try {
     const accessToken = decryptToken(account.accessToken);
     const raw = await getConversationMessages(accessToken, conversationId);
-
-    // The API returns newest-first; reverse to read top-to-bottom.
     const messages: ThreadMessage[] = raw
       .map((m) => ({
         id: m.id,
@@ -56,12 +53,13 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       }))
       .reverse();
 
-    const data: ThreadResponse = { messages };
-    return NextResponse.json({ success: true, data });
-  } catch (err) {
-    console.error("[Conversation Messages] Error:", err);
-    const message =
-      err instanceof MetaApiError ? err.message : "Failed to load messages";
+    return NextResponse.json(
+      { success: true, data: { messages } },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (error) {
+    console.error("[Conversation Messages]", error instanceof Error ? error.message : "unknown error");
+    const message = error instanceof MetaApiError ? error.message : "Failed to load messages";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

@@ -49,10 +49,7 @@ export const authConfig = {
     strategy: "jwt",
   },
   trustHost: true,
-  secret:
-    process.env.NEXTAUTH_SECRET ||
-    process.env.AUTH_SECRET ||
-    "v3nja-openreply-super-secret-key-2026-production-token",
+  secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
 } satisfies NextAuthConfig;
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
@@ -60,14 +57,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
 export async function getCurrentUserId(): Promise<string | null> {
   try {
     const session = await auth();
-    if (session?.user?.id) return session.user.id;
+    return session?.user?.id ?? null;
   } catch (err) {
-    console.warn("[getCurrentUserId] Auth session fallback:", err);
+    console.warn("[getCurrentUserId] Auth session unavailable:", err);
+    return null;
   }
-
-  return "user_v3nja_master";
 }
 
 export async function getCurrentWorkspaceId(): Promise<string | null> {
-  return "cmtsgdm010001wmnzbs3o4dx2";
+  const userId = await getCurrentUserId();
+  if (!userId) return null;
+
+  const workspace = await getPrimaryWorkspace(userId);
+  return workspace?.id ?? null;
 }

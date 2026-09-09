@@ -1,36 +1,97 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LiveDataStore } from "@/lib/db/live-store";
-import { matchKeywords } from "@/lib/utils/keyword-matcher";
+import { prisma } from "@/lib/db/client";
+import { getCurrentWorkspaceContext } from "@/lib/workspace-access";
+import { evaluateAutomationRule } from "@/lib/automation/rules";
 import { generateAntiSpamPublicReply } from "@/lib/utils/anti-spam-reply";
 import { formatBrandedArtistDM } from "@/lib/utils/artist-dm";
 
 export const dynamic = "force-dynamic";
 
+function text(value: unknown, fallback = "") {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
 export async function POST(request: NextRequest) {
+  const context = await getCurrentWorkspaceContext();
+  if (!context) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    const body = await request.json();
-    const {
-      commentText,
-      commenterName = "music_fan_265",
-      isFollowing = true,
-      triggerType = "COMMENT", // "COMMENT", "STORY_REPLY", "STORY_MENTION"
-      mediaTitle,
-    } = body;
+    const body = (await request.json()) as Record<string, unknown>;
+    const commentText = text(body.commentText);
+    const commenterName = text(body.commenterName, "music_fan_265");
+    const isFollowing = body.isFollowing !== undefined ? Boolean(body.isFollowing) : true;
+    const triggerType = text(body.triggerType, "COMMENT");
+    const requestedAccountId = text(body.instagramAccountId);
+    const mediaId = text(body.mediaId) || null;
+    const originalMediaId = text(body.originalMediaId) || null;
 
     if (!commentText) {
-      return NextResponse.json({ success: false, error: "Comment text is required" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Comment text is required" },
+        { status: 400 }
+      );
     }
 
-    const automations = LiveDataStore.getCampaigns().filter((a) => a.isActive);
+    const account = requestedAccountId
+      ? await prisma.instagramAccount.findFirst({
+          where: { id: requestedAccountId, workspaceId: context.workspaceId },
+          select: { id: true, instagramId: true, username: true },
+        })
+      : await prisma.instagramAccount.findFirst({
+          where: { workspaceId: context.workspaceId },
+          orderBy: { connectedAt: "asc" },
+          select: { id: true, instagramId: true, username: true },
+        });
 
-    let matchedAutomation: any = null;
+    if (!account) {
+      return NextResponse.json(
+        { success: false, error: "Connect an Instagram account first" },
+        { status: 400 }
+      );
+    }
+
+    const automations = await prisma.automation.findMany({
+      where: {
+        workspaceId: context.workspaceId,
+        instagramAccountId: account.id,
+        isActive: true,
+      },
+      include: {
+        trackedLinks: {
+          orderBy: { createdAt: "asc" },
+          select: { slug: true, destinationUrl: true, label: true },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    let matchedAutomation: (typeof automations)[number] | null = null;
     let matchedKeyword: string | null = null;
+    let ruleReason: string | null = null;
 
-    for (const auto of automations) {
-      const matchRes = matchKeywords(commentText, auto.keywords, auto.wholeWordMatch);
-      if (matchRes.matched) {
-        matchedAutomation = auto;
-        matchedKeyword = matchRes.matchedKeyword;
+    for (const automation of automations) {
+      const decision = evaluateAutomationRule(
+        {
+          postId: automation.postId,
+          matchAnyPost: automation.matchAnyPost,
+          pendingNextReel: automation.pendingNextReel,
+          keywords: automation.keywords,
+          matchAnyWord: automation.matchAnyWord,
+          wholeWordMatch: automation.wholeWordMatch,
+        },
+        {
+          text: commentText,
+          mediaId,
+          originalMediaId,
+        }
+      );
+
+      if (decision.matched) {
+        matchedAutomation = automation;
+        matchedKeyword = decision.matchedKeyword;
+        ruleReason = decision.reason;
         break;
       }
     }
@@ -38,16 +99,22 @@ export async function POST(request: NextRequest) {
     if (!matchedAutomation) {
       return NextResponse.json({
         success: true,
+        dryRun: true,
+        sent: false,
+        persisted: false,
         matched: false,
-        message: "No active automation matched this keyword.",
-        availableCampaigns: automations.map((a) => ({
-          name: a.name,
-          keywords: a.keywords,
+        message: "No active automation matched the current Smart Rules.",
+        availableCampaigns: automations.map((automation) => ({
+          id: automation.id,
+          name: automation.name,
+          postId: automation.postId,
+          matchAnyPost: automation.matchAnyPost,
+          keywords: automation.keywords,
+          matchAnyWord: automation.matchAnyWord,
         })),
       });
     }
 
-    // Determine anti-spam randomized public reply
     let publicReply: string | null = null;
     if (matchedAutomation.publicReplyEnabled) {
       publicReply = generateAntiSpamPublicReply(
@@ -57,20 +124,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Follow-gating logic
     const requiresFollowGate = matchedAutomation.requireFollow && !isFollowing;
+    const primaryLink =
+      matchedAutomation.trackedLinks[0]?.destinationUrl ||
+      "https://v3nja-official.web.app";
 
-    const primaryLink = matchedAutomation.trackedLinks?.[0]?.destinationUrl || "https://v3nja-official.web.app";
-    const brandedDmMessage = formatBrandedArtistDM({
+    const dmMessage = formatBrandedArtistDM({
       rawMessage: matchedAutomation.dmMessage,
       commenterName,
       campaignTitle: matchedAutomation.name,
       smartLinkUrl: primaryLink,
       followGated: requiresFollowGate,
-      followPrompt: matchedAutomation.followPromptMessage || "Please follow @v3nja2.0 on Instagram to unlock this link!",
+      followPrompt:
+        matchedAutomation.followPromptMessage ||
+        "Please follow @v3nja2.0 on Instagram to unlock this link!",
     });
 
-    const fullDmMessageUnlocked = formatBrandedArtistDM({
+    const unlockedMessage = formatBrandedArtistDM({
       rawMessage: matchedAutomation.dmMessage,
       commenterName,
       campaignTitle: matchedAutomation.name,
@@ -78,47 +148,52 @@ export async function POST(request: NextRequest) {
       followGated: false,
     });
 
-    // Record live event in Data Store
-    const newLog = LiveDataStore.recordDmEvent({
-      commenterId: `sim_${Date.now()}`,
-      commenterName,
-      commentText,
-      commentId: `sim_comment_${Date.now()}`,
-      matchedKeyword: matchedKeyword || matchedAutomation.keywords[0],
-      automationId: matchedAutomation.id,
-      automationName: matchedAutomation.name,
-      automationKeywords: matchedAutomation.keywords,
-      status: "SENT",
-      publicReplyText: triggerType === "COMMENT" ? publicReply : null,
-    });
-
     return NextResponse.json({
       success: true,
-      matched: true,
+      dryRun: true,
+      sent: false,
+      persisted: false,
       triggerType,
       isFollowing,
       isFollowGatedPrompt: requiresFollowGate,
+      ruleReason,
+      account: {
+        id: account.id,
+        instagramId: account.instagramId,
+        username: account.username,
+      },
       campaign: {
         id: matchedAutomation.id,
         name: matchedAutomation.name,
         goal: matchedAutomation.goal,
         matchedKeyword,
+        keywords: matchedAutomation.keywords,
+        matchAnyWord: matchedAutomation.matchAnyWord,
+        matchAnyPost: matchedAutomation.matchAnyPost,
+        postId: matchedAutomation.postId,
         requireFollow: matchedAutomation.requireFollow,
         followUpEnabled: matchedAutomation.followUpEnabled,
         followUpMessage: matchedAutomation.followUpMessage,
       },
       publicReply: triggerType === "COMMENT" ? publicReply : null,
-      dmMessage: brandedDmMessage,
+      dmMessage,
       linkButtonLabel: requiresFollowGate
-        ? matchedAutomation.followPromptButtonLabel || "✅ I Follow @v3nja2.0 — Unlock Link"
+        ? matchedAutomation.followPromptButtonLabel ||
+          "✅ I Follow @v3nja2.0 — Unlock Link"
         : matchedAutomation.linkButtonLabel || "Stream Track 🎧",
-      fullDmMessageUnlocked,
-      fullLinkButtonLabelUnlocked: matchedAutomation.linkButtonLabel || "Stream Track 🎧",
-      logId: newLog.id,
-      timestamp: newLog.createdAt,
+      fullDmMessageUnlocked: unlockedMessage,
+      fullLinkButtonLabelUnlocked:
+        matchedAutomation.linkButtonLabel || "Stream Track 🎧",
+      trackedLinks: matchedAutomation.trackedLinks,
     });
-  } catch (err: any) {
-    console.error("[Tester Simulate Error]:", err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } catch (error) {
+    console.error(
+      "[Tester Simulate Error]",
+      error instanceof Error ? error.message : "Unknown error"
+    );
+    return NextResponse.json(
+      { success: false, error: "Simulation failed" },
+      { status: 500 }
+    );
   }
 }

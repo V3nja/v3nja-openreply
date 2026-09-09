@@ -1,49 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LiveDataStore } from "@/lib/db/live-store";
+import { prisma } from "@/lib/db/client";
+import { getCurrentWorkspaceId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
+    const workspaceId = await getCurrentWorkspaceId();
+    if (!workspaceId) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
-    const page = Math.max(1, Number.parseInt(searchParams.get("page") ?? "1", 10));
+    const requestedPage = Number.parseInt(searchParams.get("page") ?? "0", 10);
+    const requestedOffset = Number.parseInt(searchParams.get("offset") ?? "-1", 10);
     const limit = Math.min(
       50,
       Math.max(1, Number.parseInt(searchParams.get("limit") ?? "20", 10))
     );
     const status = searchParams.get("status");
     const accountId = searchParams.get("instagramAccountId");
+    const page = requestedOffset >= 0 ? Math.floor(requestedOffset / limit) + 1 : Math.max(1, requestedPage || 1);
+    const skip = requestedOffset >= 0 ? requestedOffset : (page - 1) * limit;
 
-    let allLogs = LiveDataStore.getLogs();
+    const where = {
+      workspaceId,
+      ...(status && status !== "ALL" ? { status: status as any } : {}),
+      ...(accountId && accountId !== "all" ? { instagramAccountId: accountId } : {}),
+    };
 
-    if (status && status !== "ALL") {
-      allLogs = allLogs.filter((l) => l.status === status);
-    }
+    const [total, logs] = await Promise.all([
+      prisma.dmLog.count({ where }),
+      prisma.dmLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+        include: {
+          automation: { select: { id: true, name: true } },
+          instagramAccount: { select: { id: true, username: true, instagramId: true } },
+        },
+      }),
+    ]);
 
-    if (accountId && accountId !== "all") {
-      allLogs = allLogs.filter((l) => l.instagramAccountId === accountId);
-    }
-
-    const total = allLogs.length;
-    const skip = (page - 1) * limit;
-    const paginatedLogs = allLogs.slice(skip, skip + limit);
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        logs: paginatedLogs,
-        pagination: {
-          page,
-          limit,
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          logs,
           total,
-          totalPages: Math.max(1, Math.ceil(total / limit)),
+          pagination: {
+            page,
+            limit,
+            totalPages: Math.max(1, Math.ceil(total / limit)),
+          },
         },
       },
-    });
-  } catch (err: any) {
-    console.error("[Logs API Error]:", err);
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (err) {
+    console.error("[Logs API Error]", err instanceof Error ? err.message : "unknown error");
     return NextResponse.json(
-      { success: false, error: err.message },
+      { success: false, error: "Failed to load logs" },
       { status: 500 }
     );
   }
