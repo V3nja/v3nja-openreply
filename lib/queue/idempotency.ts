@@ -76,11 +76,21 @@ export async function acquireDeliveryLease(
   };
 }
 
+/**
+ * Legacy boolean acquisition helper. It creates a normal 180-second NX lock
+ * without a renewal loop because callers only receive a boolean and therefore
+ * have no owner token to safely renew or release it.
+ */
 export async function acquireDeliveryLock(key: string): Promise<boolean> {
-  const lease = await acquireDeliveryLease(key);
-  if (!lease) return false;
-  await lease.release();
-  return true;
+  const redis = getRedisConnection();
+  const result = await redis.set(
+    lockKey(key),
+    randomUUID(),
+    "EX",
+    LOCK_TTL_SECONDS,
+    "NX"
+  );
+  return result === "OK";
 }
 
 /**
