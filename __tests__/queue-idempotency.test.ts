@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockRedis, mockPrisma } = vi.hoisted(() => ({
-  mockRedis: { set: vi.fn(), del: vi.fn() },
+  mockRedis: { set: vi.fn(), del: vi.fn(), eval: vi.fn() },
   mockPrisma: { dmLog: { updateMany: vi.fn() } },
 }));
 
@@ -26,21 +26,32 @@ describe("queue delivery idempotency", () => {
     vi.clearAllMocks();
     mockRedis.set.mockResolvedValue("OK");
     mockRedis.del.mockResolvedValue(1);
+    mockRedis.eval.mockResolvedValue(1);
     mockPrisma.dmLog.updateMany.mockResolvedValue({ count: 1 });
   });
 
-  it("acquires a 180-second NX Redis lock", async () => {
+  it("acquires a 180-second NX Redis lock with a unique token", async () => {
     await expect(acquireDeliveryLock("workspace:auto:comment:dm")).resolves.toBe(true);
     expect(mockRedis.set).toHaveBeenCalledWith(
       "dm:idempotency:workspace:auto:comment:dm",
-      "1",
+      expect.any(String),
       "EX",
       180,
       "NX"
     );
   });
 
-  it("releases the lock", async () => {
+  it("uses owner-safe release when a token is supplied", async () => {
+    await releaseDeliveryLock("workspace:auto:comment:dm", "owner-token");
+    expect(mockRedis.eval).toHaveBeenCalledWith(
+      expect.stringContaining('redis.call("get", KEYS[1]) == ARGV[1]'),
+      1,
+      "dm:idempotency:workspace:auto:comment:dm",
+      "owner-token"
+    );
+  });
+
+  it("keeps the legacy unconditional release helper available", async () => {
     await releaseDeliveryLock("workspace:auto:comment:dm");
     expect(mockRedis.del).toHaveBeenCalledWith(
       "dm:idempotency:workspace:auto:comment:dm"
@@ -63,13 +74,20 @@ describe("queue delivery idempotency", () => {
       value: "meta-ok",
     });
     expect(mockRedis.del).not.toHaveBeenCalled();
+    expect(mockRedis.eval).not.toHaveBeenCalled();
   });
 
-  it("releases the lock when Meta send fails", async () => {
+  it("releases only its own lock when Meta send fails", async () => {
     const send = vi.fn().mockRejectedValue(new Error("Meta failed"));
 
     await expect(withDeliveryLock("same-key", send)).rejects.toThrow("Meta failed");
-    expect(mockRedis.del).toHaveBeenCalledWith("dm:idempotency:same-key");
+    expect(mockRedis.eval).toHaveBeenCalledWith(
+      expect.stringContaining('redis.call("get", KEYS[1]) == ARGV[1]'),
+      1,
+      "dm:idempotency:same-key",
+      expect.any(String)
+    );
+    expect(mockRedis.del).not.toHaveBeenCalled();
   });
 
   it("marks only a non-SENT DM log as SENT", async () => {
