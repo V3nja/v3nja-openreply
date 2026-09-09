@@ -236,6 +236,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
         { postId: mediaId },
         ...(originalMediaId ? [{ postId: originalMediaId }] : []),
         { matchAnyPost: true },
+        { pendingNextReel: true },
       ],
       isActive: true,
       instagramAccount: { instagramId: instagramAccountId },
