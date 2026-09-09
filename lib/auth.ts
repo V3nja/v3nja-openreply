@@ -4,7 +4,7 @@ import Resend from "next-auth/providers/resend";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db/client";
 import { ensureWorkspaceForUser, getPrimaryWorkspace } from "@/lib/workspace";
-import { isEmailAllowedToSignIn } from "@/lib/env";
+import { isEmailAllowedToSignIn, requireEnv } from "@/lib/env";
 
 type AdapterPrismaClient = Parameters<typeof PrismaAdapter>[0];
 
@@ -49,7 +49,10 @@ export const authConfig = {
     strategy: "database",
   },
   trustHost: true,
-  secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
+  // Keep Auth.js aligned with the project's centralized environment contract.
+  // This prevents a missing Vercel alias (NEXTAUTH_SECRET vs AUTH_SECRET)
+  // from taking down every Auth.js route with a generic configuration error.
+  secret: requireEnv("NEXTAUTH_SECRET"),
 } satisfies NextAuthConfig;
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
