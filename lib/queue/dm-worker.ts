@@ -430,11 +430,15 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
   if (isFollowCheck && automation.requireFollow) {
     const follows = await getUserFollowStatus(accessToken, userId);
     if (follows === false) {
-      const promptLock = await withDeliveryLock(
-        `${automation.workspaceId}:automation:${automation.id}:postback:${mid || userId}:follow-prompt`,
-        () => sendDirectMessageWithButton(accessToken, automation.instagramAccount.instagramId, userId, renderMessageWithoutLink({ message: automation.followPromptMessage || "Follow me and tap the button once you're following.", commenterName }), automation.followPromptButtonLabel || "I'm following", `followcheck:${automation.id}`)
-      );
-      if (!promptLock.acquired) return;
+      try {
+        const promptLock = await withDeliveryLock(
+          `${automation.workspaceId}:automation:${automation.id}:postback:${mid || userId}:follow-prompt`,
+          () => sendDirectMessageWithButton(accessToken, automation.instagramAccount.instagramId, userId, renderMessageWithoutLink({ message: automation.followPromptMessage || "Follow me and tap the button once you're following.", commenterName }), automation.followPromptButtonLabel || "I'm following", `followcheck:${automation.id}`)
+        );
+        if (!promptLock.acquired) return;
+      } catch (error) {
+        throw error;
+      }
       return;
     }
   }
@@ -459,6 +463,7 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
             commentId: revealDedupeId,
             status: "PENDING",
             attempts: job.attemptsMade + 1,
+            errorMessage: null,
           },
           update: {
             status: "PENDING",
@@ -490,12 +495,56 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
   const { instagramAccountId, userId, automationId, commenterName } = job.data;
   const automation = await prisma.automation.findFirst({ where: { id: automationId, isActive: true }, include: { instagramAccount: true } });
   if (!automation?.followUpEnabled || !automation.followUpMessage?.trim() || automation.instagramAccount.instagramId !== instagramAccountId || !automation.instagramAccount.accessToken) return;
+  const dedupeId = `followup:${userId}`;
+  const existingLog = await prisma.dmLog.findUnique({
+    where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } },
+    select: { status: true },
+  });
+  if (existingLog?.status === "SENT") return;
   const accessToken = decryptToken(automation.instagramAccount.accessToken);
-  const deliveryLock = await withDeliveryLock(
-    `${automation.workspaceId}:automation:${automation.id}:followup:${userId}`,
-    () => sendDirectMessage(accessToken, automation.instagramAccount.instagramId, userId, renderMessageWithoutLink({ message: automation.followUpMessage, commenterName: commenterName ?? null }))
-  );
-  if (!deliveryLock.acquired) return;
+  try {
+    const deliveryLock = await withDeliveryLock(
+      `${automation.workspaceId}:automation:${automation.id}:followup:${userId}`,
+      async () => {
+        await prisma.dmLog.upsert({
+          where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } },
+          create: {
+            workspaceId: automation.workspaceId,
+            automationId: automation.id,
+            instagramAccountId: automation.instagramAccountId,
+            commenterId: userId,
+            commenterName: commenterName ?? null,
+            commentText: "(scheduled follow-up)",
+            commentId: dedupeId,
+            status: "PENDING",
+            attempts: job.attemptsMade + 1,
+            errorMessage: null,
+          },
+          update: {
+            status: "PENDING",
+            attempts: job.attemptsMade + 1,
+            commenterName: commenterName ?? null,
+            errorMessage: null,
+          },
+        });
+        await sendDirectMessage(
+          accessToken,
+          automation.instagramAccount.instagramId,
+          userId,
+          renderMessageWithoutLink({ message: automation.followUpMessage, commenterName: commenterName ?? null })
+        );
+      }
+    );
+    if (!deliveryLock.acquired) return;
+    await markDmLogSent({ automationId: automation.id, commentId: dedupeId });
+  } catch (error) {
+    await markDmLogFailed(
+      { automationId: automation.id, commentId: dedupeId },
+      formatError(error),
+      job.attemptsMade + 1
+    );
+    throw error;
+  }
 }
 
 async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
