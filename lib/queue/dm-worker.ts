@@ -40,7 +40,7 @@ import {
   renderMessageWithTracking,
   renderMessageWithoutLink,
 } from "@/lib/tracking/message";
-import { withDeliveryLock } from "./idempotency";
+import { markDmLogFailed, markDmLogSent, withDeliveryLock } from "./idempotency";
 
 const BACKOFF_DELAYS = [5 * 60 * 1000, 15 * 60 * 1000, 45 * 60 * 1000];
 
@@ -347,7 +347,11 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
       rateLimit = await reserveDMSlot(instagramAccountId, requeueAttempt);
     } catch (error) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-      await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "FAILED", attempts: job.attemptsMade + 1, errorMessage: formatError(error) } });
+      await markDmLogFailed(
+        { automationId: automation.id, commentId },
+        formatError(error),
+        job.attemptsMade + 1
+      );
       throw error;
     }
     if (!rateLimit.allowed) {
@@ -398,10 +402,14 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
         await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
         continue;
       }
-      await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "SENT", dmSentAt: new Date(), errorMessage: null } });
+      await markDmLogSent({ automationId: automation.id, commentId });
     } catch (error) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-      await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "FAILED", attempts: job.attemptsMade + 1, errorMessage: formatError(error) } });
+      await markDmLogFailed(
+        { automationId: automation.id, commentId },
+        formatError(error),
+        job.attemptsMade + 1
+      );
       throw error;
     }
   }
@@ -496,6 +504,24 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
     const usage = await reserveWorkspaceDMSend(automation.workspaceId);
     if (!usage.allowed) continue;
     try {
+      if (!existingLog) {
+        await prisma.dmLog.create({
+          data: {
+            workspaceId: automation.workspaceId,
+            automationId: automation.id,
+            instagramAccountId: automation.instagramAccountId,
+            commenterId: senderId,
+            commenterName,
+            commentText: messageText,
+            commentId: dedupeId,
+            matchedKeyword: matchResult.matchedKeyword,
+            status: "PENDING",
+            attempts: job.attemptsMade + 1,
+          },
+        });
+      } else {
+        await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } }, data: { status: "PENDING", attempts: job.attemptsMade + 1, matchedKeyword: matchResult.matchedKeyword, errorMessage: null } });
+      }
       const deliveryLock = await withDeliveryLock(
         `${automation.workspaceId}:automation:${automation.id}:message:${messageId}`,
         async () => {
@@ -507,9 +533,14 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
         await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
         continue;
       }
-      await prisma.dmLog.upsert({ where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } }, create: { workspaceId: automation.workspaceId, automationId: automation.id, instagramAccountId: automation.instagramAccountId, commenterId: senderId, commenterName, commentText: messageText, commentId: dedupeId, matchedKeyword: matchResult.matchedKeyword, status: "SENT", dmSentAt: new Date() }, update: { status: "SENT", dmSentAt: new Date(), errorMessage: null } });
+      await markDmLogSent({ automationId: automation.id, commentId: dedupeId });
     } catch (error) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
+      await markDmLogFailed(
+        { automationId: automation.id, commentId: dedupeId },
+        formatError(error),
+        job.attemptsMade + 1
+      );
       throw error;
     }
   }
