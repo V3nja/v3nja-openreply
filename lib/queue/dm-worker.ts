@@ -204,6 +204,15 @@ async function processManualMessage(job: Job<ProcessManualMessageJob>): Promise<
 
   try {
     await sendDirectMessage(accessToken, account.instagramId, recipientId, text);
+  } catch (error) {
+    await releaseWorkspaceDMReservation(workspaceId, usage.periodStart);
+    throw error;
+  }
+
+  // The outbound message is already committed once Meta accepts it. Treat the
+  // operational audit event as best-effort so a database/logging failure cannot
+  // make BullMQ retry the already-sent DM and create a duplicate delivery.
+  try {
     await prisma.operationalEvent.create({
       data: {
         workspaceId,
@@ -213,9 +222,8 @@ async function processManualMessage(job: Job<ProcessManualMessageJob>): Promise<
         payload: { requestId, instagramAccountId, recipientId },
       },
     });
-  } catch (error) {
-    await releaseWorkspaceDMReservation(workspaceId, usage.periodStart);
-    throw error;
+  } catch (eventError) {
+    console.error("[DM Worker] Failed to record manual DM audit event:", formatError(eventError));
   }
 }
 
