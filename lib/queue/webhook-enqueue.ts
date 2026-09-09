@@ -27,7 +27,10 @@ export async function enqueueVerifiedWebhook(
     select: { id: true, status: true },
   });
 
-  if (existing?.status === "PROCESSED" || existing?.status === "PENDING") {
+  // PROCESSED is terminal. PENDING is explicitly retryable because a process
+  // crash can happen after some queue jobs are added but before the webhook is
+  // marked PROCESSED. Deterministic BullMQ job IDs make those retries safe.
+  if (existing?.status === "PROCESSED") {
     return { eventId, queued: 0, duplicate: true };
   }
 
