@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockRedis, mockPrisma, mockSendPrivateReply, mockDecryptToken, mockReserveWorkspaceDMSend, mockReleaseWorkspaceDMReservation, mockGetUserFollowStatus } = vi.hoisted(() => ({
+const { mockRedis, mockPrisma, mockSendPrivateReply, mockDecryptToken, mockReserveWorkspaceDMSend, mockReleaseWorkspaceDMReservation, mockGetUserFollowStatus, mockReleaseDMSlot } = vi.hoisted(() => ({
   mockRedis: { set: vi.fn(), del: vi.fn(), eval: vi.fn() },
   mockPrisma: {
     automation: { findMany: vi.fn(), findFirst: vi.fn() },
@@ -13,6 +13,7 @@ const { mockRedis, mockPrisma, mockSendPrivateReply, mockDecryptToken, mockReser
   mockReserveWorkspaceDMSend: vi.fn(),
   mockReleaseWorkspaceDMReservation: vi.fn(),
   mockGetUserFollowStatus: vi.fn(),
+  mockReleaseDMSlot: vi.fn(),
 }));
 
 vi.mock("@/lib/db/client", () => ({ prisma: mockPrisma }));
@@ -47,7 +48,10 @@ vi.mock("@/lib/meta/client", () => ({
   TokenExpiredError: class TokenExpiredError extends Error {},
 }));
 vi.mock("@/lib/meta/oauth", () => ({ decryptToken: mockDecryptToken }));
-vi.mock("@/lib/utils/rate-limiter", () => ({ reserveDMSlot: vi.fn().mockResolvedValue({ allowed: true, shouldRequeue: false, shouldSkip: false }) }));
+vi.mock("@/lib/utils/rate-limiter", () => ({
+  reserveDMSlot: vi.fn().mockResolvedValue({ allowed: true, shouldRequeue: false, shouldSkip: false }),
+  releaseDMSlot: mockReleaseDMSlot,
+}));
 vi.mock("@/lib/billing/usage", () => ({
   reserveWorkspaceDMSend: mockReserveWorkspaceDMSend,
   releaseWorkspaceDMReservation: mockReleaseWorkspaceDMReservation,
@@ -120,6 +124,7 @@ beforeEach(() => {
   mockGetUserFollowStatus.mockResolvedValue(true);
   mockReserveWorkspaceDMSend.mockResolvedValue({ allowed: true, periodStart: new Date("2026-09-09T00:00:00.000Z") });
   mockReleaseWorkspaceDMReservation.mockResolvedValue({ count: 1 });
+  mockReleaseDMSlot.mockResolvedValue(undefined);
   mockSendPrivateReply.mockResolvedValue({ message_id: "msg_1" });
 });
 
@@ -154,6 +159,7 @@ describe("DM worker hardened delivery wiring", () => {
       data: expect.objectContaining({ status: "FAILED", errorMessage: "Meta send failed" }),
     });
 
+    expect(mockReleaseDMSlot).not.toHaveBeenCalled();
     expect(mockRedis.eval).toHaveBeenCalledTimes(1);
     const [, , key, token] = mockRedis.eval.mock.calls[0];
     expect(typeof key).toBe("string");
@@ -162,7 +168,7 @@ describe("DM worker hardened delivery wiring", () => {
     expect(token).not.toBe("");
   });
 
-  it("releases the quota reservation and delivery lease when follower-status lookup fails after reservation", async () => {
+  it("releases the quota, reserved rate slot, and delivery lease when follower-status lookup fails after reservation", async () => {
     const failure = new Error("Meta follow-status failed");
     mockGetUserFollowStatus.mockRejectedValueOnce(failure);
     const job = commentJob();
@@ -179,6 +185,7 @@ describe("DM worker hardened delivery wiring", () => {
       "workspace_1",
       new Date("2026-09-09T00:00:00.000Z")
     );
+    expect(mockReleaseDMSlot).toHaveBeenCalledWith("ig_1");
     expect(mockRedis.eval).toHaveBeenCalledTimes(1);
   });
 });
