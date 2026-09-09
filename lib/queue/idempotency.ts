@@ -1,30 +1,80 @@
+import { randomUUID } from "node:crypto";
 import { getRedisConnection } from "./client";
 import { prisma } from "@/lib/db/client";
 
 const LOCK_TTL_SECONDS = 180;
+const LOCK_RENEW_INTERVAL_MS = 60_000;
+const RELEASE_SCRIPT = `
+if redis.call("get", KEYS[1]) == ARGV[1] then
+  return redis.call("del", KEYS[1])
+end
+return 0
+`;
+const RENEW_SCRIPT = `
+if redis.call("get", KEYS[1]) == ARGV[1] then
+  return redis.call("expire", KEYS[1], ARGV[2])
+end
+return 0
+`;
 
 type DmLogDeliveryKey = {
   automationId: string;
   commentId: string;
 };
 
-/**
- * Acquires a short-lived lock for one outbound automated delivery.
- * The lock is deliberately Redis-backed so concurrent workers cannot both
- * reach Meta for the same automation delivery.
- */
-export async function acquireDeliveryLock(key: string): Promise<boolean> {
+function lockKey(key: string): string {
+  return `dm:idempotency:${key}`;
+}
+
+async function acquireDeliveryLease(key: string): Promise<string | null> {
+  const token = randomUUID();
   const redis = getRedisConnection();
-  const result = await redis.set(`dm:idempotency:${key}`, "1", "EX", LOCK_TTL_SECONDS, "NX");
-  return result === "OK";
+  const result = await redis.set(
+    lockKey(key),
+    token,
+    "EX",
+    LOCK_TTL_SECONDS,
+    "NX"
+  );
+  return result === "OK" ? token : null;
 }
 
-export async function releaseDeliveryLock(key: string): Promise<void> {
-  await getRedisConnection().del(`dm:idempotency:${key}`);
+export async function acquireDeliveryLock(key: string): Promise<boolean> {
+  return (await acquireDeliveryLease(key)) !== null;
+}
+
+export async function releaseDeliveryLock(
+  key: string,
+  token?: string
+): Promise<void> {
+  const redis = getRedisConnection();
+  if (!token) {
+    await redis.del(lockKey(key));
+    return;
+  }
+
+  await redis.eval(RELEASE_SCRIPT, 1, lockKey(key), token);
+}
+
+async function renewDeliveryLock(key: string, token: string): Promise<boolean> {
+  const redis = getRedisConnection();
+  const result = await redis.eval(
+    RENEW_SCRIPT,
+    1,
+    lockKey(key),
+    token,
+    LOCK_TTL_SECONDS
+  );
+  return Number(result) === 1;
 }
 
 /**
- * Runs one automated outbound delivery behind the Redis lock.
+ * Runs one automated outbound delivery behind an owner-safe Redis lock.
+ *
+ * A unique token prevents an older worker from deleting a lock that has since
+ * expired and been acquired by another worker. The lock is renewed while Meta
+ * is in flight, so a slow external call does not reopen the duplicate-send
+ * window at the fixed TTL boundary.
  *
  * A successful send intentionally keeps the lock until TTL expiry. This gives
  * the database update/retry path a safety window against duplicate Meta sends.
@@ -34,15 +84,22 @@ export async function withDeliveryLock<T>(
   key: string,
   send: () => Promise<T>
 ): Promise<{ acquired: true; value: T } | { acquired: false }> {
-  const acquired = await acquireDeliveryLock(key);
-  if (!acquired) return { acquired: false };
+  const token = await acquireDeliveryLease(key);
+  if (!token) return { acquired: false };
+
+  let renewal: NodeJS.Timeout | undefined;
+  renewal = setInterval(() => {
+    void renewDeliveryLock(key, token).catch(() => {});
+  }, LOCK_RENEW_INTERVAL_MS);
 
   try {
     const value = await send();
     return { acquired: true, value };
   } catch (error) {
-    await releaseDeliveryLock(key).catch(() => {});
+    await releaseDeliveryLock(key, token).catch(() => {});
     throw error;
+  } finally {
+    if (renewal) clearInterval(renewal);
   }
 }
 
