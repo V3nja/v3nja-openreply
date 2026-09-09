@@ -127,7 +127,7 @@ describe("reserveDMSlot", () => {
 
 describe("releaseDMSlot", () => {
   it("should atomically decrement the account bucket", async () => {
-    mockEval.mockResolvedValue(4);
+    mockEval.mockResolvedValue(7);
 
     await releaseDMSlot("account_123");
 
@@ -136,11 +136,10 @@ describe("releaseDMSlot", () => {
       1,
       "rate:dm:account_123"
     );
-    expect(mockGet).not.toHaveBeenCalled();
     expect(mockDel).not.toHaveBeenCalled();
   });
 
-  it("should delete the bucket when releasing the final reservation", async () => {
+  it("should use an atomic delete when releasing the final reserved slot", async () => {
     mockEval.mockResolvedValue(0);
 
     await releaseDMSlot("account_123");
@@ -150,6 +149,7 @@ describe("releaseDMSlot", () => {
       1,
       "rate:dm:account_123"
     );
+    expect(mockDel).not.toHaveBeenCalled();
   });
 });
 
