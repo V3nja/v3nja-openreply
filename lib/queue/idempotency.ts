@@ -22,38 +22,12 @@ type DmLogDeliveryKey = {
   commentId: string;
 };
 
+export type DeliveryLease = {
+  release: () => Promise<void>;
+};
+
 function lockKey(key: string): string {
   return `dm:idempotency:${key}`;
-}
-
-async function acquireDeliveryLease(key: string): Promise<string | null> {
-  const token = randomUUID();
-  const redis = getRedisConnection();
-  const result = await redis.set(
-    lockKey(key),
-    token,
-    "EX",
-    LOCK_TTL_SECONDS,
-    "NX"
-  );
-  return result === "OK" ? token : null;
-}
-
-export async function acquireDeliveryLock(key: string): Promise<boolean> {
-  return (await acquireDeliveryLease(key)) !== null;
-}
-
-export async function releaseDeliveryLock(
-  key: string,
-  token?: string
-): Promise<void> {
-  const redis = getRedisConnection();
-  if (!token) {
-    await redis.del(lockKey(key));
-    return;
-  }
-
-  await redis.eval(RELEASE_SCRIPT, 1, lockKey(key), token);
 }
 
 async function renewDeliveryLock(key: string, token: string): Promise<boolean> {
@@ -69,46 +43,86 @@ async function renewDeliveryLock(key: string, token: string): Promise<boolean> {
 }
 
 /**
- * Runs one automated outbound delivery behind an owner-safe Redis lock.
- *
- * A unique token prevents an older worker from deleting a lock that has since
- * expired and been acquired by another worker. The lock is renewed while Meta
- * is in flight, so a slow external call does not reopen the duplicate-send
- * window at the fixed TTL boundary.
- *
- * A successful send intentionally keeps the lock until TTL expiry. This gives
- * the database update/retry path a safety window against duplicate Meta sends.
- * If Meta rejects the send, the lock is released so BullMQ can retry normally.
+ * Claims an owner-safe Redis delivery lease before any quota/rate reservation.
+ * Competing workers fail here and therefore consume no outbound budget.
+ */
+export async function acquireDeliveryLease(
+  key: string
+): Promise<DeliveryLease | null> {
+  const token = randomUUID();
+  const redis = getRedisConnection();
+  const result = await redis.set(
+    lockKey(key),
+    token,
+    "EX",
+    LOCK_TTL_SECONDS,
+    "NX"
+  );
+  if (result !== "OK") return null;
+
+  let released = false;
+  const renewal = setInterval(() => {
+    if (released) return;
+    void renewDeliveryLock(key, token).catch(() => {});
+  }, LOCK_RENEW_INTERVAL_MS);
+
+  return {
+    release: async () => {
+      if (released) return;
+      released = true;
+      clearInterval(renewal);
+      await redis.eval(RELEASE_SCRIPT, 1, lockKey(key), token);
+    },
+  };
+}
+
+export async function acquireDeliveryLock(key: string): Promise<boolean> {
+  const lease = await acquireDeliveryLease(key);
+  if (!lease) return false;
+  await lease.release();
+  return true;
+}
+
+/**
+ * Legacy explicit release helper. New worker code should prefer the lease's
+ * owner-safe release method so an expired lease can never delete a newer one.
+ */
+export async function releaseDeliveryLock(
+  key: string,
+  token?: string
+): Promise<void> {
+  const redis = getRedisConnection();
+  if (!token) {
+    await redis.del(lockKey(key));
+    return;
+  }
+
+  await redis.eval(RELEASE_SCRIPT, 1, lockKey(key), token);
+}
+
+/**
+ * Runs one automated outbound delivery behind an owner-safe Redis lease.
+ * A successful send intentionally keeps the lease until TTL expiry so the
+ * database transition can complete without reopening the duplicate window.
  */
 export async function withDeliveryLock<T>(
   key: string,
   send: () => Promise<T>
 ): Promise<{ acquired: true; value: T } | { acquired: false }> {
-  const token = await acquireDeliveryLease(key);
-  if (!token) return { acquired: false };
-
-  let renewal: NodeJS.Timeout | undefined;
-  renewal = setInterval(() => {
-    void renewDeliveryLock(key, token).catch(() => {});
-  }, LOCK_RENEW_INTERVAL_MS);
+  const lease = await acquireDeliveryLease(key);
+  if (!lease) return { acquired: false };
 
   try {
     const value = await send();
     return { acquired: true, value };
   } catch (error) {
-    await releaseDeliveryLock(key, token).catch(() => {});
+    await lease.release().catch(() => {});
     throw error;
-  } finally {
-    if (renewal) clearInterval(renewal);
   }
 }
 
 /**
  * Atomically records a successful automated DM delivery.
- *
- * updateMany + a status guard makes the database the final arbiter for the
- * delivery state. A concurrent retry can never move an already-SENT log back
- * through another state or overwrite its sent timestamp.
  */
 export async function markDmLogSent(
   key: DmLogDeliveryKey,
@@ -131,8 +145,8 @@ export async function markDmLogSent(
 }
 
 /**
- * Records a failed automated DM without ever regressing an already-successful
- * delivery back to FAILED. This is intentionally conditional for retry races.
+ * Records a failed automated DM without regressing an already successful
+ * delivery back to FAILED.
  */
 export async function markDmLogFailed(
   key: DmLogDeliveryKey,
