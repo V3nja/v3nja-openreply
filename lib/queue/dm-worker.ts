@@ -430,15 +430,11 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
   if (isFollowCheck && automation.requireFollow) {
     const follows = await getUserFollowStatus(accessToken, userId);
     if (follows === false) {
-      try {
-        const promptLock = await withDeliveryLock(
-          `${automation.workspaceId}:automation:${automation.id}:postback:${mid || userId}:follow-prompt`,
-          () => sendDirectMessageWithButton(accessToken, automation.instagramAccount.instagramId, userId, renderMessageWithoutLink({ message: automation.followPromptMessage || "Follow me and tap the button once you're following.", commenterName }), automation.followPromptButtonLabel || "I'm following", `followcheck:${automation.id}`)
-        );
-        if (!promptLock.acquired) return;
-      } catch (error) {
-        throw error;
-      }
+      const promptLock = await withDeliveryLock(
+        `${automation.workspaceId}:automation:${automation.id}:postback:${mid || userId}:follow-prompt`,
+        () => sendDirectMessageWithButton(accessToken, automation.instagramAccount.instagramId, userId, renderMessageWithoutLink({ message: automation.followPromptMessage || "Follow me and tap the button once you're following.", commenterName }), automation.followPromptButtonLabel || "I'm following", `followcheck:${automation.id}`)
+      );
+      if (!promptLock.acquired) return;
       return;
     }
   }
@@ -450,15 +446,42 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
   try {
     const revealLock = await withDeliveryLock(
       `${automation.workspaceId}:automation:${automation.id}:postback:${revealDedupeId}`,
-      () => sendRevealDirectMessage(accessToken, automation, userId, commenterName, "postback")
+      async () => {
+        await prisma.dmLog.upsert({
+          where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } },
+          create: {
+            workspaceId: automation.workspaceId,
+            automationId: automation.id,
+            instagramAccountId: automation.instagramAccountId,
+            commenterId: userId,
+            commenterName,
+            commentText: "(button tap)",
+            commentId: revealDedupeId,
+            status: "PENDING",
+            attempts: job.attemptsMade + 1,
+          },
+          update: {
+            status: "PENDING",
+            attempts: job.attemptsMade + 1,
+            commenterName,
+            errorMessage: null,
+          },
+        });
+        await sendRevealDirectMessage(accessToken, automation, userId, commenterName, "postback");
+      }
     );
     if (!revealLock.acquired) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
       return;
     }
-    await prisma.dmLog.upsert({ where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } }, create: { workspaceId: automation.workspaceId, automationId: automation.id, instagramAccountId: automation.instagramAccountId, commenterId: userId, commenterName, commentText: "(button tap)", commentId: revealDedupeId, status: "SENT", dmSentAt: new Date() }, update: { status: "SENT", dmSentAt: new Date(), errorMessage: null } });
+    await markDmLogSent({ automationId: automation.id, commentId: revealDedupeId });
   } catch (error) {
     await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
+    await markDmLogFailed(
+      { automationId: automation.id, commentId: revealDedupeId },
+      formatError(error),
+      job.attemptsMade + 1
+    );
     throw error;
   }
 }
