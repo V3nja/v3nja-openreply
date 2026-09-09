@@ -40,6 +40,7 @@ import {
   renderMessageWithTracking,
   renderMessageWithoutLink,
 } from "@/lib/tracking/message";
+import { withDeliveryLock } from "./idempotency";
 
 const BACKOFF_DELAYS = [5 * 60 * 1000, 15 * 60 * 1000, 45 * 60 * 1000];
 
@@ -317,13 +318,16 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
       ? automation.publicReplyMessages
       : automation.publicReplyMessage ? [automation.publicReplyMessage] : [];
     if (automation.publicReplyEnabled && replyPool.length > 0 && !existingLog?.publicReplySentAt) {
-      try {
-        const chosen = replyPool[Math.floor(Math.random() * replyPool.length)];
-        const publicReply = renderMessageWithTracking({ message: chosen, commenterName, trackedLinks: automation.trackedLinks });
-        await sendCommentReply(accessToken, commentId, publicReply);
+      const publicReplyLock = await withDeliveryLock(
+        `${automation.workspaceId}:automation:${automation.id}:comment:${commentId}:public`,
+        async () => {
+          const chosen = replyPool[Math.floor(Math.random() * replyPool.length)];
+          const publicReply = renderMessageWithTracking({ message: chosen, commenterName, trackedLinks: automation.trackedLinks });
+          await sendCommentReply(accessToken, commentId, publicReply);
+        }
+      );
+      if (publicReplyLock.acquired) {
         await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { publicReplySentAt: new Date(), publicReplyError: null } });
-      } catch (error) {
-        await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { publicReplyError: formatError(error) } }).catch(() => {});
       }
     }
     if (!needsDm) continue;
@@ -362,31 +366,35 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
       sendFollowPrompt = alreadyFollows !== true;
     }
 
-    try {
-      if (useOpeningDm) {
-        const openingText = renderMessageWithTracking({ message: automation.openingDmMessage as string, commenterName, trackedLinks: [] });
-        await sendPrivateReplyWithButton(accessToken, automation.instagramAccount.instagramId, commentId, openingText, automation.openingDmButtonLabel as string, automation.requireFollow ? `followcheck:${automation.id}` : `reveal:${automation.id}`);
-      } else if (sendFollowPrompt) {
-        const promptText = renderMessageWithoutLink({ message: automation.followPromptMessage || "Follow me and tap the button to grab your link!", commenterName });
-        await sendPrivateReplyWithButton(accessToken, automation.instagramAccount.instagramId, commentId, promptText, automation.followPromptButtonLabel || "I'm following", `followcheck:${automation.id}`);
-      } else if (automation.trackedLinks.length > 0) {
-        const bodyText = renderMessageWithoutLink({ message: automation.dmMessage, commenterName }) || "Here's your link:";
-        const buttons = buildLinkButtons(automation.trackedLinks, automation.linkButtonLabel);
-        try {
-          await sendPrivateReplyWithLinkButton(accessToken, automation.instagramAccount.instagramId, commentId, bodyText, buttons);
-        } catch (buttonError) {
-          if (!isTemplateRejection(buttonError)) throw buttonError;
-          await sendPrivateReply(accessToken, automation.instagramAccount.instagramId, commentId, buildInlineLinkFallback(automation.dmMessage, commenterName, automation.trackedLinks, bodyText));
+    const deliveryLock = await withDeliveryLock(
+      `${automation.workspaceId}:automation:${automation.id}:comment:${commentId}:dm`,
+      async () => {
+        if (useOpeningDm) {
+          const openingText = renderMessageWithTracking({ message: automation.openingDmMessage as string, commenterName, trackedLinks: [] });
+          await sendPrivateReplyWithButton(accessToken, automation.instagramAccount.instagramId, commentId, openingText, automation.openingDmButtonLabel as string, automation.requireFollow ? `followcheck:${automation.id}` : `reveal:${automation.id}`);
+        } else if (sendFollowPrompt) {
+          const promptText = renderMessageWithoutLink({ message: automation.followPromptMessage || "Follow me and tap the button to grab your link!", commenterName });
+          await sendPrivateReplyWithButton(accessToken, automation.instagramAccount.instagramId, commentId, promptText, automation.followPromptButtonLabel || "I'm following", `followcheck:${automation.id}`);
+        } else if (automation.trackedLinks.length > 0) {
+          const bodyText = renderMessageWithoutLink({ message: automation.dmMessage, commenterName }) || "Here's your link:";
+          const buttons = buildLinkButtons(automation.trackedLinks, automation.linkButtonLabel);
+          try {
+            await sendPrivateReplyWithLinkButton(accessToken, automation.instagramAccount.instagramId, commentId, bodyText, buttons);
+          } catch (buttonError) {
+            if (!isTemplateRejection(buttonError)) throw buttonError;
+            await sendPrivateReply(accessToken, automation.instagramAccount.instagramId, commentId, buildInlineLinkFallback(automation.dmMessage, commenterName, automation.trackedLinks, bodyText));
+          }
+        } else {
+          await sendPrivateReply(accessToken, automation.instagramAccount.instagramId, commentId, renderMessageWithTracking({ message: automation.dmMessage, commenterName, trackedLinks: automation.trackedLinks }));
         }
-      } else {
-        await sendPrivateReply(accessToken, automation.instagramAccount.instagramId, commentId, renderMessageWithTracking({ message: automation.dmMessage, commenterName, trackedLinks: automation.trackedLinks }));
       }
-      await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "SENT", dmSentAt: new Date(), errorMessage: null } });
-    } catch (error) {
+    );
+    if (!deliveryLock.acquired) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-      await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "FAILED", attempts: job.attemptsMade + 1, errorMessage: formatError(error) } });
-      throw error;
+      continue;
     }
+
+    await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "SENT", dmSentAt: new Date(), errorMessage: null } });
   }
 }
 
@@ -405,17 +413,30 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
   if (isFollowCheck && automation.requireFollow) {
     const follows = await getUserFollowStatus(accessToken, userId);
     if (follows === false) {
-      await sendDirectMessageWithButton(accessToken, automation.instagramAccount.instagramId, userId, renderMessageWithoutLink({ message: automation.followPromptMessage || "Follow me and tap the button once you're following.", commenterName }), automation.followPromptButtonLabel || "I'm following", `followcheck:${automation.id}`);
+      const promptLock = await withDeliveryLock(
+        `${automation.workspaceId}:automation:${automation.id}:postback:${mid || userId}:follow-prompt`,
+        () => sendDirectMessageWithButton(accessToken, automation.instagramAccount.instagramId, userId, renderMessageWithoutLink({ message: automation.followPromptMessage || "Follow me and tap the button once you're following.", commenterName }), automation.followPromptButtonLabel || "I'm following", `followcheck:${automation.id}`)
+      );
+      if (!promptLock.acquired) return;
       return;
     }
   }
+  const revealDedupeId = `reveal:${userId}`;
+  const existingReveal = await prisma.dmLog.findUnique({ where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } }, select: { status: true } });
+  if (existingReveal?.status === "SENT") return;
   const usage = await reserveWorkspaceDMSend(automation.workspaceId);
   if (!usage.allowed) return;
-  try {
-    await sendRevealDirectMessage(accessToken, automation, userId, commenterName, "postback");
-    await prisma.dmLog.upsert({ where: { automationId_commentId: { automationId: automation.id, commentId: `reveal:${userId}` } }, create: { workspaceId: automation.workspaceId, automationId: automation.id, instagramAccountId: automation.instagramAccountId, commenterId: userId, commenterName, commentText: "(button tap)", commentId: `reveal:${userId}`, status: "SENT", dmSentAt: new Date() }, update: { status: "SENT", dmSentAt: new Date(), errorMessage: null } });
-  } catch (error) {
+  const revealLock = await withDeliveryLock(
+    `${automation.workspaceId}:automation:${automation.id}:postback:${revealDedupeId}`,
+    () => sendRevealDirectMessage(accessToken, automation, userId, commenterName, "postback")
+  );
+  if (!revealLock.acquired) {
     await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
+    return;
+  }
+  try {
+    await prisma.dmLog.upsert({ where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } }, create: { workspaceId: automation.workspaceId, automationId: automation.id, instagramAccountId: automation.instagramAccountId, commenterId: userId, commenterName, commentText: "(button tap)", commentId: revealDedupeId, status: "SENT", dmSentAt: new Date() }, update: { status: "SENT", dmSentAt: new Date(), errorMessage: null } });
+  } catch (error) {
     throw error;
   }
 }
@@ -425,7 +446,11 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
   const automation = await prisma.automation.findFirst({ where: { id: automationId, isActive: true }, include: { instagramAccount: true } });
   if (!automation?.followUpEnabled || !automation.followUpMessage?.trim() || automation.instagramAccount.instagramId !== instagramAccountId || !automation.instagramAccount.accessToken) return;
   const accessToken = decryptToken(automation.instagramAccount.accessToken);
-  await sendDirectMessage(accessToken, automation.instagramAccount.instagramId, userId, renderMessageWithoutLink({ message: automation.followUpMessage, commenterName: commenterName ?? null }));
+  const deliveryLock = await withDeliveryLock(
+    `${automation.workspaceId}:automation:${automation.id}:followup:${userId}`,
+    () => sendDirectMessage(accessToken, automation.instagramAccount.instagramId, userId, renderMessageWithoutLink({ message: automation.followUpMessage, commenterName: commenterName ?? null }))
+  );
+  if (!deliveryLock.acquired) return;
 }
 
 async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
@@ -456,14 +481,18 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
     if (automation.requireFollow) { const follows = await getUserFollowStatus(accessToken, senderId); sendFollowPrompt = follows !== true; }
     const usage = await reserveWorkspaceDMSend(automation.workspaceId);
     if (!usage.allowed) continue;
-    try {
-      if (sendFollowPrompt) await sendDirectMessageWithButton(accessToken, automation.instagramAccount.instagramId, senderId, renderMessageWithoutLink({ message: automation.followPromptMessage || "Almost there! Follow me and tap the button below to grab your link 💛", commenterName }), automation.followPromptButtonLabel || "I'm following ✅", `followcheck:${automation.id}`);
-      else await sendRevealDirectMessage(accessToken, automation, senderId, commenterName, "message trigger");
-      await prisma.dmLog.upsert({ where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } }, create: { workspaceId: automation.workspaceId, automationId: automation.id, instagramAccountId: automation.instagramAccountId, commenterId: senderId, commenterName, commentText: messageText, commentId: dedupeId, matchedKeyword: matchResult.matchedKeyword, status: "SENT", dmSentAt: new Date() }, update: { status: "SENT", dmSentAt: new Date(), errorMessage: null } });
-    } catch (error) {
+    const deliveryLock = await withDeliveryLock(
+      `${automation.workspaceId}:automation:${automation.id}:message:${messageId}`,
+      async () => {
+        if (sendFollowPrompt) await sendDirectMessageWithButton(accessToken, automation.instagramAccount.instagramId, senderId, renderMessageWithoutLink({ message: automation.followPromptMessage || "Almost there! Follow me and tap the button below to grab your link 💛", commenterName }), automation.followPromptButtonLabel || "I'm following ✅", `followcheck:${automation.id}`);
+        else await sendRevealDirectMessage(accessToken, automation, senderId, commenterName, "message trigger");
+      }
+    );
+    if (!deliveryLock.acquired) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-      throw error;
+      continue;
     }
+    await prisma.dmLog.upsert({ where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } }, create: { workspaceId: automation.workspaceId, automationId: automation.id, instagramAccountId: automation.instagramAccountId, commenterId: senderId, commenterName, commentText: messageText, commentId: dedupeId, matchedKeyword: matchResult.matchedKeyword, status: "SENT", dmSentAt: new Date() }, update: { status: "SENT", dmSentAt: new Date(), errorMessage: null } });
   }
 }
 
