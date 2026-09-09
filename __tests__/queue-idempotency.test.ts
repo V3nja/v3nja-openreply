@@ -62,6 +62,25 @@ describe("queue delivery idempotency", () => {
     );
   });
 
+  it("bounds lease renewal so a successful lease can never renew forever", async () => {
+    vi.useFakeTimers();
+    try {
+      const lease = await acquireDeliveryLease("bounded-key");
+      expect(lease).not.toBeNull();
+
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(mockRedis.eval).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(mockRedis.eval).toHaveBeenCalledTimes(2);
+
+      await lease!.release();
+      expect(mockRedis.eval).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("uses owner-safe release when a token is supplied", async () => {
     await releaseDeliveryLock("workspace:auto:comment:dm", "owner-token");
     expect(mockRedis.eval).toHaveBeenCalledWith(
