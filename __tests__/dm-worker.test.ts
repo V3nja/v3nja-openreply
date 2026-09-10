@@ -26,6 +26,7 @@ const {
       findFirst: vi.fn(),
       upsert: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       create: vi.fn(),
     },
     instagramAccount: {
@@ -109,10 +110,15 @@ vi.mock("@/lib/queue/client", () => ({
   getDMQueue: () => ({
     add: mockQueueAdd,
   }),
-  getRedisConnection: vi.fn(),
+  getRedisConnection: () => ({
+    set: vi.fn().mockResolvedValue("OK"),
+    eval: vi.fn().mockResolvedValue(1),
+    del: vi.fn().mockResolvedValue(1),
+  }),
   POSTBACK_JOB_NAME: "process-postback",
   FOLLOWUP_JOB_NAME: "process-followup",
   MESSAGE_JOB_NAME: "process-message",
+  MANUAL_MESSAGE_JOB_NAME: "process-manual-message",
 }));
 
 vi.mock("bullmq", () => {
