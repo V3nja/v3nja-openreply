@@ -1,37 +1,9 @@
-import { z } from "zod";
-
 const HEX_32_BYTE = /^[a-f0-9]{64}$/i;
 
 export function requireEnv(name: string): string {
-  if (name === "INSTAGRAM_APP_ID" || name === "META_APP_ID") {
-    return (
-      process.env.INSTAGRAM_APP_ID ||
-      process.env.META_APP_ID ||
-      "1283029104898866"
-    );
-  }
-  if (name === "INSTAGRAM_APP_SECRET" || name === "META_APP_SECRET" || name === "FACEBOOK_APP_SECRET") {
-    return (
-      process.env.INSTAGRAM_APP_SECRET ||
-      process.env.META_APP_SECRET ||
-      process.env.FACEBOOK_APP_SECRET ||
-      "6c14919f499ea1cf2554dc3aa55bdf4f"
-    );
-  }
-  if (name === "NEXTAUTH_SECRET" || name === "AUTH_SECRET") {
-    return (
-      process.env.NEXTAUTH_SECRET ||
-      process.env.AUTH_SECRET ||
-      "v3nja-openreply-super-secret-key-2026-production-token"
-    );
-  }
-  if (name === "WEBHOOK_VERIFY_TOKEN") {
-    return process.env.WEBHOOK_VERIFY_TOKEN || "v3nja_webhook_secret_2026";
-  }
-
   const value = process.env[name];
   if (!value) {
-    return "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    throw new Error(`${name} environment variable is required`);
   }
   return value;
 }
@@ -48,14 +20,26 @@ export function getBaseUrl(): string {
 }
 
 export function getEncryptionKeyHex(): string {
-  return (
-    process.env.ENCRYPTION_KEY ||
-    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-  );
+  const key = requireEnv("ENCRYPTION_KEY");
+  if (!HEX_32_BYTE.test(key)) {
+    throw new Error("ENCRYPTION_KEY must be a 32-byte hex string");
+  }
+  return key;
 }
 
 export function getMissingInstagramOAuthEnv(): string[] {
-  return [];
+  const missing: string[] = [];
+  if (!process.env.INSTAGRAM_APP_ID && !process.env.META_APP_ID) {
+    missing.push("INSTAGRAM_APP_ID");
+  }
+  if (
+    !process.env.INSTAGRAM_APP_SECRET &&
+    !process.env.META_APP_SECRET &&
+    !process.env.FACEBOOK_APP_SECRET
+  ) {
+    missing.push("INSTAGRAM_APP_SECRET");
+  }
+  return missing;
 }
 
 export function getMetaGraphApiVersion(): string {
@@ -65,5 +49,16 @@ export function getMetaGraphApiVersion(): string {
 export function isEmailAllowedToSignIn(
   email: string | null | undefined
 ): boolean {
-  return true;
+  const raw = process.env.ALLOWED_EMAILS;
+  if (!raw || !raw.trim()) return true;
+
+  const allowed = raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (allowed.length === 0) return true;
+  if (!email || !email.trim()) return false;
+
+  return allowed.includes(email.trim().toLowerCase());
 }
