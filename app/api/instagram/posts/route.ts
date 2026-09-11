@@ -27,63 +27,59 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  let token = account.accessToken;
   try {
-    const token = decryptToken(account.accessToken);
-    const url = new URL(
-      `https://graph.facebook.com/${getMetaGraphApiVersion()}/${account.instagramId}/media`
-    );
-    url.searchParams.set(
-      "fields",
-      "id,caption,media_type,media_product_type,media_url,thumbnail_url,timestamp,permalink,like_count,comments_count"
-    );
-    url.searchParams.set("limit", "50");
-    url.searchParams.set("access_token", token);
-
-    const response = await fetch(url.toString(), { cache: "no-store" });
-    const data = await response.json();
-
-    if (!response.ok || data?.error) {
-      const error = data?.error;
-      console.error("[Instagram Posts] Meta API error", {
-        status: response.status,
-        code: error?.code,
-        subcode: error?.error_subcode,
-        message: error?.message,
-        trace: error?.fbtrace_id,
-        accountId: account.instagramId,
-      });
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Instagram posts could not be loaded",
-          code: error?.code ?? response.status,
-        },
-        { status: response.status >= 400 ? response.status : 502 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: Array.isArray(data?.data) ? data.data : [],
-        account: {
-          id: account.id,
-          instagramId: account.instagramId,
-          username: account.username,
-        },
-      },
-      { headers: { "Cache-Control": "private, no-store" } }
-    );
-  } catch (error) {
-    console.error("[Instagram Posts] Fetch error", {
-      error: error instanceof Error ? error.message : String(error),
-      accountId: account.instagramId,
-    });
-
-    return NextResponse.json(
-      { success: false, error: "Failed to load Instagram posts" },
-      { status: 500 }
-    );
+    token = decryptToken(account.accessToken);
+  } catch {
+    token = account.accessToken;
   }
+
+  const version = getMetaGraphApiVersion();
+  const fields = "id,caption,media_type,media_url,permalink,timestamp,thumbnail_url,like_count,comments_count";
+
+  const urlsToTry = [
+    `https://graph.instagram.com/${version}/me/media?fields=${fields}&limit=50&access_token=${token}`,
+    `https://graph.instagram.com/me/media?fields=${fields}&limit=50&access_token=${token}`,
+    `https://graph.facebook.com/${version}/${account.instagramId}/media?fields=${fields}&limit=50&access_token=${token}`,
+    `https://graph.facebook.com/${version}/me/media?fields=${fields}&limit=50&access_token=${token}`,
+  ];
+
+  let lastError: any = null;
+
+  for (const mediaUrl of urlsToTry) {
+    try {
+      const response = await fetch(mediaUrl, { cache: "no-store" });
+      const data = await response.json();
+
+      if (response.ok && Array.isArray(data?.data)) {
+        return NextResponse.json(
+          {
+            success: true,
+            data: data.data,
+            account: {
+              id: account.id,
+              instagramId: account.instagramId,
+              username: account.username,
+            },
+          },
+          { headers: { "Cache-Control": "private, no-store" } }
+        );
+      }
+
+      lastError = data?.error;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  console.error("[Instagram Posts] All media endpoints failed:", lastError);
+
+  return NextResponse.json(
+    {
+      success: false,
+      error: "Instagram posts could not be loaded",
+      details: lastError?.message || "Check permissions for @v3nja2.0",
+    },
+    { status: 502 }
+  );
 }
