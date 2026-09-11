@@ -13,4 +13,4 @@ RUN npx prisma generate
 
 ENV NODE_ENV=production
 
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm run worker"]
+CMD ["sh", "-c", "npx prisma db push --url \"$DATABASE_URL\" --accept-data-loss && npm run worker"]
