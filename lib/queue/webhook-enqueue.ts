@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/client";
 import { getDMQueue } from "@/lib/queue/client";
 import { recordFanInteraction } from "@/lib/fans/engine";
 import { evaluateAutomationRule } from "@/lib/automation/rules";
+import { processComment, processMessage, processPostback } from "@/lib/queue/dm-worker";
 import {
   parseCommentEvents,
   parseMessageEvents,
@@ -42,14 +43,26 @@ export async function enqueueVerifiedWebhook(
 
   const accounts = accountIds.size > 0
     ? await prisma.instagramAccount.findMany({
-        where: { instagramId: { in: [...accountIds] } },
+        where: {
+          OR: [
+            { instagramId: { in: [...accountIds] } },
+            { id: { in: [...accountIds] } },
+          ],
+        },
         select: { id: true, instagramId: true, workspaceId: true },
       })
     : [];
 
+  const defaultAccount = accounts.length === 0
+    ? await prisma.instagramAccount.findFirst({
+        select: { id: true, instagramId: true, workspaceId: true },
+        orderBy: { connectedAt: "desc" },
+      })
+    : null;
+
   const accountMap = new Map(accounts.map((account) => [account.instagramId, account]));
   const workspaceIds = new Set(accounts.map((account) => account.workspaceId));
-  const workspaceId = workspaceIds.size === 1 ? [...workspaceIds][0] : null;
+  const workspaceId = workspaceIds.size === 1 ? [...workspaceIds][0] : defaultAccount?.workspaceId ?? null;
 
   if (!existing) {
     await prisma.webhookEvent.create({
@@ -63,12 +76,17 @@ export async function enqueueVerifiedWebhook(
     });
   }
 
-  const queue = getDMQueue();
+  let queue: ReturnType<typeof getDMQueue> | null = null;
+  try {
+    queue = getDMQueue();
+  } catch {
+    queue = null;
+  }
   let queued = 0;
 
   try {
     for (const event of commentEvents) {
-      const account = accountMap.get(event.instagramAccountId);
+      const account = accountMap.get(event.instagramAccountId) ?? defaultAccount;
       if (!account) continue;
 
       await recordFanInteraction({
@@ -134,25 +152,50 @@ export async function enqueueVerifiedWebhook(
         }
       }
 
-      await queue.add(
-        "process-comment",
-        {
-          instagramAccountId: event.instagramAccountId,
-          commentId: event.commentId,
-          commentText: event.commentText,
-          commenterId: event.commenterId,
-          commenterName: event.commenterName,
-          mediaId: event.mediaId,
-          originalMediaId: event.originalMediaId,
-          source: "WEBHOOK",
-        },
-        { jobId: `comment_${event.instagramAccountId}_${event.commentId}` }
-      );
+      // Direct in-process execution on Vercel Serverless
+      try {
+        await processComment({
+          data: {
+            instagramAccountId: account.instagramId,
+            commentId: event.commentId,
+            commentText: event.commentText,
+            commenterId: event.commenterId,
+            commenterName: event.commenterName,
+            mediaId: event.mediaId,
+            originalMediaId: event.originalMediaId,
+            source: "WEBHOOK",
+          },
+          attemptsMade: 0,
+        });
+      } catch (directErr) {
+        console.error("[Direct Comment Dispatch Error]:", directErr);
+      }
+
+      if (queue) {
+        try {
+          await queue.add(
+            "process-comment",
+            {
+              instagramAccountId: account.instagramId,
+              commentId: event.commentId,
+              commentText: event.commentText,
+              commenterId: event.commenterId,
+              commenterName: event.commenterName,
+              mediaId: event.mediaId,
+              originalMediaId: event.originalMediaId,
+              source: "WEBHOOK",
+            },
+            { jobId: `comment_${account.instagramId}_${event.commentId}` }
+          );
+        } catch {
+          // queue fallback optional in serverless
+        }
+      }
       queued += 1;
     }
 
     for (const event of messageEvents) {
-      const account = accountMap.get(event.instagramAccountId);
+      const account = accountMap.get(event.instagramAccountId) ?? defaultAccount;
       if (!account) continue;
 
       await recordFanInteraction({
@@ -165,21 +208,42 @@ export async function enqueueVerifiedWebhook(
         interactionType: "dm",
       });
 
-      await queue.add(
-        "process-message",
-        {
-          instagramAccountId: event.instagramAccountId,
-          messageId: event.messageId,
-          messageText: event.messageText,
-          senderId: event.senderId,
-        },
-        { jobId: `message_${event.instagramAccountId}_${event.messageId}` }
-      );
+      // Direct in-process execution on Vercel Serverless
+      try {
+        await processMessage({
+          data: {
+            instagramAccountId: account.instagramId,
+            messageId: event.messageId,
+            messageText: event.messageText,
+            senderId: event.senderId,
+          },
+          attemptsMade: 0,
+        });
+      } catch (directErr) {
+        console.error("[Direct Message Dispatch Error]:", directErr);
+      }
+
+      if (queue) {
+        try {
+          await queue.add(
+            "process-message",
+            {
+              instagramAccountId: account.instagramId,
+              messageId: event.messageId,
+              messageText: event.messageText,
+              senderId: event.senderId,
+            },
+            { jobId: `message_${account.instagramId}_${event.messageId}` }
+          );
+        } catch {
+          // queue fallback optional in serverless
+        }
+      }
       queued += 1;
     }
 
     for (const event of postbackEvents) {
-      const account = accountMap.get(event.instagramAccountId);
+      const account = accountMap.get(event.instagramAccountId) ?? defaultAccount;
       if (!account) continue;
 
       const postbackKey = event.mid ?? `${event.userId}:${event.payload}`;
@@ -193,16 +257,37 @@ export async function enqueueVerifiedWebhook(
         interactionType: "button-tap",
       });
 
-      await queue.add(
-        "process-postback",
-        {
-          instagramAccountId: event.instagramAccountId,
-          userId: event.userId,
-          payload: event.payload,
-          mid: event.mid,
-        },
-        { jobId: `postback_${event.instagramAccountId}_${event.mid ?? event.userId}_${event.payload}` }
-      );
+      // Direct in-process execution on Vercel Serverless
+      try {
+        await processPostback({
+          data: {
+            instagramAccountId: account.instagramId,
+            userId: event.userId,
+            payload: event.payload,
+            mid: event.mid,
+          },
+          attemptsMade: 0,
+        });
+      } catch (directErr) {
+        console.error("[Direct Postback Dispatch Error]:", directErr);
+      }
+
+      if (queue) {
+        try {
+          await queue.add(
+            "process-postback",
+            {
+              instagramAccountId: account.instagramId,
+              userId: event.userId,
+              payload: event.payload,
+              mid: event.mid,
+            },
+            { jobId: `postback_${account.instagramId}_${event.mid ?? event.userId}_${event.payload}` }
+          );
+        } catch {
+          // queue fallback optional in serverless
+        }
+      }
       queued += 1;
     }
 

@@ -144,28 +144,51 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return data as T;
 }
 
+async function postToMessagesEndpoint<T>(
+  accessToken: string,
+  instagramAccountId: string,
+  body: object
+): Promise<T> {
+  const version = getMetaGraphApiVersion();
+  const endpoints = [
+    `${instagramGraphBase()}/${instagramAccountId}/messages`,
+    `https://graph.facebook.com/${version}/${instagramAccountId}/messages`,
+    `https://graph.facebook.com/${version}/me/messages`,
+  ];
+
+  let lastError: unknown = null;
+  for (const url of endpoints) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(body),
+      });
+      return await handleResponse<T>(response);
+    } catch (err) {
+      lastError = err;
+      if (err instanceof RateLimitError || err instanceof TokenExpiredError) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError || new Error("Failed to post message to Meta API");
+}
+
 export async function sendPrivateReply(
   accessToken: string,
   instagramAccountId: string,
   commentId: string,
   message: string
 ): Promise<{ recipient_id: string; message_id: string }> {
-  const response = await fetch(
-    `${instagramGraphBase()}/${instagramAccountId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        recipient: { comment_id: commentId },
-        message: { text: message },
-      }),
-    }
-  );
-
-  return handleResponse(response);
+  return postToMessagesEndpoint(accessToken, instagramAccountId, {
+    recipient: { comment_id: commentId },
+    message: { text: message },
+  });
 }
 
 /**
@@ -182,34 +205,21 @@ export async function sendPrivateReplyWithButton(
   buttonTitle: string,
   payload: string
 ): Promise<{ recipient_id: string; message_id: string }> {
-  const response = await fetch(
-    `${instagramGraphBase()}/${instagramAccountId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        recipient: { comment_id: commentId },
-        message: {
-          attachment: {
-            type: "template",
-            payload: {
-              template_type: "button",
-              // Button template text is capped at 640 chars by Meta.
-              text: text.slice(0, 640),
-              buttons: [
-                { type: "postback", title: buttonTitle.slice(0, 20), payload },
-              ],
-            },
-          },
+  return postToMessagesEndpoint(accessToken, instagramAccountId, {
+    recipient: { comment_id: commentId },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "button",
+          text: text.slice(0, 640),
+          buttons: [
+            { type: "postback", title: buttonTitle.slice(0, 20), payload },
+          ],
         },
-      }),
-    }
-  );
-
-  return handleResponse(response);
+      },
+    },
+  });
 }
 
 /**
@@ -225,33 +235,21 @@ export async function sendDirectMessageWithButton(
   buttonTitle: string,
   payload: string
 ): Promise<{ recipient_id: string; message_id: string }> {
-  const response = await fetch(
-    `${instagramGraphBase()}/${instagramAccountId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        recipient: { id: userId },
-        message: {
-          attachment: {
-            type: "template",
-            payload: {
-              template_type: "button",
-              text: text.slice(0, 640),
-              buttons: [
-                { type: "postback", title: buttonTitle.slice(0, 20), payload },
-              ],
-            },
-          },
+  return postToMessagesEndpoint(accessToken, instagramAccountId, {
+    recipient: { id: userId },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "button",
+          text: text.slice(0, 640),
+          buttons: [
+            { type: "postback", title: buttonTitle.slice(0, 20), payload },
+          ],
         },
-      }),
-    }
-  );
-
-  return handleResponse(response);
+      },
+    },
+  });
 }
 
 /**
@@ -310,31 +308,19 @@ export async function sendPrivateReplyWithLinkButton(
   text: string,
   buttons: LinkButton[]
 ): Promise<{ recipient_id: string; message_id: string }> {
-  const response = await fetch(
-    `${instagramGraphBase()}/${instagramAccountId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        recipient: { comment_id: commentId },
-        message: {
-          attachment: {
-            type: "template",
-            payload: {
-              template_type: "button",
-              text: text.slice(0, 640),
-              buttons: toWebUrlButtons(buttons),
-            },
-          },
+  return postToMessagesEndpoint(accessToken, instagramAccountId, {
+    recipient: { comment_id: commentId },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "button",
+          text: text.slice(0, 640),
+          buttons: toWebUrlButtons(buttons),
         },
-      }),
-    }
-  );
-
-  return handleResponse(response);
+      },
+    },
+  });
 }
 
 /**
@@ -347,22 +333,10 @@ export async function sendDirectMessage(
   userId: string,
   message: string
 ): Promise<{ recipient_id: string; message_id: string }> {
-  const response = await fetch(
-    `${instagramGraphBase()}/${instagramAccountId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        recipient: { id: userId },
-        message: { text: message },
-      }),
-    }
-  );
-
-  return handleResponse(response);
+  return postToMessagesEndpoint(accessToken, instagramAccountId, {
+    recipient: { id: userId },
+    message: { text: message },
+  });
 }
 
 /**
@@ -376,31 +350,19 @@ export async function sendDirectMessageWithLinkButton(
   text: string,
   buttons: LinkButton[]
 ): Promise<{ recipient_id: string; message_id: string }> {
-  const response = await fetch(
-    `${instagramGraphBase()}/${instagramAccountId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        recipient: { id: userId },
-        message: {
-          attachment: {
-            type: "template",
-            payload: {
-              template_type: "button",
-              text: text.slice(0, 640),
-              buttons: toWebUrlButtons(buttons),
-            },
-          },
+  return postToMessagesEndpoint(accessToken, instagramAccountId, {
+    recipient: { id: userId },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "button",
+          text: text.slice(0, 640),
+          buttons: toWebUrlButtons(buttons),
         },
-      }),
-    }
-  );
-
-  return handleResponse(response);
+      },
+    },
+  });
 }
 
 export async function sendCommentReply(
@@ -408,19 +370,33 @@ export async function sendCommentReply(
   commentId: string,
   message: string
 ): Promise<{ id: string }> {
-  const response = await fetch(
+  const version = getMetaGraphApiVersion();
+  const endpoints = [
     `${instagramGraphBase()}/${commentId}/replies`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ message }),
-    }
-  );
+    `https://graph.facebook.com/${version}/${commentId}/replies`,
+  ];
 
-  return handleResponse(response);
+  let lastError: unknown = null;
+  for (const url of endpoints) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ message }),
+      });
+      return await handleResponse<{ id: string }>(response);
+    } catch (err) {
+      lastError = err;
+      if (err instanceof RateLimitError || err instanceof TokenExpiredError) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError || new Error("Failed to send comment reply to Meta API");
 }
 
 export async function getMediaComments(

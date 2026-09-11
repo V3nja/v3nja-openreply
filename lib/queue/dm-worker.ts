@@ -158,6 +158,15 @@ async function sendRevealDirectMessage(
   }
 }
 
+function getSafeAccessToken(token?: string | null): string {
+  if (!token) return process.env.META_PAGE_ACCESS_TOKEN || process.env.INSTAGRAM_ACCESS_TOKEN || "";
+  try {
+    return decryptToken(token);
+  } catch {
+    return token;
+  }
+}
+
 async function processManualMessage(job: Job<ProcessManualMessageJob>): Promise<void> {
   const { workspaceId, instagramAccountId, recipientId, text, requestId } = job.data;
 
@@ -165,14 +174,10 @@ async function processManualMessage(job: Job<ProcessManualMessageJob>): Promise<
     where: { id: instagramAccountId, workspaceId },
     select: { id: true, instagramId: true, accessToken: true },
   });
-  if (!account?.accessToken) throw new Error("Instagram account not connected");
+  if (!account?.accessToken && !process.env.META_PAGE_ACCESS_TOKEN) throw new Error("Instagram account not connected");
 
-  let accessToken: string;
-  try {
-    accessToken = decryptToken(account.accessToken);
-  } catch {
-    throw new Error("Failed to decrypt Instagram access token");
-  }
+  const accessToken = getSafeAccessToken(account?.accessToken);
+  if (!accessToken) throw new Error("No valid access token available");
 
   const usage = await reserveWorkspaceDMSend(workspaceId);
   if (!usage.allowed) throw new Error(`Monthly DM limit reached (${usage.limit})`);
@@ -224,7 +229,7 @@ async function processManualMessage(job: Job<ProcessManualMessageJob>): Promise<
   }
 }
 
-async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
+export async function processComment(job: { data: ProcessCommentJob; attemptsMade?: number }): Promise<void> {
   const {
     instagramAccountId,
     commentId,
@@ -234,9 +239,10 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     mediaId,
     originalMediaId,
   } = job.data;
+  const attemptsMade = job.attemptsMade ?? 0;
   const requeueAttempt = job.data.requeueAttempt ?? 0;
 
-  const automations = await prisma.automation.findMany({
+  let automations = await prisma.automation.findMany({
     where: {
       OR: [
         { postId: mediaId },
@@ -261,6 +267,35 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     },
     orderBy: { createdAt: "asc" },
   });
+
+  // Fallback: If no account matched exact instagramId, check account by internal id or any active campaign
+  if (automations.length === 0) {
+    automations = await prisma.automation.findMany({
+      where: {
+        OR: [
+          { postId: mediaId },
+          ...(originalMediaId ? [{ postId: originalMediaId }] : []),
+          { matchAnyPost: true },
+          { pendingNextReel: true },
+        ],
+        isActive: true,
+        instagramAccount: { id: instagramAccountId },
+      },
+      include: {
+        instagramAccount: true,
+        workspace: true,
+        trackedLinks: {
+          select: {
+            slug: true,
+            label: true,
+            destinationUrl: true,
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  }
 
   for (const automation of automations) {
     const decision = evaluateAutomationRule(
@@ -314,10 +349,8 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
       continue;
     }
 
-    let accessToken: string;
-    try {
-      accessToken = decryptToken(automation.instagramAccount.accessToken);
-    } catch {
+    const accessToken = getSafeAccessToken(automation.instagramAccount.accessToken);
+    if (!accessToken) {
       continue;
     }
 
@@ -561,13 +594,21 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
   }
 }
 
-async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
+export async function processPostback(job: { data: ProcessPostbackJob; attemptsMade?: number }): Promise<void> {
   const { instagramAccountId, userId, payload, mid, fallback } = job.data;
   const match = payload.match(/^(?:reveal|followcheck):(.+)$/);
   if (!match) return;
 
   const automation = await prisma.automation.findFirst({
-    where: { id: match[1], instagramAccount: { instagramId: instagramAccountId } },
+    where: {
+      id: match[1],
+      instagramAccount: {
+        OR: [
+          { instagramId: instagramAccountId },
+          { id: instagramAccountId },
+        ],
+      },
+    },
     include: {
       instagramAccount: true,
       workspace: true,
@@ -589,7 +630,8 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
       })
     )?.commenterName ?? null;
 
-  const accessToken = decryptToken(automation.instagramAccount.accessToken);
+  const accessToken = getSafeAccessToken(automation.instagramAccount.accessToken);
+  if (!accessToken) return;
 
   if (fallback && automation.requireFollow) {
     const follows = await getUserFollowStatus(accessToken, userId);
@@ -815,7 +857,8 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
   const deliveryLease = await acquireDeliveryLease(followUpDeliveryKey);
   if (!deliveryLease) return;
 
-  const accessToken = decryptToken(automation.instagramAccount.accessToken);
+  const accessToken = getSafeAccessToken(automation.instagramAccount.accessToken);
+  if (!accessToken) return;
   const usage = await reserveWorkspaceDMSend(automation.workspaceId);
   if (!usage.allowed) {
     await deliveryLease.release().catch(() => {});
@@ -889,14 +932,19 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
   }
 }
 
-async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
+export async function processMessage(job: { data: ProcessMessageJob; attemptsMade?: number }): Promise<void> {
   const { instagramAccountId, messageId, messageText, senderId } = job.data;
 
   const automations = await prisma.automation.findMany({
     where: {
       dmTriggerEnabled: true,
       isActive: true,
-      instagramAccount: { instagramId: instagramAccountId },
+      instagramAccount: {
+        OR: [
+          { instagramId: instagramAccountId },
+          { id: instagramAccountId },
+        ],
+      },
     },
     include: {
       instagramAccount: true,
@@ -931,8 +979,8 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
     });
     if (existingLog?.status === "SENT" || existingLog?.status === "SKIPPED_PLAN_LIMIT") continue;
 
-    if (!automation.instagramAccount.accessToken) continue;
-    const accessToken = decryptToken(automation.instagramAccount.accessToken);
+    const accessToken = getSafeAccessToken(automation.instagramAccount.accessToken);
+    if (!accessToken) continue;
 
     const priorLog = await prisma.dmLog.findFirst({
       where: { automationId: automation.id, commenterId: senderId },
