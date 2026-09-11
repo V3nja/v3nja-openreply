@@ -7,11 +7,6 @@ import {
 } from "crypto";
 import { getEncryptionKeyHex, requireEnv } from "@/lib/env";
 
-// Instagram API with Instagram Login authorizes on www.instagram.com. The old
-// api.instagram.com/oauth/authorize host belonged to the retired Basic Display
-// API and now 404s ("Sorry, this page isn't available"), which looks like a bad
-// link rather than a wrong endpoint. The token exchange below still lives on
-// api.instagram.com — only the authorize hop moved.
 const INSTAGRAM_OAUTH_URL = "https://www.instagram.com/oauth/authorize";
 const INSTAGRAM_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
 const ALGORITHM = "aes-256-gcm";
@@ -22,6 +17,23 @@ const STATE_MAX_AGE_MS = 10 * 60 * 1000;
 interface OAuthStatePayload {
   workspaceId: string;
   ts: number;
+}
+
+function getAppId(): string {
+  return (
+    process.env.INSTAGRAM_APP_ID ||
+    process.env.META_APP_ID ||
+    requireEnv("INSTAGRAM_APP_ID")
+  );
+}
+
+function getAppSecret(): string {
+  return (
+    process.env.INSTAGRAM_APP_SECRET ||
+    process.env.META_APP_SECRET ||
+    process.env.FACEBOOK_APP_SECRET ||
+    requireEnv("INSTAGRAM_APP_SECRET")
+  );
 }
 
 function base64UrlEncode(value: string): string {
@@ -76,7 +88,7 @@ export function verifyOAuthState(state: string | null): OAuthStatePayload | null
 
 export function getAuthorizationUrl(redirectUri: string, state: string): string {
   const params = new URLSearchParams({
-    client_id: requireEnv("INSTAGRAM_APP_ID"),
+    client_id: getAppId(),
     redirect_uri: redirectUri,
     scope:
       "instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_manage_insights",
@@ -92,8 +104,8 @@ export async function exchangeCodeForToken(
   redirectUri: string
 ): Promise<{ accessToken: string; userId: string }> {
   const body = new URLSearchParams({
-    client_id: requireEnv("INSTAGRAM_APP_ID"),
-    client_secret: requireEnv("INSTAGRAM_APP_SECRET"),
+    client_id: getAppId(),
+    client_secret: getAppSecret(),
     grant_type: "authorization_code",
     redirect_uri: redirectUri,
     code,

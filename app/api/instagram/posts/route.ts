@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
   const version = getMetaGraphApiVersion();
   const fields = "id,caption,media_type,media_url,permalink,timestamp,thumbnail_url,like_count,comments_count";
 
+  // Try Graph Instagram endpoint first, then fallback to Graph Facebook endpoint
   const urlsToTry = [
     `https://graph.instagram.com/${version}/me/media?fields=${fields}&limit=50&access_token=${token}`,
     `https://graph.instagram.com/me/media?fields=${fields}&limit=50&access_token=${token}`,

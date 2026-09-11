@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentWorkspaceContext } from "@/lib/workspace-access";
 import { getWorkspaceInstagramAccount } from "@/lib/instagram-accounts";

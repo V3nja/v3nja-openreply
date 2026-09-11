@@ -13,7 +13,6 @@ async function main() {
     return;
   }
 
-  // Reads securely from Railway encrypted environment variable
   const token =
     process.env.META_PAGE_ACCESS_TOKEN ||
     process.env.INSTAGRAM_ACCESS_TOKEN ||

@@ -5,7 +5,17 @@ import type { AccountOption } from "@/components/account-select";
 import { InstagramConnectNotice } from "@/components/instagram-connect-notice";
 
 interface SettingsData {
-  dmsSentMonth: number;
+  workspace: {
+    name: string;
+    dmsSentThisPeriod: number;
+  };
+  instagramAccount: {
+    id: string;
+    username: string;
+    instagramId: string;
+    tokenExpiresAt: string | null;
+    webhookSubscribed: boolean;
+  } | null;
   instagramAccounts: Array<
     AccountOption & {
       tokenExpiresAt: string | null;
@@ -14,29 +24,56 @@ interface SettingsData {
   >;
 }
 
+interface WorkspaceMembersData {
+  currentUserRole: "OWNER" | "ADMIN" | "MEMBER";
+  members: Array<{
+    id: string;
+    role: "OWNER" | "ADMIN" | "MEMBER";
+    createdAt: string;
+    user: {
+      id: string;
+      email: string | null;
+      name: string | null;
+    };
+  }>;
+  invitations: Array<{
+    id: string;
+    email: string;
+    role: "OWNER" | "ADMIN" | "MEMBER";
+    inviteUrl: string;
+    expiresAt: string;
+  }>;
+}
+
 export default function SettingsPage() {
   const [data, setData] = useState<SettingsData | null>(null);
+  const [membersData, setMembersData] = useState<WorkspaceMembersData | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [directToken, setDirectToken] = useState("");
   const [tokenStatus, setTokenStatus] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"ADMIN" | "MEMBER">("MEMBER");
+  const [memberError, setMemberError] = useState<string | null>(null);
 
   useEffect(() => {
     refreshData();
   }, []);
 
   function refreshData() {
-    fetch("/api/dashboard/stats")
-      .then((res) => res.json())
-      .then((statsPayload) => {
+    Promise.all([
+      fetch("/api/dashboard/stats").then((res) => res.json()),
+      fetch("/api/workspace/members").then((res) => res.json()),
+    ])
+      .then(([statsPayload, membersPayload]) => {
         if (statsPayload.success) setData(statsPayload.data);
+        if (membersPayload.success) setMembersData(membersPayload.data);
       })
       .finally(() => setLoading(false));
   }
 
-  async function handleDirectConnect(e: React.FormEvent) {
-    e.preventDefault();
-    if (!directToken.trim()) return;
+  async function handleDirectConnect(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     setBusy("connecting");
     setTokenStatus(null);
 
@@ -44,7 +81,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/instagram/direct-connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: directToken.trim() }),
+        body: JSON.stringify({ token: directToken.trim() || undefined }),
       });
       const result = await res.json();
       if (result.success) {
@@ -76,11 +113,33 @@ export default function SettingsPage() {
     setBusy(null);
   }
 
+  async function inviteMember(event: React.FormEvent) {
+    event.preventDefault();
+    setMemberError(null);
+    setBusy("invite");
+    const res = await fetch("/api/workspace/members", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+    });
+    const payload = await res.json();
+    if (payload.success) {
+      setMembersData(payload.data);
+      setInviteEmail("");
+    } else {
+      setMemberError(payload.error ?? "Could not invite member");
+    }
+    setBusy(null);
+  }
+
   if (loading) {
     return <div className="panel rounded p-8 h-64" />;
   }
 
   const accounts = data?.instagramAccounts ?? [];
+  const canManageMembers =
+    membersData?.currentUserRole === "OWNER" ||
+    membersData?.currentUserRole === "ADMIN";
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -88,6 +147,7 @@ export default function SettingsPage() {
         <InstagramConnectNotice />
       </Suspense>
 
+      {/* Instagram Connection Panel */}
       <section className="panel rounded p-4 sm:p-6 bg-zinc-900/60 border border-zinc-800">
         <h2 className="text-base font-semibold mb-6 flex items-center justify-between">
           <span>Instagram Account Connection</span>
@@ -102,6 +162,7 @@ export default function SettingsPage() {
           </span>
         </h2>
 
+        {/* Connected Accounts List */}
         <div className="space-y-4 mb-6">
           {accounts.map((account) => (
             <div
@@ -134,12 +195,13 @@ export default function SettingsPage() {
           )}
         </div>
 
+        {/* Direct Token Connection Form */}
         <div className="pt-5 border-t border-zinc-800">
           <h3 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">
             Direct Meta Token Connection
           </h3>
           <p className="text-xs text-zinc-400 mb-4">
-            Paste your Meta Access Token (from Meta Graph API Explorer) to connect @v3nja2.0 directly.
+            Paste your Meta Page Access Token (from Meta Graph API Explorer) to link @v3nja2.0 directly without 2FA / OAuth errors.
           </p>
 
           <form onSubmit={handleDirectConnect} className="space-y-3">
@@ -147,7 +209,7 @@ export default function SettingsPage() {
               type="password"
               value={directToken}
               onChange={(e) => setDirectToken(e.target.value)}
-              placeholder="Paste Meta Access Token here"
+              placeholder="Paste Meta Access Token here (e.g. EAAS... or Page Token)"
               className="w-full px-3.5 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-xs text-white placeholder:text-zinc-500 focus:border-orange-500 outline-none"
             />
 
@@ -157,7 +219,7 @@ export default function SettingsPage() {
                 disabled={busy === "connecting"}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:from-orange-600 hover:to-amber-600 disabled:opacity-50"
               >
-                {busy === "connecting" ? "Verifying..." : "⚡ Connect @v3nja2.0"}
+                {busy === "connecting" ? "Verifying Token..." : "⚡ Connect @v3nja2.0 Now"}
               </button>
             </div>
 
@@ -174,6 +236,7 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Usage Info */}
       <section className="panel rounded p-4 sm:p-6 bg-zinc-900/60 border border-zinc-800">
         <h2 className="text-base font-semibold mb-4">Automation Usage</h2>
         <div className="flex items-center justify-between py-2 border-b border-zinc-800">
@@ -182,7 +245,7 @@ export default function SettingsPage() {
             <p className="text-xs text-zinc-400">Self-hosted V3NJA OpenReply Engine</p>
           </div>
           <span className="text-sm font-bold text-orange-400">
-            {data?.dmsSentMonth ?? 0}
+            {data?.dmsSentMonth ?? 0 ?? 0}
           </span>
         </div>
       </section>

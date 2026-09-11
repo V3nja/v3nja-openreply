@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
 
     const version = getMetaGraphApiVersion();
 
+    // 1. Check if token is for page / me
     let instagramId = "17841450944703637";
     let username = "v3nja2.0";
     let name = "V3NJA Official";
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
           }
         }
       } else if (meData?.id) {
+        // Direct IG account token
         const igRes = await fetch(
           `https://graph.facebook.com/${version}/me?fields=id,username,name&access_token=${token}`
         );

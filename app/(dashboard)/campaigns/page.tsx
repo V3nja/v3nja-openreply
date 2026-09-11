@@ -15,50 +15,50 @@ import { readCache, writeCache } from "@/lib/client-cache";
 interface Campaign {
   id: string;
   name: string;
-  goal: string | null;
-  postId: string | null;
-  postUrl: string | null;
-  pendingNextReel: boolean;
-  matchAnyPost: boolean;
-  keywords: string[];
-  matchAnyWord: boolean;
-  dmMessage: string;
-  openingDmEnabled: boolean;
-  openingDmMessage: string | null;
-  openingDmButtonLabel: string | null;
-  publicReplyEnabled: boolean;
-  publicReplyMessage: string | null;
-  publicReplyMessages: string[];
-  requireFollow: boolean;
-  followPromptMessage: string | null;
-  followPromptButtonLabel: string | null;
-  isActive: boolean;
-  wholeWordMatch: boolean;
+  goal?: string | null;
+  postId?: string | null;
+  postUrl?: string | null;
+  pendingNextReel?: boolean;
+  matchAnyPost?: boolean;
+  keywords?: string[];
+  matchAnyWord?: boolean;
+  dmMessage?: string;
+  openingDmEnabled?: boolean;
+  openingDmMessage?: string | null;
+  openingDmButtonLabel?: string | null;
+  publicReplyEnabled?: boolean;
+  publicReplyMessage?: string | null;
+  publicReplyMessages?: string[];
+  requireFollow?: boolean;
+  followPromptMessage?: string | null;
+  followPromptButtonLabel?: string | null;
+  isActive?: boolean;
+  wholeWordMatch?: boolean;
   instagramAccountId: string;
-  instagramAccount: {
-    username: string;
-    instagramId: string;
+  instagramAccount?: {
+    username?: string;
+    instagramId?: string;
   };
-  reportShareSlug: string | null;
-  reportShareEnabled: boolean;
-  reportUrl: string | null;
-  createdAt: string;
-  _count: { dmLogs: number };
-  trackedLinks: Array<{
+  reportShareSlug?: string | null;
+  reportShareEnabled?: boolean;
+  reportUrl?: string | null;
+  createdAt?: string;
+  _count?: { dmLogs?: number };
+  trackedLinks?: Array<{
     id: string;
     slug: string;
-    label: string | null;
+    label?: string | null;
     destinationUrl: string;
-    trackedUrl: string;
-    _count: { clicks: number };
+    trackedUrl?: string;
+    _count?: { clicks: number };
   }>;
-  analytics: {
-    sent: number;
-    skipped: number;
-    failed: number;
-    clicks: number;
-    ctr: number;
-    topKeywords: { keyword: string; count: number }[];
+  analytics?: {
+    sent?: number;
+    skipped?: number;
+    failed?: number;
+    clicks?: number;
+    ctr?: number;
+    topKeywords?: { keyword: string; count: number }[];
   };
 }
 
@@ -419,9 +419,9 @@ export default function CampaignsPage() {
               )}
               <div className="min-w-[12rem] flex-1">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <h3 className="text-sm font-semibold truncate">{auto.name}</h3>
+                  <h3 className="text-sm font-semibold truncate">{auto.name || "Untitled Campaign"}</h3>
                   <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs text-muted">
-                    @{auto.instagramAccount.username}
+                    @{auto.instagramAccount?.username || "v3nja2.0"}
                   </span>
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -442,7 +442,7 @@ export default function CampaignsPage() {
                       Follow gate
                     </span>
                   )}
-                  {auto.trackedLinks.length >= 2 && (
+                  {(auto.trackedLinks?.length ?? 0) >= 2 && (
                     <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
                       2 links
                     </span>
@@ -451,7 +451,7 @@ export default function CampaignsPage() {
 
                 {/* Keywords */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {auto.keywords.map((kw) => (
+                  {(auto.keywords ?? []).map((kw) => (
                     <span
                       key={kw}
                       className="px-2 py-0.5 rounded-md bg-accent/10 text-accent text-xs font-medium border border-accent/10"
@@ -462,10 +462,10 @@ export default function CampaignsPage() {
                 </div>
 
                 {/* DM preview */}
-                <p className="text-sm text-muted truncate">&ldquo;{auto.dmMessage}&rdquo;</p>
+                <p className="text-sm text-muted truncate">&ldquo;{auto.dmMessage || ""}&rdquo;</p>
 
                 {/* Tracked link sent */}
-                {auto.trackedLinks[0]?.trackedUrl && (
+                {auto.trackedLinks?.[0]?.trackedUrl && (
                   <p className="mt-2 truncate font-mono text-xs text-zinc-500">
                     {auto.trackedLinks[0].trackedUrl}
                   </p>
@@ -474,25 +474,25 @@ export default function CampaignsPage() {
                 {/* Stats */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-xs text-zinc-500">
                   <span className="font-medium text-foreground">
-                    {auto._count.dmLogs} runs
+                    {auto._count?.dmLogs ?? (auto.analytics?.sent ?? 0) + (auto.analytics?.skipped ?? 0) + (auto.analytics?.failed ?? 0)} runs
                   </span>
                   <span>·</span>
                   <span className="font-medium text-foreground">
-                    {auto.analytics.ctr}% CTR
+                    {auto.analytics?.ctr ?? 0}% CTR
                   </span>
                   <span>·</span>
-                  <span>{auto.analytics.sent} sent</span>
+                  <span>{auto.analytics?.sent ?? 0} sent</span>
                   <span>·</span>
-                  <span>{auto.analytics.skipped} skipped</span>
+                  <span>{auto.analytics?.skipped ?? 0} skipped</span>
                   <span>·</span>
-                  <span>{auto.analytics.failed} failed</span>
+                  <span>{auto.analytics?.failed ?? 0} failed</span>
                   <span>·</span>
-                  <span>{auto.analytics.clicks} clicks</span>
+                  <span>{auto.analytics?.clicks ?? 0} clicks</span>
                 </div>
 
-                {auto.analytics.topKeywords.length > 0 && (
+                {(auto.analytics?.topKeywords?.length ?? 0) > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {auto.analytics.topKeywords.map((keyword) => (
+                    {auto.analytics?.topKeywords?.map((keyword) => (
                       <span
                         key={keyword.keyword}
                         className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-muted"

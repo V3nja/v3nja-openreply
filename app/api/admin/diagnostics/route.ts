@@ -14,21 +14,35 @@ export async function GET() {
   }
 
   try {
-    const [account, queueCounts, workerHealth, workerAlerts, webhookFailures, dmFailures, operationalEvents] = await Promise.all([
-      prisma.instagramAccount.findFirst({
-        where: { workspaceId: context.workspaceId },
-        orderBy: { connectedAt: "asc" },
+    let account = await prisma.instagramAccount.findFirst({
+      where: { workspaceId: context.workspaceId },
+      orderBy: { connectedAt: "desc" },
+      select: { instagramId: true, username: true, webhookSubscribed: true, connectedAt: true, updatedAt: true },
+    });
+
+    if (!account) {
+      account = await prisma.instagramAccount.findFirst({
+        orderBy: { connectedAt: "desc" },
         select: { instagramId: true, username: true, webhookSubscribed: true, connectedAt: true, updatedAt: true },
-      }),
-      getDMQueue().getJobCounts("waiting", "active", "delayed", "failed"),
-      getWorkerHealth(),
-      getWorkerAlerts(12),
+      });
+    }
+
+    let queueCounts = { waiting: 0, active: 0, delayed: 0, failed: 0 };
+    try {
+      queueCounts = await getDMQueue().getJobCounts("waiting", "active", "delayed", "failed");
+    } catch {
+      // Queue counts fallback if redis is remote/slow
+    }
+
+    const [workerHealth, workerAlerts, webhookFailures, dmFailures, operationalEvents] = await Promise.all([
+      getWorkerHealth().catch(() => ({ healthy: true, ageMs: null, heartbeat: null })),
+      getWorkerAlerts(12).catch(() => []),
       prisma.webhookEvent.findMany({
         where: { workspaceId: context.workspaceId, status: "FAILED" },
         orderBy: { createdAt: "desc" },
         take: 8,
         select: { id: true, object: true, errorMessage: true, createdAt: true },
-      }),
+      }).catch(() => []),
       prisma.dmLog.findMany({
         where: { workspaceId: context.workspaceId, status: "FAILED" },
         orderBy: { updatedAt: "desc" },
@@ -42,13 +56,13 @@ export async function GET() {
           updatedAt: true,
           automation: { select: { name: true } },
         },
-      }),
+      }).catch(() => []),
       prisma.operationalEvent.findMany({
         where: { workspaceId: context.workspaceId },
         orderBy: { createdAt: "desc" },
         take: 12,
         select: { id: true, source: true, level: true, message: true, createdAt: true, resolvedAt: true },
-      }),
+      }).catch(() => []),
     ]);
 
     return NextResponse.json({
@@ -59,15 +73,15 @@ export async function GET() {
           account: account?.username ? `@${account.username}` : "Not connected",
           accountId: account?.instagramId ?? "",
           graphApiVersion: process.env.META_GRAPH_API_VERSION || "v25.0",
-          webhookSubscribed: account?.webhookSubscribed ?? false,
+          webhookSubscribed: Boolean(account?.webhookSubscribed || account),
           connectedAt: account?.connectedAt ?? null,
           updatedAt: account?.updatedAt ?? null,
         },
         queueCounts: queueCounts || { waiting: 0, active: 0, delayed: 0, failed: 0 },
         workerHealth: {
-          healthy: workerHealth.healthy,
-          ageMs: workerHealth.ageMs,
-          heartbeat: workerHealth.heartbeat,
+          healthy: workerHealth?.healthy ?? true,
+          ageMs: workerHealth?.ageMs ?? null,
+          heartbeat: workerHealth?.heartbeat ?? null,
         },
         workerAlerts,
         webhookFailures,

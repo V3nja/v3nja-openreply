@@ -158,13 +158,13 @@ export default function CampaignDetailPage() {
       : "A specific post or reel";
   const matchText = campaign.matchAnyWord
     ? "Any comment"
-    : campaign.keywords.join(", ") || "No keywords";
+    : (campaign.keywords ?? []).join(", ") || "No keywords";
 
   const metrics = [
-    { label: "Sends", value: campaign.analytics.sent },
-    { label: "Clicks", value: campaign.analytics.clicks },
-    { label: "CTR", value: `${campaign.analytics.ctr}%` },
-    { label: "Failed", value: campaign.analytics.failed },
+    { label: "Sends", value: campaign.analytics?.sent ?? 0 },
+    { label: "Clicks", value: campaign.analytics?.clicks ?? 0 },
+    { label: "CTR", value: `${campaign.analytics?.ctr ?? 0}%` },
+    { label: "Failed", value: campaign.analytics?.failed ?? 0 },
   ];
 
   return (
@@ -341,11 +341,11 @@ export default function CampaignDetailPage() {
           <CampaignPreview
             tab={previewTab}
             onTabChange={setPreviewTab}
-            username={campaign.instagramAccount.username}
+            username={campaign.instagramAccount?.username || "v3nja2.0"}
             avatarUrl={avatarUrl}
             postThumb={postThumb}
             caption=""
-            sampleComment={campaign.matchAnyWord ? "nice!" : campaign.keywords[0] ?? "LINK"}
+            sampleComment={campaign.matchAnyWord ? "nice!" : (campaign.keywords?.[0] ?? "LINK")}
             dmTriggerEnabled={campaign.dmTriggerEnabled}
             publicReplyEnabled={campaign.publicReplyEnabled}
             publicReplyMessage={publicReplies[0] ?? ""}

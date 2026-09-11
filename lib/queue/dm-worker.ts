@@ -209,9 +209,6 @@ async function processManualMessage(job: Job<ProcessManualMessageJob>): Promise<
     throw error;
   }
 
-  // The outbound message is already committed once Meta accepts it. Treat the
-  // operational audit event as best-effort so a database/logging failure cannot
-  // make BullMQ retry the already-sent DM and create a duplicate delivery.
   try {
     await prisma.operationalEvent.create({
       data: {
@@ -283,6 +280,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     );
     if (!decision.matched) continue;
     const matchResult = decision;
+
     const existingLog = await prisma.dmLog.findUnique({
       where: { automationId_commentId: { automationId: automation.id, commentId } },
     });
@@ -292,7 +290,30 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     if (existingLog?.status === "SKIPPED_PLAN_LIMIT") continue;
     if (alreadyDmd && (alreadyPublicReplied || !automation.publicReplyEnabled)) continue;
 
-    if (!automation.instagramAccount.accessToken) continue;
+    if (!automation.instagramAccount.accessToken) {
+      await prisma.dmLog.upsert({
+        where: { automationId_commentId: { automationId: automation.id, commentId } },
+        create: {
+          workspaceId: automation.workspaceId,
+          automationId: automation.id,
+          instagramAccountId: automation.instagramAccountId,
+          commenterId,
+          commenterName,
+          commentText,
+          commentId,
+          status: "FAILED",
+          attempts: 1,
+          errorMessage: "No Instagram access token available",
+        },
+        update: {
+          status: "FAILED",
+          attempts: 1,
+          errorMessage: "No Instagram access token available",
+        },
+      });
+      continue;
+    }
+
     let accessToken: string;
     try {
       accessToken = decryptToken(automation.instagramAccount.accessToken);
@@ -318,31 +339,74 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     } else if (needsDm) {
       await prisma.dmLog.update({
         where: { automationId_commentId: { automationId: automation.id, commentId } },
-        data: { status: "PENDING", attempts: job.attemptsMade + 1, matchedKeyword: matchResult.matchedKeyword, errorMessage: null },
+        data: {
+          status: "PENDING",
+          attempts: job.attemptsMade + 1,
+          matchedKeyword: matchResult.matchedKeyword,
+          errorMessage: null,
+        },
       });
     }
 
-    const replyPool = automation.publicReplyMessages.length > 0
-      ? automation.publicReplyMessages
-      : automation.publicReplyMessage ? [automation.publicReplyMessage] : [];
-    if (automation.publicReplyEnabled && replyPool.length > 0 && !existingLog?.publicReplySentAt) {
+    const replyPool =
+      automation.publicReplyMessages && automation.publicReplyMessages.length > 0
+        ? automation.publicReplyMessages
+        : automation.publicReplyMessage
+        ? [automation.publicReplyMessage]
+        : [];
+
+    if (automation.publicReplyEnabled && replyPool.length > 0 && !alreadyPublicReplied) {
       try {
         const publicReplyLock = await withDeliveryLock(
           `${automation.workspaceId}:automation:${automation.id}:comment:${commentId}:public`,
           async () => {
             const chosen = replyPool[Math.floor(Math.random() * replyPool.length)];
-            const publicReply = renderMessageWithTracking({ message: chosen, commenterName, trackedLinks: automation.trackedLinks });
+            const publicReply = renderMessageWithTracking({
+              message: chosen,
+              commenterName,
+              trackedLinks: automation.trackedLinks,
+            });
             await sendCommentReply(accessToken, commentId, publicReply);
           }
         );
         if (publicReplyLock.acquired) {
-          await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { publicReplySentAt: new Date(), publicReplyError: null } });
+          await prisma.dmLog.update({
+            where: { automationId_commentId: { automationId: automation.id, commentId } },
+            data: { publicReplySentAt: new Date(), publicReplyError: null },
+          });
         }
       } catch (error) {
-        await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { publicReplyError: formatError(error) } }).catch(() => {});
+        await prisma.dmLog
+          .update({
+            where: { automationId_commentId: { automationId: automation.id, commentId } },
+            data: { publicReplyError: formatError(error) },
+          })
+          .catch(() => {});
       }
     }
+
     if (!needsDm) continue;
+
+    // Check if another campaign has already used the private reply on this comment
+    const otherSentLog = await prisma.dmLog.findFirst({
+      where: {
+        commentId,
+        status: "SENT",
+        automationId: { not: automation.id },
+      },
+      include: { automation: { select: { name: true } } },
+    });
+
+    if (otherSentLog) {
+      await prisma.dmLog.update({
+        where: { automationId_commentId: { automationId: automation.id, commentId } },
+        data: {
+          status: "SKIPPED_DEDUP",
+          errorMessage: `A private reply was already sent by another campaign (${otherSentLog.automation?.name ?? "another campaign"}).`,
+        },
+      });
+      continue;
+    }
 
     const deliveryKey = `${automation.workspaceId}:automation:${automation.id}:comment:${commentId}:dm`;
     const deliveryLease = await acquireDeliveryLease(deliveryKey);
@@ -351,7 +415,14 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     const usage = await reserveWorkspaceDMSend(automation.workspaceId);
     if (!usage.allowed) {
       await deliveryLease.release().catch(() => {});
-      await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "SKIPPED_PLAN_LIMIT", matchedKeyword: matchResult.matchedKeyword, errorMessage: `Monthly DM limit reached (${usage.limit})` } });
+      await prisma.dmLog.update({
+        where: { automationId_commentId: { automationId: automation.id, commentId } },
+        data: {
+          status: "SKIPPED_PLAN_LIMIT",
+          matchedKeyword: matchResult.matchedKeyword,
+          errorMessage: `Monthly DM limit reached (${usage.limit})`,
+        },
+      });
       continue;
     }
 
@@ -364,22 +435,40 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
       await markDmLogFailed({ automationId: automation.id, commentId }, formatError(error), job.attemptsMade + 1);
       throw error;
     }
+
     if (!rateLimit.allowed) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
       await deliveryLease.release().catch(() => {});
       if (rateLimit.shouldSkip) {
-        await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "SKIPPED_RATE_LIMIT", errorMessage: "Hourly Instagram DM rate limit reached" } });
+        await prisma.dmLog.update({
+          where: { automationId_commentId: { automationId: automation.id, commentId } },
+          data: { status: "SKIPPED_RATE_LIMIT", errorMessage: "Hourly Instagram DM rate limit reached" },
+        });
         continue;
       }
       if (rateLimit.shouldRequeue) {
-        await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId } }, data: { status: "PENDING", errorMessage: "Hourly rate limit hit; retry scheduled" } });
-        await getDMQueue().add("process-comment", { ...job.data, requeueAttempt: requeueAttempt + 1 }, { delay: rateLimit.requeueDelayMs, jobId: `comment_${instagramAccountId}_${commentId}_retry_${requeueAttempt + 1}` });
+        await prisma.dmLog.update({
+          where: { automationId_commentId: { automationId: automation.id, commentId } },
+          data: { status: "PENDING", errorMessage: "Hourly rate limit hit; retry scheduled" },
+        });
+        await getDMQueue().add(
+          "process-comment",
+          { ...job.data, requeueAttempt: requeueAttempt + 1 },
+          {
+            delay: rateLimit.requeueDelayMs,
+            jobId: `comment_${instagramAccountId}_${commentId}_retry_${requeueAttempt + 1}`,
+          }
+        );
         continue;
       }
       continue;
     }
 
-    const useOpeningDm = automation.openingDmEnabled && Boolean(automation.openingDmMessage) && Boolean(automation.openingDmButtonLabel);
+    const useOpeningDm =
+      automation.openingDmEnabled &&
+      Boolean(automation.openingDmMessage) &&
+      Boolean(automation.openingDmButtonLabel);
+
     let sendFollowPrompt = false;
     try {
       if (automation.requireFollow && !useOpeningDm) {
@@ -396,23 +485,72 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
 
     try {
       if (useOpeningDm) {
-        const openingText = renderMessageWithTracking({ message: automation.openingDmMessage as string, commenterName, trackedLinks: [] });
-        await sendPrivateReplyWithButton(accessToken, automation.instagramAccount.instagramId, commentId, openingText, automation.openingDmButtonLabel as string, automation.requireFollow ? `followcheck:${automation.id}` : `reveal:${automation.id}`);
+        const openingText = renderMessageWithTracking({
+          message: automation.openingDmMessage as string,
+          commenterName,
+          trackedLinks: [],
+        });
+        await sendPrivateReplyWithButton(
+          accessToken,
+          automation.instagramAccount.instagramId,
+          commentId,
+          openingText,
+          automation.openingDmButtonLabel as string,
+          automation.requireFollow ? `followcheck:${automation.id}` : `reveal:${automation.id}`
+        );
       } else if (sendFollowPrompt) {
-        const promptText = renderMessageWithoutLink({ message: automation.followPromptMessage || "Follow me and tap the button to grab your link!", commenterName });
-        await sendPrivateReplyWithButton(accessToken, automation.instagramAccount.instagramId, commentId, promptText, automation.followPromptButtonLabel || "I'm following", `followcheck:${automation.id}`);
+        const promptText = renderMessageWithoutLink({
+          message: automation.followPromptMessage || "Follow me and tap the button to grab your link!",
+          commenterName,
+        });
+        await sendPrivateReplyWithButton(
+          accessToken,
+          automation.instagramAccount.instagramId,
+          commentId,
+          promptText,
+          automation.followPromptButtonLabel || "I'm following",
+          `followcheck:${automation.id}`
+        );
       } else if (automation.trackedLinks.length > 0) {
-        const bodyText = renderMessageWithoutLink({ message: automation.dmMessage, commenterName }) || "Here's your link:";
+        const bodyText =
+          renderMessageWithoutLink({ message: automation.dmMessage, commenterName }) ||
+          "Here's your link:";
         const buttons = buildLinkButtons(automation.trackedLinks, automation.linkButtonLabel);
         try {
-          await sendPrivateReplyWithLinkButton(accessToken, automation.instagramAccount.instagramId, commentId, bodyText, buttons);
+          await sendPrivateReplyWithLinkButton(
+            accessToken,
+            automation.instagramAccount.instagramId,
+            commentId,
+            bodyText,
+            buttons
+          );
         } catch (buttonError) {
           if (!isTemplateRejection(buttonError)) throw buttonError;
-          await sendPrivateReply(accessToken, automation.instagramAccount.instagramId, commentId, buildInlineLinkFallback(automation.dmMessage, commenterName, automation.trackedLinks, bodyText));
+          await sendPrivateReply(
+            accessToken,
+            automation.instagramAccount.instagramId,
+            commentId,
+            buildInlineLinkFallback(
+              automation.dmMessage,
+              commenterName,
+              automation.trackedLinks,
+              bodyText
+            )
+          );
         }
       } else {
-        await sendPrivateReply(accessToken, automation.instagramAccount.instagramId, commentId, renderMessageWithTracking({ message: automation.dmMessage, commenterName, trackedLinks: automation.trackedLinks }));
+        await sendPrivateReply(
+          accessToken,
+          automation.instagramAccount.instagramId,
+          commentId,
+          renderMessageWithTracking({
+            message: automation.dmMessage,
+            commenterName,
+            trackedLinks: automation.trackedLinks,
+          })
+        );
       }
+
       await markDmLogSent({ automationId: automation.id, commentId });
     } catch (error) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
@@ -427,21 +565,43 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
   const { instagramAccountId, userId, payload, mid, fallback } = job.data;
   const match = payload.match(/^(?:reveal|followcheck):(.+)$/);
   if (!match) return;
+
   const automation = await prisma.automation.findFirst({
     where: { id: match[1], instagramAccount: { instagramId: instagramAccountId } },
-    include: { instagramAccount: true, workspace: true, trackedLinks: { select: { slug: true, label: true, destinationUrl: true }, orderBy: { createdAt: "asc" } } },
+    include: {
+      instagramAccount: true,
+      workspace: true,
+      trackedLinks: {
+        select: { slug: true, label: true, destinationUrl: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
   });
+
   if (!automation?.instagramAccount.accessToken) return;
+
   const isFollowCheck = payload.startsWith("followcheck:");
-  const commenterName = (await prisma.dmLog.findFirst({ where: { automationId: automation.id, commenterId: userId }, select: { commenterName: true } }))?.commenterName ?? null;
+  const commenterName =
+    (
+      await prisma.dmLog.findFirst({
+        where: { automationId: automation.id, commenterId: userId },
+        select: { commenterName: true },
+      })
+    )?.commenterName ?? null;
+
   const accessToken = decryptToken(automation.instagramAccount.accessToken);
+
+  if (fallback && automation.requireFollow) {
+    const follows = await getUserFollowStatus(accessToken, userId);
+    if (follows !== true) return;
+  }
+
   if (isFollowCheck && automation.requireFollow) {
     const follows = await getUserFollowStatus(accessToken, userId);
     if (follows === false) {
       const promptDedupeId = `followcheck:${userId}`;
       const existingPrompt = await prisma.dmLog.findUnique({
         where: { automationId_commentId: { automationId: automation.id, commentId: promptDedupeId } },
-        select: { status: true },
       });
       if (existingPrompt?.status === "SENT") return;
 
@@ -507,7 +667,10 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
           accessToken,
           automation.instagramAccount.instagramId,
           userId,
-          renderMessageWithoutLink({ message: automation.followPromptMessage || "Follow me and tap the button once you're following.", commenterName }),
+          renderMessageWithoutLink({
+            message: automation.followPromptMessage || "Follow me and tap the button once you're following.",
+            commenterName,
+          }),
           automation.followPromptButtonLabel || "I'm following",
           `followcheck:${automation.id}`
         );
@@ -523,7 +686,9 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
   }
 
   const revealDedupeId = `reveal:${userId}`;
-  const existingReveal = await prisma.dmLog.findUnique({ where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } }, select: { status: true } });
+  const existingReveal = await prisma.dmLog.findUnique({
+    where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } },
+  });
   if (existingReveal?.status === "SENT") return;
 
   const revealDeliveryKey = `${automation.workspaceId}:automation:${automation.id}:postback:${revealDedupeId}`;
@@ -564,53 +729,93 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
   }
 
   try {
-    await prisma.dmLog.upsert({
-      where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } },
-      create: {
-        workspaceId: automation.workspaceId,
-        automationId: automation.id,
-        instagramAccountId: automation.instagramAccountId,
-        commenterId: userId,
-        commenterName,
-        commentText: "(button tap)",
-        commentId: revealDedupeId,
-        status: "PENDING",
-        attempts: job.attemptsMade + 1,
-        errorMessage: null,
-      },
-      update: {
-        status: "PENDING",
-        attempts: job.attemptsMade + 1,
-        commenterName,
-        errorMessage: null,
-      },
-    });
-    await sendRevealDirectMessage(accessToken, automation, userId, commenterName, "postback");
-    await markDmLogSent({ automationId: automation.id, commentId: revealDedupeId });
+    if (!fallback) {
+      await prisma.dmLog.upsert({
+        where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } },
+        create: {
+          workspaceId: automation.workspaceId,
+          automationId: automation.id,
+          instagramAccountId: automation.instagramAccountId,
+          commenterId: userId,
+          commenterName,
+          commentText: "(button tap)",
+          commentId: revealDedupeId,
+          status: "PENDING",
+          attempts: job.attemptsMade + 1,
+          errorMessage: null,
+        },
+        update: {
+          status: "PENDING",
+          attempts: job.attemptsMade + 1,
+          commenterName,
+          errorMessage: null,
+        },
+      });
+    }
+
+    await sendRevealDirectMessage(
+      accessToken,
+      automation,
+      userId,
+      commenterName,
+      fallback ? "read fallback" : "button tap"
+    );
+
+    if (!fallback) {
+      await markDmLogSent({ automationId: automation.id, commentId: revealDedupeId });
+    }
   } catch (error) {
     await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
     await deliveryLease.release().catch(() => {});
-    await markDmLogFailed({ automationId: automation.id, commentId: revealDedupeId }, formatError(error), job.attemptsMade + 1);
+    if (fallback && /outside of allowed window/i.test(formatError(error))) {
+      return;
+    }
+    if (!fallback) {
+      await prisma.dmLog.upsert({
+        where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } },
+        create: {
+          workspaceId: automation.workspaceId,
+          automationId: automation.id,
+          instagramAccountId: automation.instagramAccountId,
+          commenterId: userId,
+          commenterName,
+          commentText: "(button tap)",
+          commentId: revealDedupeId,
+          status: "FAILED",
+          attempts: job.attemptsMade + 1,
+          errorMessage: formatError(error),
+        },
+        update: {
+          status: "FAILED",
+          attempts: job.attemptsMade + 1,
+          errorMessage: formatError(error),
+        },
+      });
+    }
     throw error;
   }
 }
 
 async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
-  const { instagramAccountId, userId, automationId, commenterName } = job.data;
-  const automation = await prisma.automation.findFirst({ where: { id: automationId, isActive: true }, include: { instagramAccount: true } });
-  if (!automation?.followUpEnabled || !automation.followUpMessage?.trim() || automation.instagramAccount.instagramId !== instagramAccountId || !automation.instagramAccount.accessToken) return;
-  const dedupeId = `followup:${userId}`;
-  const existingLog = await prisma.dmLog.findUnique({
-    where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } },
-    select: { status: true },
+  const { automationId, userId, commenterName } = job.data;
+  const automation = await prisma.automation.findUnique({
+    where: { id: automationId },
+    include: { instagramAccount: true },
   });
-  if (existingLog?.status === "SENT") return;
-  const accessToken = decryptToken(automation.instagramAccount.accessToken);
+  if (!automation?.instagramAccount.accessToken) return;
+  if (!automation.followUpEnabled || !automation.followUpMessage) return;
 
-  const deliveryKey = `${automation.workspaceId}:automation:${automation.id}:followup:${userId}`;
-  const deliveryLease = await acquireDeliveryLease(deliveryKey);
+  const dedupeId = `followup:${userId}`;
+  const existingFollowUp = await prisma.dmLog.findUnique({
+    where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } },
+  });
+  if (existingFollowUp?.status === "SENT") return;
+
+  const followUpDeliveryKey = `${automation.workspaceId}:automation:${automation.id}:followup:${dedupeId}`;
+  const deliveryLease = await acquireDeliveryLease(followUpDeliveryKey);
   if (!deliveryLease) return;
 
+  const accessToken = decryptToken(automation.instagramAccount.accessToken);
   const usage = await reserveWorkspaceDMSend(automation.workspaceId);
   if (!usage.allowed) {
     await deliveryLease.release().catch(() => {});
@@ -619,10 +824,11 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
 
   let rateLimit;
   try {
-    rateLimit = await reserveDMSlot(instagramAccountId, job.attemptsMade);
+    rateLimit = await reserveDMSlot(automation.instagramAccountId, job.attemptsMade);
   } catch (error) {
     await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
     await deliveryLease.release().catch(() => {});
+    await markDmLogFailed({ automationId: automation.id, commentId: dedupeId }, formatError(error), job.attemptsMade + 1);
     throw error;
   }
   if (!rateLimit.allowed) {
@@ -630,7 +836,14 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
     await deliveryLease.release().catch(() => {});
     if (rateLimit.shouldSkip) return;
     if (rateLimit.shouldRequeue) {
-      await getDMQueue().add(FOLLOWUP_JOB_NAME, { ...job.data }, { delay: rateLimit.requeueDelayMs, jobId: `followup_${automation.id}_${userId}_retry_${job.attemptsMade + 1}` });
+      await getDMQueue().add(
+        FOLLOWUP_JOB_NAME,
+        { ...job.data },
+        {
+          delay: rateLimit.requeueDelayMs,
+          jobId: `followup_${automation.id}_${userId}_retry_${job.attemptsMade + 1}`,
+        }
+      );
       return;
     }
     throw new Error("Instagram messaging rate limit reached");
@@ -644,7 +857,7 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
         automationId: automation.id,
         instagramAccountId: automation.instagramAccountId,
         commenterId: userId,
-        commenterName: commenterName ?? null,
+        commenterName,
         commentText: "(scheduled follow-up)",
         commentId: dedupeId,
         status: "PENDING",
@@ -654,7 +867,7 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
       update: {
         status: "PENDING",
         attempts: job.attemptsMade + 1,
-        commenterName: commenterName ?? null,
+        commenterName,
         errorMessage: null,
       },
     });
@@ -662,7 +875,10 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
       accessToken,
       automation.instagramAccount.instagramId,
       userId,
-      renderMessageWithoutLink({ message: automation.followUpMessage, commenterName: commenterName ?? null })
+      renderMessageWithoutLink({
+        message: automation.followUpMessage,
+        commenterName: commenterName ?? null,
+      })
     );
     await markDmLogSent({ automationId: automation.id, commentId: dedupeId });
   } catch (error) {
@@ -675,8 +891,26 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
 
 async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
   const { instagramAccountId, messageId, messageText, senderId } = job.data;
-  const automations = await prisma.automation.findMany({ where: { dmTriggerEnabled: true, isActive: true, instagramAccount: { instagramId: instagramAccountId } }, include: { instagramAccount: true, workspace: true, trackedLinks: { select: { slug: true, label: true, destinationUrl: true }, orderBy: { createdAt: "asc" } } }, orderBy: { createdAt: "asc" } });
+
+  const automations = await prisma.automation.findMany({
+    where: {
+      dmTriggerEnabled: true,
+      isActive: true,
+      instagramAccount: { instagramId: instagramAccountId },
+    },
+    include: {
+      instagramAccount: true,
+      workspace: true,
+      trackedLinks: {
+        select: { slug: true, label: true, destinationUrl: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
   const dedupeId = `dm:${messageId}`;
+
   for (const automation of automations) {
     const decision = evaluateAutomationRule(
       {
@@ -691,14 +925,26 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
     );
     if (!decision.matched) continue;
     const matchResult = decision;
-    const existingLog = await prisma.dmLog.findUnique({ where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } } });
+
+    const existingLog = await prisma.dmLog.findUnique({
+      where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } },
+    });
     if (existingLog?.status === "SENT" || existingLog?.status === "SKIPPED_PLAN_LIMIT") continue;
+
     if (!automation.instagramAccount.accessToken) continue;
     const accessToken = decryptToken(automation.instagramAccount.accessToken);
-    const priorLog = await prisma.dmLog.findFirst({ where: { automationId: automation.id, commenterId: senderId }, select: { commenterName: true } });
+
+    const priorLog = await prisma.dmLog.findFirst({
+      where: { automationId: automation.id, commenterId: senderId },
+      select: { commenterName: true },
+    });
     const commenterName = priorLog?.commenterName ?? null;
+
     let sendFollowPrompt = false;
-    if (automation.requireFollow) { const follows = await getUserFollowStatus(accessToken, senderId); sendFollowPrompt = follows !== true; }
+    if (automation.requireFollow) {
+      const follows = await getUserFollowStatus(accessToken, senderId);
+      sendFollowPrompt = follows !== true;
+    }
 
     const deliveryKey = `${automation.workspaceId}:automation:${automation.id}:message:${messageId}`;
     const deliveryLease = await acquireDeliveryLease(deliveryKey);
@@ -707,6 +953,27 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
     const usage = await reserveWorkspaceDMSend(automation.workspaceId);
     if (!usage.allowed) {
       await deliveryLease.release().catch(() => {});
+      await prisma.dmLog.upsert({
+        where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } },
+        create: {
+          workspaceId: automation.workspaceId,
+          automationId: automation.id,
+          instagramAccountId: automation.instagramAccountId,
+          commenterId: senderId,
+          commenterName,
+          commentText: messageText,
+          commentId: dedupeId,
+          matchedKeyword: matchResult.matchedKeyword,
+          status: "SKIPPED_PLAN_LIMIT",
+          attempts: 1,
+          errorMessage: `Monthly DM limit reached (${usage.limit})`,
+        },
+        update: {
+          status: "SKIPPED_PLAN_LIMIT",
+          matchedKeyword: matchResult.matchedKeyword,
+          errorMessage: `Monthly DM limit reached (${usage.limit})`,
+        },
+      });
       continue;
     }
 
@@ -723,41 +990,87 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
       await deliveryLease.release().catch(() => {});
       if (rateLimit.shouldSkip) continue;
       if (rateLimit.shouldRequeue) {
-        await getDMQueue().add(MESSAGE_JOB_NAME, { ...job.data }, { delay: rateLimit.requeueDelayMs, jobId: `message_${instagramAccountId}_${messageId}_retry_${job.attemptsMade + 1}` });
+        await getDMQueue().add(
+          MESSAGE_JOB_NAME,
+          { ...job.data },
+          {
+            delay: rateLimit.requeueDelayMs,
+            jobId: `message_${instagramAccountId}_${messageId}_retry_${job.attemptsMade + 1}`,
+          }
+        );
         continue;
       }
       throw new Error("Instagram messaging rate limit reached");
     }
 
     try {
-      if (!existingLog) {
-        await prisma.dmLog.create({
-          data: {
-            workspaceId: automation.workspaceId,
-            automationId: automation.id,
-            instagramAccountId: automation.instagramAccountId,
-            commenterId: senderId,
-            commenterName,
-            commentText: messageText,
-            commentId: dedupeId,
-            matchedKeyword: matchResult.matchedKeyword,
-            status: "PENDING",
-            attempts: job.attemptsMade + 1,
-          },
-        });
-      } else {
-        await prisma.dmLog.update({ where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } }, data: { status: "PENDING", attempts: job.attemptsMade + 1, matchedKeyword: matchResult.matchedKeyword, errorMessage: null } });
-      }
       if (sendFollowPrompt) {
-        await sendDirectMessageWithButton(accessToken, automation.instagramAccount.instagramId, senderId, renderMessageWithoutLink({ message: automation.followPromptMessage || "Almost there! Follow me and tap the button below to grab your link 💛", commenterName }), automation.followPromptButtonLabel || "I'm following ✅", `followcheck:${automation.id}`);
+        await sendDirectMessageWithButton(
+          accessToken,
+          automation.instagramAccount.instagramId,
+          senderId,
+          renderMessageWithoutLink({
+            message: automation.followPromptMessage || "Almost there! Follow me and tap the button below to grab your link 💛",
+            commenterName,
+          }),
+          automation.followPromptButtonLabel || "I'm following ✅",
+          `followcheck:${automation.id}`
+        );
       } else {
-        await sendRevealDirectMessage(accessToken, automation, senderId, commenterName, "message trigger");
+        await sendRevealDirectMessage(
+          accessToken,
+          automation,
+          senderId,
+          commenterName,
+          "message trigger"
+        );
       }
-      await markDmLogSent({ automationId: automation.id, commentId: dedupeId });
+
+      await prisma.dmLog.upsert({
+        where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } },
+        create: {
+          workspaceId: automation.workspaceId,
+          automationId: automation.id,
+          instagramAccountId: automation.instagramAccountId,
+          commenterId: senderId,
+          commenterName,
+          commentText: messageText,
+          commentId: dedupeId,
+          matchedKeyword: matchResult.matchedKeyword,
+          status: "SENT",
+          attempts: job.attemptsMade + 1,
+        },
+        update: {
+          status: "SENT",
+          attempts: job.attemptsMade + 1,
+          matchedKeyword: matchResult.matchedKeyword,
+          errorMessage: null,
+        },
+      });
     } catch (error) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
       await deliveryLease.release().catch(() => {});
-      await markDmLogFailed({ automationId: automation.id, commentId: dedupeId }, formatError(error), job.attemptsMade + 1);
+      await prisma.dmLog.upsert({
+        where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } },
+        create: {
+          workspaceId: automation.workspaceId,
+          automationId: automation.id,
+          instagramAccountId: automation.instagramAccountId,
+          commenterId: senderId,
+          commenterName,
+          commentText: messageText,
+          commentId: dedupeId,
+          matchedKeyword: matchResult.matchedKeyword,
+          status: "FAILED",
+          attempts: job.attemptsMade + 1,
+          errorMessage: formatError(error),
+        },
+        update: {
+          status: "FAILED",
+          attempts: job.attemptsMade + 1,
+          errorMessage: formatError(error),
+        },
+      });
       throw error;
     }
   }
@@ -775,9 +1088,35 @@ async function recordWorkerFailure(job: Job<DmQueueJob> | undefined, error: Erro
   try {
     const instagramAccountId = job?.data.instagramAccountId;
     const commentId = job && "commentId" in job.data ? job.data.commentId : null;
-    const account = instagramAccountId ? await prisma.instagramAccount.findUnique({ where: { instagramId: instagramAccountId }, select: { workspaceId: true } }) : null;
-    await prisma.operationalEvent.create({ data: { workspaceId: account?.workspaceId ?? (job && "workspaceId" in job.data ? job.data.workspaceId : null), source: "WORKER", level: "ERROR", message: `DM worker job ${job?.id ?? "unknown"} failed: ${error.message}`, payload: { jobId: job?.id ?? null, attemptsMade: job?.attemptsMade ?? null, instagramAccountId: instagramAccountId ?? null, commentId } } });
-    await recordWorkerAlert({ level: "error", message: error.message, jobId: job?.id, instagramAccountId, commentId: commentId ?? undefined });
+    const account = instagramAccountId
+      ? await prisma.instagramAccount.findUnique({
+          where: { instagramId: instagramAccountId },
+          select: { workspaceId: true },
+        })
+      : null;
+
+    await prisma.operationalEvent.create({
+      data: {
+        workspaceId: account?.workspaceId ?? (job && "workspaceId" in job.data ? job.data.workspaceId : null),
+        source: "WORKER",
+        level: "ERROR",
+        message: `DM worker job ${job?.id ?? "unknown"} failed: ${error.message}`,
+        payload: {
+          jobId: job?.id ?? null,
+          attemptsMade: job?.attemptsMade ?? null,
+          instagramAccountId: instagramAccountId ?? null,
+          commentId,
+        },
+      },
+    });
+
+    await recordWorkerAlert({
+      level: "error",
+      message: error.message,
+      jobId: job?.id,
+      instagramAccountId,
+      commentId: commentId ?? undefined,
+    });
   } catch (recordError) {
     console.error("[DM Worker] Failed to record worker failure:", formatError(recordError));
   }
@@ -787,10 +1126,36 @@ export function createDMWorker(): Worker<DmQueueJob> {
   const worker = new Worker<DmQueueJob>("dm-processing", processJob, {
     connection: getRedisConnection(),
     concurrency: 5,
-    settings: { backoffStrategy: (attemptsMade: number) => BACKOFF_DELAYS[Math.min(attemptsMade - 1, BACKOFF_DELAYS.length - 1)] },
+    settings: {
+      backoffStrategy: (attemptsMade: number) =>
+        BACKOFF_DELAYS[Math.min(attemptsMade - 1, BACKOFF_DELAYS.length - 1)],
+    },
   });
-  worker.on("completed", (job) => console.log(`[DM Worker] Job ${job.id} completed`));
-  worker.on("failed", (job, err) => { console.error(`[DM Worker] Job ${job?.id} failed (attempt ${job?.attemptsMade}):`, err.message); void recordWorkerFailure(job, err); });
-  worker.on("error", (err) => { console.error("[DM Worker] Worker error:", err.message); void prisma.operationalEvent.create({ data: { source: "WORKER", level: "ERROR", message: `DM worker process error: ${err.message}`, payload: { name: err.name } } }).catch((recordError) => console.error("[DM Worker] Failed to record worker process error:", formatError(recordError))); });
+
+  worker.on("completed", (job) => {
+    console.log(`[DM Worker] Job ${job.id} completed`);
+  });
+
+  worker.on("failed", (job, err) => {
+    console.error(`[DM Worker] Job ${job?.id} failed (attempt ${job?.attemptsMade}):`, err.message);
+    void recordWorkerFailure(job, err);
+  });
+
+  worker.on("error", (err) => {
+    console.error("[DM Worker] Worker error:", err.message);
+    void prisma.operationalEvent
+      .create({
+        data: {
+          source: "WORKER",
+          level: "ERROR",
+          message: `DM worker process error: ${err.message}`,
+          payload: { name: err.name },
+        },
+      })
+      .catch((recordError) => {
+        console.error("[DM Worker] Failed to record worker process error:", formatError(recordError));
+      });
+  });
+
   return worker;
 }

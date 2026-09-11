@@ -73,6 +73,9 @@ async function campaignForResponse(id: string, workspaceId: string) {
         include: { _count: { select: { clicks: true } } },
         orderBy: { createdAt: "asc" },
       },
+      _count: {
+        select: { dmLogs: true },
+      },
     },
   });
 
@@ -108,7 +111,10 @@ async function campaignForResponse(id: string, workspaceId: string) {
 
   return {
     ...campaign,
-    instagramAccountUsername: campaign.instagramAccount.username,
+    _count: {
+      dmLogs: campaign._count?.dmLogs ?? sent + skipped + failed,
+    },
+    instagramAccountUsername: campaign.instagramAccount?.username ?? "",
     analytics: {
       sent,
       skipped,
@@ -120,7 +126,7 @@ async function campaignForResponse(id: string, workspaceId: string) {
         .map((group) => ({ keyword: group.matchedKeyword, count: group._count._all })),
     },
     reportUrl: campaign.reportShareSlug ? buildReportUrl(campaign.reportShareSlug) : null,
-    trackedLinks: campaign.trackedLinks.map((link) => ({
+    trackedLinks: (campaign.trackedLinks ?? []).map((link) => ({
       ...link,
       trackedUrl: buildTrackedUrl(link.slug),
     })),
