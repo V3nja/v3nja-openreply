@@ -9,8 +9,11 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+
+RUN echo 'export default { schema: "prisma/schema.prisma", datasource: { url: process.env.DATABASE_URL } };' > prisma.config.ts
+
 RUN npx prisma generate
 
 ENV NODE_ENV=production
 
-CMD ["sh", "-c", "npx prisma db push --url \"$DATABASE_URL\" --accept-data-loss && npm run worker"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm run worker"]
