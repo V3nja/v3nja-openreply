@@ -150,12 +150,16 @@ async function postToMessagesEndpoint<T>(
   body: object
 ): Promise<T> {
   const version = getMetaGraphApiVersion();
-  const endpoints = [
-    `${instagramGraphBase()}/${instagramAccountId}/messages?access_token=${encodeURIComponent(accessToken)}`,
-    `${instagramGraphBase()}/me/messages?access_token=${encodeURIComponent(accessToken)}`,
-    `https://graph.facebook.com/${version}/${instagramAccountId}/messages?access_token=${encodeURIComponent(accessToken)}`,
-    `https://graph.facebook.com/${version}/me/messages?access_token=${encodeURIComponent(accessToken)}`,
-  ];
+  const endpoints = accessToken.startsWith("IG")
+    ? [
+        `${instagramGraphBase()}/${instagramAccountId}/messages?access_token=${encodeURIComponent(accessToken)}`,
+        `${instagramGraphBase()}/me/messages?access_token=${encodeURIComponent(accessToken)}`,
+      ]
+    : [
+        `https://graph.facebook.com/${version}/${instagramAccountId}/messages?access_token=${encodeURIComponent(accessToken)}`,
+        `https://graph.facebook.com/${version}/me/messages?access_token=${encodeURIComponent(accessToken)}`,
+        `${instagramGraphBase()}/${instagramAccountId}/messages?access_token=${encodeURIComponent(accessToken)}`,
+      ];
 
   let lastError: unknown = null;
   for (const url of endpoints) {
@@ -372,10 +376,12 @@ export async function sendCommentReply(
   message: string
 ): Promise<{ id: string }> {
   const version = getMetaGraphApiVersion();
-  const endpoints = [
-    `${instagramGraphBase()}/${commentId}/replies?access_token=${encodeURIComponent(accessToken)}`,
-    `https://graph.facebook.com/${version}/${commentId}/replies?access_token=${encodeURIComponent(accessToken)}`,
-  ];
+  const endpoints = accessToken.startsWith("IG")
+    ? [`${instagramGraphBase()}/${commentId}/replies?access_token=${encodeURIComponent(accessToken)}`]
+    : [
+        `https://graph.facebook.com/${version}/${commentId}/replies?access_token=${encodeURIComponent(accessToken)}`,
+        `${instagramGraphBase()}/${commentId}/replies?access_token=${encodeURIComponent(accessToken)}`,
+      ];
 
   let lastError: unknown = null;
   for (const url of endpoints) {
