@@ -74,11 +74,12 @@ export async function recordFanInteraction(input: FanInteractionInput): Promise<
         "updatedAt" = CURRENT_TIMESTAMP;
     `;
 
+    const interactionId = `fani_${createHash("sha256").update(input.dedupeKey).digest("hex").slice(0, 32)}`;
     const inserted = await tx.$executeRaw`
       INSERT INTO "FanInteraction" (
-        "workspaceId", "fanId", "instagramAccountId", "webhookEventId", "dedupeKey", "interactionType", "createdAt"
+        "id", "workspaceId", "fanId", "instagramAccountId", "webhookEventId", "dedupeKey", "interactionType", "createdAt"
       ) VALUES (
-        ${input.workspaceId}, ${id}, ${input.instagramAccountId}, ${input.webhookEventId}, ${input.dedupeKey},
+        ${interactionId}, ${input.workspaceId}, ${id}, ${input.instagramAccountId}, ${input.webhookEventId}, ${input.dedupeKey},
         ${input.interactionType || tag || "interaction"}, CURRENT_TIMESTAMP
       )
       ON CONFLICT ("dedupeKey") DO NOTHING;

@@ -89,16 +89,20 @@ export async function enqueueVerifiedWebhook(
       const account = accountMap.get(event.instagramAccountId) ?? defaultAccount;
       if (!account) continue;
 
-      await recordFanInteraction({
-        workspaceId: account.workspaceId,
-        instagramAccountId: account.id,
-        instagramUserId: event.commenterId,
-        username: event.commenterName,
-        tag: "comment",
-        webhookEventId: eventId,
-        dedupeKey: `webhook:${eventId}:comment:${event.commentId}`,
-        interactionType: "comment",
-      });
+      try {
+        await recordFanInteraction({
+          workspaceId: account.workspaceId,
+          instagramAccountId: account.id,
+          instagramUserId: event.commenterId,
+          username: event.commenterName,
+          tag: "comment",
+          webhookEventId: eventId,
+          dedupeKey: `webhook:${eventId}:comment:${event.commentId}`,
+          interactionType: "comment",
+        });
+      } catch (fanErr) {
+        console.warn("[Webhook] Fan interaction logging warning:", fanErr);
+      }
 
       if (event.mediaId) {
         const pendingAutomations = await prisma.automation.findMany({
@@ -198,15 +202,19 @@ export async function enqueueVerifiedWebhook(
       const account = accountMap.get(event.instagramAccountId) ?? defaultAccount;
       if (!account) continue;
 
-      await recordFanInteraction({
-        workspaceId: account.workspaceId,
-        instagramAccountId: account.id,
-        instagramUserId: event.senderId,
-        tag: "dm",
-        webhookEventId: eventId,
-        dedupeKey: `webhook:${eventId}:message:${event.messageId}`,
-        interactionType: "dm",
-      });
+      try {
+        await recordFanInteraction({
+          workspaceId: account.workspaceId,
+          instagramAccountId: account.id,
+          instagramUserId: event.senderId,
+          tag: "dm",
+          webhookEventId: eventId,
+          dedupeKey: `webhook:${eventId}:message:${event.messageId}`,
+          interactionType: "dm",
+        });
+      } catch (fanErr) {
+        console.warn("[Webhook] Fan interaction logging warning:", fanErr);
+      }
 
       // Direct in-process execution on Vercel Serverless
       try {
@@ -247,15 +255,19 @@ export async function enqueueVerifiedWebhook(
       if (!account) continue;
 
       const postbackKey = event.mid ?? `${event.userId}:${event.payload}`;
-      await recordFanInteraction({
-        workspaceId: account.workspaceId,
-        instagramAccountId: account.id,
-        instagramUserId: event.userId,
-        tag: "button-tap",
-        webhookEventId: eventId,
-        dedupeKey: `webhook:${eventId}:postback:${postbackKey}`,
-        interactionType: "button-tap",
-      });
+      try {
+        await recordFanInteraction({
+          workspaceId: account.workspaceId,
+          instagramAccountId: account.id,
+          instagramUserId: event.userId,
+          tag: "button-tap",
+          webhookEventId: eventId,
+          dedupeKey: `webhook:${eventId}:postback:${postbackKey}`,
+          interactionType: "button-tap",
+        });
+      } catch (fanErr) {
+        console.warn("[Webhook] Fan interaction logging warning:", fanErr);
+      }
 
       // Direct in-process execution on Vercel Serverless
       try {
