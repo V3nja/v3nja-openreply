@@ -79,7 +79,7 @@ function buildLinkButtons(
 ): { title: string; url: string }[] {
   return trackedLinks.slice(0, 3).map((link, index) => ({
     url: buildTrackedUrl(link.slug),
-    title: (index === 0 ? primaryLabel : link.label) || link.label || "Open link",
+    title: ((index === 0 ? primaryLabel : link.label) || link.label || "Open link").slice(0, 20),
   }));
 }
 
@@ -89,9 +89,18 @@ function buildInlineLinkFallback(
   trackedLinks: WorkerTrackedLink[],
   bodyText: string
 ): string {
-  const base =
+  let base =
     renderMessageWithTracking({ message, commenterName, trackedLinks }) ||
     bodyText;
+
+  const targetLink =
+    trackedLinks[0]?.destinationUrl ||
+    (trackedLinks[0]?.slug ? buildTrackedUrl(trackedLinks[0].slug) : "");
+
+  if (targetLink && !base.includes("http")) {
+    base = `${base}\n\n🎧 Stream & Watch:\n${targetLink}`;
+  }
+
   const extraUrls = trackedLinks.slice(1).map((link) => buildTrackedUrl(link.slug));
   return extraUrls.length > 0 ? `${base}\n${extraUrls.join("\n")}` : base;
 }

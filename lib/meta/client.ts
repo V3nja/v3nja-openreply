@@ -368,6 +368,41 @@ export async function sendDirectMessage(
   });
 }
 
+export async function sendDirectMessageWithGenericTemplate(
+  accessToken: string,
+  instagramAccountId: string,
+  userId: string,
+  title: string,
+  subtitle: string,
+  buttonTitle: string,
+  buttonUrl: string
+): Promise<{ recipient_id: string; message_id: string }> {
+  return postToMessagesEndpoint(accessToken, instagramAccountId, {
+    recipient: { id: userId },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "generic",
+          elements: [
+            {
+              title: title.slice(0, 80),
+              subtitle: subtitle.slice(0, 80),
+              buttons: [
+                {
+                  type: "web_url",
+                  url: buttonUrl,
+                  title: buttonTitle.slice(0, 20),
+                },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  });
+}
+
 /**
  * Send a direct message as a button template with up to 3 web_url buttons —
  * the reveal message plus tappable link buttons (cleaner than inline URLs).
