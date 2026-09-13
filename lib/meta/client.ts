@@ -152,6 +152,7 @@ async function postToMessagesEndpoint<T>(
   const version = getMetaGraphApiVersion();
   const endpoints = [
     `${instagramGraphBase()}/${instagramAccountId}/messages?access_token=${encodeURIComponent(accessToken)}`,
+    `${instagramGraphBase()}/me/messages?access_token=${encodeURIComponent(accessToken)}`,
     `https://graph.facebook.com/${version}/${instagramAccountId}/messages?access_token=${encodeURIComponent(accessToken)}`,
     `https://graph.facebook.com/${version}/me/messages?access_token=${encodeURIComponent(accessToken)}`,
   ];

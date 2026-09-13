@@ -150,6 +150,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      matched: true,
       dryRun: true,
       sent: false,
       persisted: false,

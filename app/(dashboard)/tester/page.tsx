@@ -358,7 +358,7 @@ export default function TesterPage() {
                 </div>
               </div>
 
-              {result?.matched ? (
+              {result?.matched || result?.campaign?.id ? (
                 <div className="p-3.5 space-y-3">
                   {!isUnlocked && result.isFollowGatedPrompt ? (
                     <div className="space-y-2.5">
@@ -388,7 +388,7 @@ export default function TesterPage() {
                       </div>
 
                       <a
-                        href="https://v3nja-official.web.app/wayulomi"
+                        href={result.trackedLinks?.[0]?.destinationUrl || "https://v3nja-official.web.app/"}
                         target="_blank"
                         rel="noreferrer"
                         className="v3nja-gold-button block text-center w-full py-2.5 px-3 text-xs uppercase tracking-wider"
@@ -399,8 +399,8 @@ export default function TesterPage() {
                   )}
 
                   <div className="text-[10px] text-zinc-400 flex items-center justify-between pt-1 border-t border-white/[0.06]">
-                    <span>Campaign: <strong className="text-white">{result.campaign.name}</strong></span>
-                    <span>Matched: <strong className="text-amber-400">{result.campaign.matchedKeyword}</strong></span>
+                    <span>Campaign: <strong className="text-white">{result.campaign?.name}</strong></span>
+                    <span>Matched: <strong className="text-amber-400">{result.campaign?.matchedKeyword}</strong></span>
                   </div>
                 </div>
               ) : result && !result.matched ? (
