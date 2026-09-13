@@ -21,7 +21,12 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as Record<string, unknown>;
     const commentText = text(body.commentText);
     const commenterName = text(body.commenterName, "music_fan_265");
-    const isFollowing = body.isFollowing !== undefined ? Boolean(body.isFollowing) : true;
+    const isFollowing =
+      body.isFollowing !== undefined
+        ? Boolean(body.isFollowing)
+        : body.isFollower !== undefined
+        ? Boolean(body.isFollower)
+        : true;
     const triggerType = text(body.triggerType, "COMMENT");
     const requestedAccountId = text(body.instagramAccountId);
     const mediaId = text(body.mediaId) || null;
