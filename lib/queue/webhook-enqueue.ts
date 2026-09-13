@@ -53,16 +53,18 @@ export async function enqueueVerifiedWebhook(
       })
     : [];
 
-  const defaultAccount = accounts.length === 0
-    ? await prisma.instagramAccount.findFirst({
-        select: { id: true, instagramId: true, workspaceId: true },
-        orderBy: { connectedAt: "desc" },
-      })
-    : null;
+  const defaultAccount =
+    accounts.length === 0 && typeof prisma.instagramAccount?.findFirst === "function"
+      ? await prisma.instagramAccount.findFirst({
+          select: { id: true, instagramId: true, workspaceId: true },
+          orderBy: { connectedAt: "desc" },
+        })
+      : null;
 
   const accountMap = new Map(accounts.map((account) => [account.instagramId, account]));
   const workspaceIds = new Set(accounts.map((account) => account.workspaceId));
   const workspaceId = workspaceIds.size === 1 ? [...workspaceIds][0] : defaultAccount?.workspaceId ?? null;
+  const fallbackAccount = accounts[0] ?? defaultAccount;
 
   if (!existing) {
     await prisma.webhookEvent.create({
@@ -86,7 +88,7 @@ export async function enqueueVerifiedWebhook(
 
   try {
     for (const event of commentEvents) {
-      const account = accountMap.get(event.instagramAccountId) ?? defaultAccount;
+      const account = accountMap.get(event.instagramAccountId) ?? fallbackAccount;
       if (!account) continue;
 
       try {
@@ -199,7 +201,7 @@ export async function enqueueVerifiedWebhook(
     }
 
     for (const event of messageEvents) {
-      const account = accountMap.get(event.instagramAccountId) ?? defaultAccount;
+      const account = accountMap.get(event.instagramAccountId) ?? fallbackAccount;
       if (!account) continue;
 
       try {
@@ -251,7 +253,7 @@ export async function enqueueVerifiedWebhook(
     }
 
     for (const event of postbackEvents) {
-      const account = accountMap.get(event.instagramAccountId) ?? defaultAccount;
+      const account = accountMap.get(event.instagramAccountId) ?? fallbackAccount;
       if (!account) continue;
 
       const postbackKey = event.mid ?? `${event.userId}:${event.payload}`;

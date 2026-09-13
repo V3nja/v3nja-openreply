@@ -384,40 +384,19 @@ export async function POST(request: NextRequest) {
       return errorResponse("Instagram account not found", 404);
     }
 
-    const destinationUrl = parseDestination(body.trackedDestinationUrl);
-    const secondaryDestinationUrl = parseDestination(body.secondaryDestinationUrl);
-    const linkCreates = [
-      destinationUrl
-        ? {
-            workspaceId: context.workspaceId,
-            slug: generateTrackedLinkSlug(),
-            label: boundedText(body.linkButtonLabel, 100, "Open link") || "Open link",
-            destinationUrl,
-          }
-        : null,
-      secondaryDestinationUrl
-        ? {
-            workspaceId: context.workspaceId,
-            slug: generateTrackedLinkSlug(),
-            label:
-              boundedText(body.secondaryButtonLabel, 100, "Open link") || "Open link",
-            destinationUrl: secondaryDestinationUrl,
-          }
-        : null,
-    ].filter(Boolean) as Array<{
-      workspaceId: string;
-      slug: string;
-      label: string;
-      destinationUrl: string;
-    }>;
-
     const created = await prisma.automation.create({
-      data: {
-        ...createData(body, instagramAccountId, context.workspaceId),
-        ...(linkCreates.length ? { trackedLinks: { create: linkCreates } } : {}),
-      },
+      data: createData(body, instagramAccountId, context.workspaceId),
       select: { id: true },
     });
+
+    if (
+      body.trackedDestinationUrl !== undefined ||
+      body.secondaryDestinationUrl !== undefined ||
+      body.linkButtonLabel !== undefined ||
+      body.secondaryButtonLabel !== undefined
+    ) {
+      await syncTrackedLinks(created.id, context.workspaceId, body);
+    }
 
     const data = await campaignForResponse(created.id, context.workspaceId);
     return NextResponse.json({ success: true, data }, { status: 201 });

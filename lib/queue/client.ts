@@ -11,10 +11,26 @@ let connection: Redis | null = null;
 
 export function getSafeRedisUrl(): string {
   let raw = (process.env.REDIS_URL || "").trim();
-  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
-    raw = raw.slice(1, -1).trim();
+  while (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'")) ||
+    (raw.startsWith("%22") && raw.endsWith("%22")) ||
+    (raw.startsWith("%27") && raw.endsWith("%27"))
+  ) {
+    if (raw.startsWith("%22") && raw.endsWith("%22")) {
+      raw = raw.slice(3, -3).trim();
+    } else if (raw.startsWith("%27") && raw.endsWith("%27")) {
+      raw = raw.slice(3, -3).trim();
+    } else {
+      raw = raw.slice(1, -1).trim();
+    }
   }
-  raw = raw.replace(/^%22|%22$/g, "");
+  try {
+    if (raw.includes("%22") || raw.includes("%27")) {
+      raw = decodeURIComponent(raw);
+    }
+  } catch {}
+  raw = raw.replace(/^["']|["']$/g, "").trim();
   return raw || "redis://localhost:6379";
 }
 

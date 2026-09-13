@@ -40,6 +40,7 @@ import {
   renderMessageWithTracking,
   renderMessageWithoutLink,
 } from "@/lib/tracking/message";
+import { generateAntiSpamPublicReply } from "@/lib/utils/anti-spam-reply";
 import { acquireDeliveryLease, markDmLogFailed, markDmLogSent, withDeliveryLock } from "./idempotency";
 
 const BACKOFF_DELAYS = [5 * 60 * 1000, 15 * 60 * 1000, 45 * 60 * 1000];
@@ -377,24 +378,16 @@ export async function processComment(job: { data: ProcessCommentJob; attemptsMad
       });
     }
 
-    const replyPool =
-      automation.publicReplyMessages && automation.publicReplyMessages.length > 0
-        ? automation.publicReplyMessages
-        : automation.publicReplyMessage
-        ? [automation.publicReplyMessage]
-        : [];
-
-    if (automation.publicReplyEnabled && replyPool.length > 0 && !alreadyPublicReplied) {
+    if (automation.publicReplyEnabled && !alreadyPublicReplied) {
       try {
         const publicReplyLock = await withDeliveryLock(
           `${automation.workspaceId}:automation:${automation.id}:comment:${commentId}:public`,
           async () => {
-            const chosen = replyPool[Math.floor(Math.random() * replyPool.length)];
-            const publicReply = renderMessageWithTracking({
-              message: chosen,
-              commenterName,
-              trackedLinks: automation.trackedLinks,
-            });
+            const publicReply = generateAntiSpamPublicReply(
+              automation.publicReplyMessages,
+              automation.publicReplyMessage,
+              commenterName
+            );
             await sendCommentReply(accessToken, commentId, publicReply);
           }
         );
@@ -581,6 +574,28 @@ export async function processComment(job: { data: ProcessCommentJob; attemptsMad
       }
 
       await markDmLogSent({ automationId: automation.id, commentId });
+
+      if (!useOpeningDm && !sendFollowPrompt && automation.followUpEnabled && automation.followUpMessage) {
+        try {
+          const queue = getDMQueue();
+          const delayMs = Math.max(1, automation.followUpDelayMinutes || 15) * 60 * 1000;
+          await queue.add(
+            FOLLOWUP_JOB_NAME,
+            {
+              automationId: automation.id,
+              userId: commenterId,
+              instagramAccountId: automation.instagramAccount.instagramId,
+              commenterName: commenterName ?? null,
+            },
+            {
+              delay: delayMs,
+              jobId: `followup_${automation.id}_${commenterId}`,
+            }
+          );
+        } catch (queueErr) {
+          console.warn("[DM Worker] Followup schedule warning:", queueErr);
+        }
+      }
     } catch (error) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
       await deliveryLease.release().catch(() => {});
@@ -801,6 +816,28 @@ export async function processPostback(job: { data: ProcessPostbackJob; attemptsM
 
     if (!fallback) {
       await markDmLogSent({ automationId: automation.id, commentId: revealDedupeId });
+
+      if (automation.followUpEnabled && automation.followUpMessage) {
+        try {
+          const queue = getDMQueue();
+          const delayMs = Math.max(1, automation.followUpDelayMinutes || 15) * 60 * 1000;
+          await queue.add(
+            FOLLOWUP_JOB_NAME,
+            {
+              automationId: automation.id,
+              userId,
+              instagramAccountId: automation.instagramAccount.instagramId,
+              commenterName: commenterName ?? null,
+            },
+            {
+              delay: delayMs,
+              jobId: `followup_${automation.id}_${userId}`,
+            }
+          );
+        } catch (queueErr) {
+          console.warn("[DM Worker] Followup schedule warning:", queueErr);
+        }
+      }
     }
   } catch (error) {
     await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
@@ -1091,6 +1128,28 @@ export async function processMessage(job: { data: ProcessMessageJob; attemptsMad
           errorMessage: null,
         },
       });
+
+      if (!sendFollowPrompt && automation.followUpEnabled && automation.followUpMessage) {
+        try {
+          const queue = getDMQueue();
+          const delayMs = Math.max(1, automation.followUpDelayMinutes || 15) * 60 * 1000;
+          await queue.add(
+            FOLLOWUP_JOB_NAME,
+            {
+              automationId: automation.id,
+              userId: senderId,
+              instagramAccountId: automation.instagramAccount.instagramId,
+              commenterName: commenterName ?? null,
+            },
+            {
+              delay: delayMs,
+              jobId: `followup_${automation.id}_${senderId}`,
+            }
+          );
+        } catch (queueErr) {
+          console.warn("[DM Worker] Followup schedule warning:", queueErr);
+        }
+      }
     } catch (error) {
       await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
       await deliveryLease.release().catch(() => {});
