@@ -151,9 +151,9 @@ async function postToMessagesEndpoint<T>(
 ): Promise<T> {
   const version = getMetaGraphApiVersion();
   const endpoints = [
-    `${instagramGraphBase()}/${instagramAccountId}/messages`,
-    `https://graph.facebook.com/${version}/${instagramAccountId}/messages`,
-    `https://graph.facebook.com/${version}/me/messages`,
+    `${instagramGraphBase()}/${instagramAccountId}/messages?access_token=${encodeURIComponent(accessToken)}`,
+    `https://graph.facebook.com/${version}/${instagramAccountId}/messages?access_token=${encodeURIComponent(accessToken)}`,
+    `https://graph.facebook.com/${version}/me/messages?access_token=${encodeURIComponent(accessToken)}`,
   ];
 
   let lastError: unknown = null;
@@ -372,8 +372,8 @@ export async function sendCommentReply(
 ): Promise<{ id: string }> {
   const version = getMetaGraphApiVersion();
   const endpoints = [
-    `${instagramGraphBase()}/${commentId}/replies`,
-    `https://graph.facebook.com/${version}/${commentId}/replies`,
+    `${instagramGraphBase()}/${commentId}/replies?access_token=${encodeURIComponent(accessToken)}`,
+    `https://graph.facebook.com/${version}/${commentId}/replies?access_token=${encodeURIComponent(accessToken)}`,
   ];
 
   let lastError: unknown = null;

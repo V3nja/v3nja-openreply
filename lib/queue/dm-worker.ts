@@ -325,7 +325,8 @@ export async function processComment(job: { data: ProcessCommentJob; attemptsMad
     if (existingLog?.status === "SKIPPED_PLAN_LIMIT") continue;
     if (alreadyDmd && (alreadyPublicReplied || !automation.publicReplyEnabled)) continue;
 
-    if (!automation.instagramAccount.accessToken) {
+    const accessToken = getSafeAccessToken(automation.instagramAccount.accessToken);
+    if (!accessToken) {
       await prisma.dmLog.upsert({
         where: { automationId_commentId: { automationId: automation.id, commentId } },
         create: {
@@ -346,11 +347,6 @@ export async function processComment(job: { data: ProcessCommentJob; attemptsMad
           errorMessage: "No Instagram access token available",
         },
       });
-      continue;
-    }
-
-    const accessToken = getSafeAccessToken(automation.instagramAccount.accessToken);
-    if (!accessToken) {
       continue;
     }
 
