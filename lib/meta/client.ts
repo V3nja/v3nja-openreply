@@ -208,8 +208,22 @@ export async function sendPrivateReplyWithButton(
   commentId: string,
   text: string,
   buttonTitle: string,
-  payload: string
+  payload: string,
+  extraButtons?: Array<{ type: "web_url" | "postback"; title: string; url?: string; payload?: string }>
 ): Promise<{ recipient_id: string; message_id: string }> {
+  const buttons: Array<{ type: string; title: string; url?: string; payload?: string }> = [];
+  if (payload.startsWith("followcheck:")) {
+    buttons.push({
+      type: "web_url",
+      url: "https://www.instagram.com/v3nja2.0/",
+      title: "Follow @v3nja2.0 ↗",
+    });
+  }
+  if (extraButtons && extraButtons.length > 0) {
+    buttons.push(...extraButtons.slice(0, 2).map((b) => ({ ...b, title: b.title.slice(0, 20) })));
+  }
+  buttons.push({ type: "postback", title: buttonTitle.slice(0, 20), payload });
+
   return postToMessagesEndpoint(accessToken, instagramAccountId, {
     recipient: { comment_id: commentId },
     message: {
@@ -218,9 +232,7 @@ export async function sendPrivateReplyWithButton(
         payload: {
           template_type: "button",
           text: text.slice(0, 640),
-          buttons: [
-            { type: "postback", title: buttonTitle.slice(0, 20), payload },
-          ],
+          buttons: buttons.slice(0, 3),
         },
       },
     },
@@ -238,8 +250,22 @@ export async function sendDirectMessageWithButton(
   userId: string,
   text: string,
   buttonTitle: string,
-  payload: string
+  payload: string,
+  extraButtons?: Array<{ type: "web_url" | "postback"; title: string; url?: string; payload?: string }>
 ): Promise<{ recipient_id: string; message_id: string }> {
+  const buttons: Array<{ type: string; title: string; url?: string; payload?: string }> = [];
+  if (payload.startsWith("followcheck:")) {
+    buttons.push({
+      type: "web_url",
+      url: "https://www.instagram.com/v3nja2.0/",
+      title: "Follow @v3nja2.0 ↗",
+    });
+  }
+  if (extraButtons && extraButtons.length > 0) {
+    buttons.push(...extraButtons.slice(0, 2).map((b) => ({ ...b, title: b.title.slice(0, 20) })));
+  }
+  buttons.push({ type: "postback", title: buttonTitle.slice(0, 20), payload });
+
   return postToMessagesEndpoint(accessToken, instagramAccountId, {
     recipient: { id: userId },
     message: {
@@ -248,9 +274,7 @@ export async function sendDirectMessageWithButton(
         payload: {
           template_type: "button",
           text: text.slice(0, 640),
-          buttons: [
-            { type: "postback", title: buttonTitle.slice(0, 20), payload },
-          ],
+          buttons: buttons.slice(0, 3),
         },
       },
     },

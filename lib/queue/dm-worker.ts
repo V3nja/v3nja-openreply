@@ -522,7 +522,9 @@ export async function processComment(job: { data: ProcessCommentJob; attemptsMad
         );
       } else if (sendFollowPrompt) {
         const promptText = renderMessageWithoutLink({
-          message: automation.followPromptMessage || "Follow me and tap the button to grab your link!",
+          message:
+            automation.followPromptMessage ||
+            "Follow @v3nja2.0 and tap below to unlock your VIP link ✨",
           commenterName,
         });
         await sendPrivateReplyWithButton(
@@ -721,7 +723,9 @@ export async function processPostback(job: { data: ProcessPostbackJob; attemptsM
           automation.instagramAccount.instagramId,
           userId,
           renderMessageWithoutLink({
-            message: automation.followPromptMessage || "Follow me and tap the button once you're following.",
+            message:
+              automation.followPromptMessage ||
+              "Follow @v3nja2.0 and tap below once you are following ✨",
             commenterName,
           }),
           automation.followPromptButtonLabel || "I'm following",
@@ -1091,7 +1095,9 @@ export async function processMessage(job: { data: ProcessMessageJob; attemptsMad
           automation.instagramAccount.instagramId,
           senderId,
           renderMessageWithoutLink({
-            message: automation.followPromptMessage || "Almost there! Follow me and tap the button below to grab your link 💛",
+            message:
+              automation.followPromptMessage ||
+              "Follow @v3nja2.0 and tap below to unlock your VIP link ✨",
             commenterName,
           }),
           automation.followPromptButtonLabel || "I'm following ✅",
