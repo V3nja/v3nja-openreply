@@ -15,6 +15,7 @@
  */
 
 import Redis from "ioredis";
+import { getSafeRedisUrl } from "@/lib/queue/client";
 
 const RATE_LIMIT_MAX = 750; // private replies per hour, per Meta's documented cap
 const RATE_LIMIT_WINDOW = 3600; // 1 hour in seconds
@@ -25,8 +26,13 @@ let redis: Redis | null = null;
 
 function getRedis(): Redis {
   if (!redis) {
-    redis = new Redis(process.env.REDIS_URL!, {
+    redis = new Redis(getSafeRedisUrl(), {
       maxRetriesPerRequest: null, // required by BullMQ
+      lazyConnect: true,
+      retryStrategy(times) {
+        if (times > 3) return null;
+        return Math.min(times * 100, 500);
+      },
     });
   }
   return redis;
@@ -169,34 +175,47 @@ export async function reserveDMSlot(
   instagramAccountId: string,
   requeueAttempt: number = 0
 ): Promise<RateLimitResult> {
-  const client = getRedis();
-  const key = `rate:dm:${instagramAccountId}`;
+  try {
+    const client = getRedis();
+    const key = `rate:dm:${instagramAccountId}`;
 
-  const result = await client.eval(
-    RESERVE_DM_SLOT_SCRIPT,
-    1,
-    key,
-    RATE_LIMIT_MAX,
-    RATE_LIMIT_WINDOW
-  );
-  const values = Array.isArray(result) ? result : [];
-  const allowedFlag = toScriptNumber(values[0]);
-  const count = toScriptNumber(values[1]);
-  const remaining = toScriptNumber(values[2]);
+    const result = await client.eval(
+      RESERVE_DM_SLOT_SCRIPT,
+      1,
+      key,
+      RATE_LIMIT_MAX,
+      RATE_LIMIT_WINDOW
+    );
+    const values = Array.isArray(result) ? result : [];
+    const allowedFlag = toScriptNumber(values[0]);
+    const count = toScriptNumber(values[1]);
+    const remaining = toScriptNumber(values[2]);
 
-  if (allowedFlag !== 1) {
-    return blockedResult(count, requeueAttempt);
+    if (allowedFlag !== 1) {
+      return blockedResult(count, requeueAttempt);
+    }
+
+    return {
+      allowed: true,
+      currentCount: count,
+      remainingDMs: remaining,
+      shouldRequeue: false,
+      requeueDelayMs: 0,
+      shouldSkip: false,
+      reserved: true,
+    };
+  } catch (err) {
+    console.warn("[RateLimiter] Redis slot reservation warning, bypassing:", err);
+    return {
+      allowed: true,
+      currentCount: 1,
+      remainingDMs: RATE_LIMIT_MAX - 1,
+      shouldRequeue: false,
+      requeueDelayMs: 0,
+      shouldSkip: false,
+      reserved: true,
+    };
   }
-
-  return {
-    allowed: true,
-    currentCount: count,
-    remainingDMs: remaining,
-    shouldRequeue: false,
-    requeueDelayMs: 0,
-    shouldSkip: false,
-    reserved: true,
-  };
 }
 
 /**

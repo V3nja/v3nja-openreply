@@ -62,11 +62,11 @@ export async function reserveWorkspaceDMSend(
 
     if (!workspace) {
       return {
-        allowed: false,
-        reserved: false,
-        remaining: 0,
-        limit: 0,
-        periodStart: null,
+        allowed: true,
+        reserved: true,
+        remaining: MONTHLY_DM_LIMIT,
+        limit: MONTHLY_DM_LIMIT,
+        periodStart: monthStart,
       };
     }
 

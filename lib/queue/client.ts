@@ -9,10 +9,24 @@ import Redis from "ioredis";
 
 let connection: Redis | null = null;
 
+export function getSafeRedisUrl(): string {
+  let raw = (process.env.REDIS_URL || "").trim();
+  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+    raw = raw.slice(1, -1).trim();
+  }
+  raw = raw.replace(/^%22|%22$/g, "");
+  return raw || "redis://localhost:6379";
+}
+
 export function getRedisConnection(): Redis {
   if (!connection) {
-    connection = new Redis(process.env.REDIS_URL!, {
+    connection = new Redis(getSafeRedisUrl(), {
       maxRetriesPerRequest: null,
+      lazyConnect: true,
+      retryStrategy(times) {
+        if (times > 3) return null;
+        return Math.min(times * 200, 1000);
+      },
     });
   }
   return connection;

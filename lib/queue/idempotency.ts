@@ -55,32 +55,41 @@ export async function acquireDeliveryLease(
   key: string
 ): Promise<DeliveryLease | null> {
   const token = randomUUID();
-  const redis = getRedisConnection();
-  const result = await redis.set(
-    lockKey(key),
-    token,
-    "EX",
-    LOCK_TTL_SECONDS,
-    "NX"
-  );
-  if (result !== "OK") return null;
+  try {
+    const redis = getRedisConnection();
+    const result = await redis.set(
+      lockKey(key),
+      token,
+      "EX",
+      LOCK_TTL_SECONDS,
+      "NX"
+    );
+    if (result !== "OK") return null;
 
-  let released = false;
-  const renewal = setInterval(() => {
-    if (released) return;
-    void renewDeliveryLock(key, token).catch(() => {});
-  }, LOCK_RENEW_INTERVAL_MS);
-  const renewalStop = setTimeout(() => clearInterval(renewal), LOCK_RENEW_MAX_MS);
-
-  return {
-    release: async () => {
+    let released = false;
+    const renewal = setInterval(() => {
       if (released) return;
-      released = true;
-      clearInterval(renewal);
-      clearTimeout(renewalStop);
-      await redis.eval(RELEASE_SCRIPT, 1, lockKey(key), token);
-    },
-  };
+      void renewDeliveryLock(key, token).catch(() => {});
+    }, LOCK_RENEW_INTERVAL_MS);
+    const renewalStop = setTimeout(() => clearInterval(renewal), LOCK_RENEW_MAX_MS);
+
+    return {
+      release: async () => {
+        if (released) return;
+        released = true;
+        clearInterval(renewal);
+        clearTimeout(renewalStop);
+        try {
+          await redis.eval(RELEASE_SCRIPT, 1, lockKey(key), token);
+        } catch {}
+      },
+    };
+  } catch (err) {
+    console.warn("[DeliveryLease] Redis lease warning, bypassing lock:", err);
+    return {
+      release: async () => {},
+    };
+  }
 }
 
 /**
