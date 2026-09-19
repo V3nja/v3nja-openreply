@@ -216,7 +216,7 @@ export async function sendPrivateReplyWithButton(
     buttons.push({
       type: "web_url",
       url: "https://www.instagram.com/v3nja2.0/",
-      title: "Follow @v3nja2.0 ↗",
+      title: "Follow V3NJA ↗",
     });
   }
   if (extraButtons && extraButtons.length > 0) {
@@ -258,7 +258,7 @@ export async function sendDirectMessageWithButton(
     buttons.push({
       type: "web_url",
       url: "https://www.instagram.com/v3nja2.0/",
-      title: "Follow @v3nja2.0 ↗",
+      title: "Follow V3NJA ↗",
     });
   }
   if (extraButtons && extraButtons.length > 0) {
