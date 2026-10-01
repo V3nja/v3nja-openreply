@@ -240,14 +240,9 @@ export default function InboxPage() {
       });
       const data = await res.json();
       if (data.success) {
-        if (data.queued) {
-          setQueuedRequestId(data.data?.requestId ?? null);
-          void loadConversations(true);
-          window.setTimeout(() => void loadMessages(active.id, true), 1500);
-        } else {
-          await loadMessages(active.id, true);
-          void loadConversations(true);
-        }
+        setQueuedRequestId(null);
+        window.setTimeout(() => void loadMessages(active.id, true), 800);
+        void loadConversations(true);
       } else {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
         setDraft(text);

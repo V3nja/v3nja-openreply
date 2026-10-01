@@ -96,6 +96,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
+function getSafeAccessToken(token?: string | null): string {
+  if (!token) return process.env.META_PAGE_ACCESS_TOKEN || process.env.INSTAGRAM_ACCESS_TOKEN || "";
+  try {
+    return decryptToken(token);
+  } catch {
+    return token;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const context = await getCurrentWorkspaceContext();
   if (!context) {
@@ -120,8 +129,8 @@ export async function POST(request: NextRequest) {
 
   const account = await prisma.instagramAccount.findFirst({
     where: {
-      id: body.instagramAccountId,
       workspaceId: context.workspaceId,
+      ...(body.instagramAccountId ? { id: body.instagramAccountId } : {}),
     },
     select: { id: true, instagramId: true, accessToken: true },
   });
@@ -129,31 +138,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Instagram account not found" }, { status: 404 });
   }
 
-  const requestId = request.headers.get("x-request-id")?.trim() || randomUUID();
+  const accessToken = getSafeAccessToken(account.accessToken);
+  if (!accessToken) {
+    return NextResponse.json({ success: false, error: "No valid access token available" }, { status: 400 });
+  }
 
   try {
-    await getDMQueue().add(
-      MANUAL_MESSAGE_JOB_NAME,
-      {
-        workspaceId: context.workspaceId,
-        instagramAccountId: account.id,
-        recipientId,
-        text,
-        requestId,
-      },
-      { jobId: `manual_${requestId}` }
-    );
+    // Direct Instant Live API Dispatch to Meta Graph API
+    const { sendDirectMessage } = await import("@/lib/meta/client");
+    const result = await sendDirectMessage(accessToken, account.instagramId, recipientId, text);
 
-    return NextResponse.json(
-      {
-        success: true,
-        queued: true,
-        data: { requestId },
+    // Record operational log in background
+    prisma.operationalEvent
+      .create({
+        data: {
+          workspaceId: context.workspaceId,
+          source: "INBOX",
+          level: "INFO",
+          message: "Manual Instagram DM sent",
+          payload: { instagramAccountId: account.id, recipientId, text: text.slice(0, 100) },
+        },
+      })
+      .catch(() => {});
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        messageId: result.message_id,
+        recipientId: result.recipient_id,
       },
-      { status: 202 }
-    );
+    });
   } catch (error) {
-    console.error("[Conversations POST]", error instanceof Error ? error.message : "unknown error");
-    return NextResponse.json({ success: false, error: "Failed to queue message" }, { status: 500 });
+    console.error("[Conversations POST Direct Error]", error);
+    const message = error instanceof Error ? error.message : "Failed to deliver message via Meta API";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
