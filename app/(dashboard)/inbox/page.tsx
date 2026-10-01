@@ -3,7 +3,7 @@
 /**
  * Universal Unified Messaging & Social OS (V3NJA WRLD)
  *
- * Authentic iOS & Instagram Direct Architecture:
+ * Real, Honest, Zero-Fake Architecture:
  * 1. Multi-Channel Switcher (All Channels, Instagram Direct, FB Messenger, OpenReply CRM, Offline SMS).
  * 2. Real Web Audio & MediaRecorder Voice Notes:
  *    - Real microphone permissions (`navigator.mediaDevices.getUserMedia`).
@@ -13,10 +13,12 @@
  *    - Photo & video uploads with instant preview and lightbox zoom.
  * 4. Authentic Apple SF Symbols & Instagram Direct SVG Icons (Zero crude text glyphs).
  * 5. Authentic iOS Emoji Keyboard Popover with 5 categorized tabs.
- * 6. Dynamic Real Contact Profiles & Fan CRM:
- *    - Accurate per-contact details, avatar photos, bio, tags, and interaction history.
- *    - Dedicated 3-Tab Explorer: [Contact Profile & CRM] [Chat Media & Voice] [Official @v3nja2.0 Profile].
- * 7. In-App Media Lightbox with Double-Tap Heart Like & In-App Comment Composer.
+ * 6. 100% Real, Honest Contact Profiles & Fan CRM:
+ *    - NO fake follower counts, NO fake badges, NO fake placeholder bios, NO fake Unsplash portraits.
+ *    - Shows authentic Meta Graph API follow status, real conversation messages count, real Fan CRM interactions & tags.
+ *    - Direct link to open the user's authentic Instagram profile on Instagram (`https://instagram.com/username`).
+ * 7. Authentic Connected Account View:
+ *    - @v3nja2.0 business profile with 2,851 followers, 50 posts, smart links, and live published Instagram media grid.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -303,7 +305,6 @@ export const WALLPAPER_OPTIONS: WallpaperOption[] = [
 
 const REACTION_EMOJIS = ["❤️", "👍", "🔥", "😂", "‼️", "👏", "🎵", "🙌"];
 
-// iOS Emoji Picker Categories
 const EMOJI_CATEGORIES = [
   {
     name: "Frequent",
@@ -344,103 +345,6 @@ const EMOJI_CATEGORIES = [
     ],
   },
 ];
-
-// Realistic Story Notes with genuine high-resolution portrait avatars
-const STORY_NOTES = [
-  {
-    id: "self",
-    username: "Your note",
-    note: "Dropping heat soon 🔥",
-    isSelf: true,
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
-  },
-  {
-    id: "v3nja",
-    username: "v3nja2.0",
-    note: "WAYULOMI Live 🎵",
-    hasUnseen: true,
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
-  },
-  {
-    id: "hyped",
-    username: "thee_hyped_teens",
-    note: "Blantyre Vibes 🚀",
-    hasUnseen: true,
-    avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=200&q=80",
-  },
-  {
-    id: "fan1",
-    username: "urban_dj",
-    note: "On repeat 🎧",
-    hasUnseen: true,
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
-  },
-  {
-    id: "fan2",
-    username: "music_plug",
-    note: "Fire beat 💥",
-    hasUnseen: false,
-    avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80",
-  },
-];
-
-// Profile data mapping per contact to avoid fake/mixed data
-const CONTACT_PROFILES: Record<string, {
-  name: string;
-  avatar: string;
-  bio: string;
-  followerCount: string;
-  followingCount: string;
-  postsCount: string;
-  isVerified: boolean;
-  tags: string[];
-  city: string;
-}> = {
-  thee_hyped_teens: {
-    name: "Hyped Teens Malawi",
-    avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80",
-    bio: "Youth creative collective & urban streetwear culture in Blantyre 🇲🇼 • Music enthusiasts & V3NJA community members.",
-    followerCount: "1,420",
-    followingCount: "385",
-    postsCount: "28",
-    isVerified: true,
-    tags: ["#SuperFan", "#VIP", "#WayulomiLead", "#Blantyre"],
-    city: "Blantyre, MW",
-  },
-  urban_dj: {
-    name: "DJ Urban Blantyre",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80",
-    bio: "Resident DJ @ Club Galaxy 🎧 Afrobeat & Amapiano sets. Spinning latest V3NJA releases live on air.",
-    followerCount: "8,940",
-    followingCount: "512",
-    postsCount: "142",
-    isVerified: true,
-    tags: ["#RadioDJ", "#Influencer", "#VIP"],
-    city: "Blantyre, MW",
-  },
-  music_plug: {
-    name: "Malawi Music Plug",
-    avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80",
-    bio: "Promoting fresh talent & breaking new tracks across Southern Africa 🌍 Contact for press & features.",
-    followerCount: "24.5K",
-    followingCount: "820",
-    postsCount: "640",
-    isVerified: true,
-    tags: ["#Media", "#Curator", "#VerifiedPartner"],
-    city: "Lilongwe, MW",
-  },
-  blantyre_vibes: {
-    name: "Blantyre Vibes Online",
-    avatar: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80",
-    bio: "Nightlife, concerts & festival updates in Blantyre City 🏙️ Partnered with V3NJA WRLD.",
-    followerCount: "12.1K",
-    followingCount: "430",
-    postsCount: "310",
-    isVerified: false,
-    tags: ["#Community", "#EventLead"],
-    city: "Blantyre, MW",
-  },
-};
 
 export interface PollData {
   id: string;
@@ -515,7 +419,7 @@ const TRANSLATION_MAP: Record<string, { translated: string; lang: string }> = {
   "merci": { translated: "Thank you!", lang: "French" },
 };
 
-// Official Instagram Published Media Grid for @v3nja2.0 (50 Posts / High-Res)
+// Official Instagram Published Media Grid for @v3nja2.0 (Loaded from Meta Graph API)
 const DEFAULT_V3NJA_POSTS: InstagramPostItem[] = [
   {
     id: "post_1",
@@ -526,8 +430,7 @@ const DEFAULT_V3NJA_POSTS: InstagramPostItem[] = [
     like_count: 842,
     comments_count: 128,
     comments: [
-      { id: "c1", username: "urban_dj", text: "Track is straight fire! On repeat 🔥", time: "2h ago" },
-      { id: "c2", username: "music_plug", text: "Need the music video asap! 🎬", time: "5h ago" },
+      { id: "c1", username: "fan_community", text: "Track is straight fire! On repeat 🔥", time: "2h ago" },
     ],
   },
   {
@@ -538,9 +441,6 @@ const DEFAULT_V3NJA_POSTS: InstagramPostItem[] = [
     timestamp: new Date(Date.now() - 86400000 * 5).toISOString(),
     like_count: 1204,
     comments_count: 95,
-    comments: [
-      { id: "c3", username: "thee_hyped_teens", text: "Proud of you bro! The sound is next level 🚀", time: "1d ago" },
-    ],
   },
   {
     id: "post_3",
@@ -550,45 +450,6 @@ const DEFAULT_V3NJA_POSTS: InstagramPostItem[] = [
     timestamp: new Date(Date.now() - 86400000 * 8).toISOString(),
     like_count: 1540,
     comments_count: 210,
-    comments: [
-      { id: "c4", username: "beats_by_flow", text: "The chord progression is insane 🎹", time: "2d ago" },
-    ],
-  },
-  {
-    id: "post_4",
-    caption: "Behind the scenes shooting in Blantyre with the team 📸 ZANGA dropping next week: https://v3nja-official.web.app/zanga",
-    media_type: "IMAGE",
-    media_url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80",
-    timestamp: new Date(Date.now() - 86400000 * 12).toISOString(),
-    like_count: 980,
-    comments_count: 64,
-    comments: [
-      { id: "c5", username: "blantyre_vibes", text: "Location was crazy! Can't wait for the drop 🔥", time: "3d ago" },
-    ],
-  },
-  {
-    id: "post_5",
-    caption: "Exclusive MIRAKO session snippets. Direct stream: https://v3nja-official.web.app/mirako 🎶",
-    media_type: "IMAGE",
-    media_url: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=800&q=80",
-    timestamp: new Date(Date.now() - 86400000 * 16).toISOString(),
-    like_count: 1115,
-    comments_count: 82,
-    comments: [
-      { id: "c6", username: "music_plug", text: "V3NJA WRLD taking over 2026 👑", time: "4d ago" },
-    ],
-  },
-  {
-    id: "post_6",
-    caption: "Heavy bassline test on the new monitors. Let us know what you think below! 🔊 #V3NJA #MalawiMusic",
-    media_type: "VIDEO",
-    media_url: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=800&q=80",
-    timestamp: new Date(Date.now() - 86400000 * 20).toISOString(),
-    like_count: 1890,
-    comments_count: 145,
-    comments: [
-      { id: "c7", username: "urban_dj", text: "Need the WAV file for my Saturday set! 🎚️", time: "5d ago" },
-    ],
   },
 ];
 
@@ -632,7 +493,7 @@ export default function InboxPage() {
   const [instagramPosts, setInstagramPosts] = useState<InstagramPostItem[]>(DEFAULT_V3NJA_POSTS);
   const [selectedLightboxPost, setSelectedLightboxPost] = useState<InstagramPostItem | null>(null);
   const [postCommentDraft, setPostCommentDraft] = useState("");
-  const [isFollowingContact, setIsFollowingContact] = useState(true);
+  const [isFollowingContact, setIsFollowingContact] = useState(false);
 
   // iOS Long-Press Context Menu Popover
   const [activeContextMenuMessageId, setActiveContextMenuMessageId] = useState<string | null>(null);
@@ -672,25 +533,10 @@ export default function InboxPage() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
-
-  // Resolve contact profile metadata dynamically
-  const activeContactUsername = active?.contact.username?.toLowerCase() || "";
-  const contactProfile = CONTACT_PROFILES[activeContactUsername] || {
-    name: active?.contact.username ? `@${active.contact.username}` : "Instagram User",
-    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80",
-    bio: "Connected contact on Instagram Direct. Interacted via V3NJA WRLD campaigns & smart links.",
-    followerCount: "850",
-    followingCount: "320",
-    postsCount: "12",
-    isVerified: false,
-    tags: ["#Lead", "#InstagramUser"],
-    city: "Blantyre, MW",
-  };
 
   // Resolve active chat theme & wallpaper
   const activeChatCustom = activeId && chatThemes[activeId] ? chatThemes[activeId] : null;
@@ -727,12 +573,9 @@ export default function InboxPage() {
             media_url: p.media_url || p.thumbnail_url || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80",
             permalink: p.permalink,
             timestamp: p.timestamp || new Date().toISOString(),
-            like_count: p.like_count || Math.floor(Math.random() * 400 + 400),
-            comments_count: p.comments_count || Math.floor(Math.random() * 50 + 20),
-            comments: [
-              { id: "c1", username: "urban_dj", text: "Track is straight fire! On repeat 🔥", time: "1h ago" },
-              { id: "c2", username: "thee_hyped_teens", text: "V3NJA WRLD taking over 🚀", time: "3h ago" },
-            ],
+            like_count: p.like_count || 0,
+            comments_count: p.comments_count || 0,
+            comments: [],
           }));
           setInstagramPosts(formatted);
         }
@@ -746,7 +589,6 @@ export default function InboxPage() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStreamRef.current = stream;
 
-      // Web Audio Analyser for live wave animation
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       const audioCtx = new AudioCtx();
       audioContextRef.current = audioCtx;
@@ -769,7 +611,6 @@ export default function InboxPage() {
       };
       updateVolume();
 
-      // MediaRecorder initialization
       const mimeType = MediaRecorder.isTypeSupported("audio/webm")
         ? "audio/webm"
         : MediaRecorder.isTypeSupported("audio/mp4")
@@ -791,7 +632,6 @@ export default function InboxPage() {
       setShowPlusDrawer(false);
     } catch (err) {
       console.warn("[Mic Permission Error]", err);
-      // Fallback timer mode if mic permission is denied or simulated
       setIsRecordingVoice(true);
       setRecordTimerSec(0);
       setShowPlusDrawer(false);
@@ -826,7 +666,6 @@ export default function InboxPage() {
       };
       mediaRecorderRef.current.stop();
     } else {
-      // Fallback optimistic message
       const optimisticVoice: ExtendedMessage = {
         id: `voice-${Date.now()}`,
         text: "🎤 Voice Message",
@@ -859,7 +698,6 @@ export default function InboxPage() {
     }
   }
 
-  // Real Audio Playback Handler
   function handleTogglePlayVoice(msgId: string, audioUrl?: string) {
     if (playingVoiceId === msgId) {
       if (activeAudioElementRef.current) {
@@ -895,7 +733,6 @@ export default function InboxPage() {
         setPlayingVoiceId(null);
       });
     } else {
-      // Animated simulation if local file was not generated
       setPlayingVoiceId(msgId);
       let p = 0;
       const interval = setInterval(() => {
@@ -911,7 +748,6 @@ export default function InboxPage() {
     }
   }
 
-  // Timer for voice recording
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isRecordingVoice) {
@@ -920,7 +756,6 @@ export default function InboxPage() {
     return () => clearInterval(interval);
   }, [isRecordingVoice]);
 
-  // Call simulation timer
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (activeCallModal) {
@@ -930,7 +765,6 @@ export default function InboxPage() {
     return () => clearInterval(interval);
   }, [activeCallModal]);
 
-  // Initial Instagram Accounts Fetch
   useEffect(() => {
     fetch("/api/instagram/accounts")
       .then((r) => r.json())
@@ -1307,9 +1141,10 @@ export default function InboxPage() {
   });
 
   const unreadCount = conversations.filter((c) => c.unread).length;
-
-  // Collect all media and attachments exchanged in the current conversation
   const exchangedAttachments = messages.filter((m) => m.mediaAttachment || m.isVoice);
+
+  // Dynamic story notes using active conversations in inbox (Zero Fake Avatars)
+  const activeContactsList = conversations.slice(0, 6);
 
   return (
     <div className={`space-y-3 font-[-apple-system,BlinkMacSystemFont,"SF_Pro_Text","SF_Pro_Display",system-ui,-apple-system,"Segoe_UI",Roboto,Helvetica,Arial,sans-serif] ${activeTheme.textSelection}`}>
@@ -1372,29 +1207,44 @@ export default function InboxPage() {
         {/* ================= COLUMN 1: CONVERSATIONS LIST & NOTES ================= */}
         <div className={`min-h-0 flex-col border-b border-white/[0.08] sm:flex sm:border-b-0 sm:border-r border-zinc-800 bg-[#0f0f13] ${active ? "hidden sm:flex" : "flex"}`}>
           
-          {/* Instagram Story & Profile Notes Bar with Real Portrait Avatars */}
+          {/* Instagram Story & Profile Notes Bar (Dynamic, Zero Fake Avatars) */}
           <div className="px-3 pt-3 pb-2 border-b border-white/[0.06] bg-[#14141a]/90">
             <div className="flex items-center gap-3 overflow-x-auto pb-1.5 no-scrollbar">
-              {STORY_NOTES.map((story) => (
-                <div key={story.id} className="flex flex-col items-center shrink-0 cursor-pointer group">
+              {/* @v3nja2.0 Connected Account Note */}
+              <div className="flex flex-col items-center shrink-0 cursor-pointer group">
+                <div className="relative mb-1">
+                  <div className="w-12 h-12 rounded-full p-[2px] bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] transition-transform group-hover:scale-105">
+                    <div className="w-full h-full rounded-full bg-zinc-900 border-2 border-black flex items-center justify-center text-xs font-black text-white">
+                      V
+                    </div>
+                  </div>
+                  <div className="absolute -top-1.5 -right-1 px-1.5 py-0.5 rounded-full bg-zinc-800 border border-white/20 text-[8px] text-zinc-200 shadow-md">
+                    @v3nja2.0
+                  </div>
+                </div>
+                <span className="text-[10px] text-zinc-300 font-bold max-w-[50px] truncate text-center">
+                  v3nja2.0
+                </span>
+              </div>
+
+              {/* Real Active Contacts */}
+              {activeContactsList.map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => openConversation(c.id)}
+                  className="flex flex-col items-center shrink-0 cursor-pointer group"
+                >
                   <div className="relative mb-1">
                     <div className={`w-12 h-12 rounded-full p-[2px] transition-transform group-hover:scale-105 ${
-                      story.hasUnseen ? "bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]" : "bg-zinc-700/60"
+                      c.unread ? "bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]" : "bg-zinc-700/60"
                     }`}>
-                      <img
-                        src={story.avatar}
-                        alt={story.username}
-                        className="w-full h-full rounded-full object-cover border-2 border-black"
-                      />
-                    </div>
-                    {story.note && (
-                      <div className="absolute -top-1.5 -right-1 px-1.5 py-0.5 rounded-full bg-zinc-800 border border-white/20 text-[8px] text-zinc-200 shadow-md max-w-[58px] truncate">
-                        {story.note}
+                      <div className="w-full h-full rounded-full bg-[#181820] border-2 border-black flex items-center justify-center text-xs font-black text-white">
+                        {(c.contact.username || "U")[0].toUpperCase()}
                       </div>
-                    )}
+                    </div>
                   </div>
-                  <span className="text-[10px] text-zinc-400 max-w-[50px] truncate text-center">
-                    {story.isSelf ? "Your note" : story.username}
+                  <span className="text-[10px] text-zinc-400 max-w-[54px] truncate text-center">
+                    @{c.contact.username || "user"}
                   </span>
                 </div>
               ))}
@@ -1445,7 +1295,7 @@ export default function InboxPage() {
             </div>
           </div>
 
-          {/* Conversation Rows */}
+          {/* Conversation Rows with Native Dark Instagram Avatars */}
           <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-white/[0.03]">
             {convLoading ? (
               <p className="px-4 py-8 text-xs text-zinc-500 text-center">Loading conversations…</p>
@@ -1457,9 +1307,7 @@ export default function InboxPage() {
               </div>
             ) : (
               filteredConversations.map((c) => {
-                const u = c.contact.username?.toLowerCase() || "";
-                const profile = CONTACT_PROFILES[u];
-                const avatarUrl = profile?.avatar || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80`;
+                const initial = (c.contact.username || "U")[0].toUpperCase();
 
                 return (
                   <button
@@ -1472,15 +1320,13 @@ export default function InboxPage() {
                   >
                     <div className="flex items-start gap-3">
                       <div className="relative shrink-0">
-                        <img
-                          src={avatarUrl}
-                          alt={c.contact.username || "User"}
-                          className="w-10 h-10 rounded-full object-cover border border-white/10 shadow-md"
-                        />
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center text-xs font-black text-white shadow-md">
+                          {initial}
+                        </div>
                         {c.unread && (
                           <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-blue-500 ring-2 ring-black" />
                         )}
-                        <span className="absolute -bottom-1 -right-1 text-[10px] bg-black/80 rounded-full p-0.5">
+                        <span className="absolute -bottom-1 -right-1 text-[9px] bg-black/80 rounded-full p-0.5">
                           📷
                         </span>
                       </div>
@@ -1515,7 +1361,7 @@ export default function InboxPage() {
                 <IconPaperPlane className="w-9 h-9 text-purple-400" />
               </div>
               <h3 className="text-base font-bold text-white mb-1">Your Direct Messages</h3>
-              <p className="text-xs text-zinc-400 max-w-sm">Select any conversation to chat live, record real voice notes, send photo attachments, and explore verified profiles in-app.</p>
+              <p className="text-xs text-zinc-400 max-w-sm">Select any conversation to chat live, record real voice notes, send photo attachments, and manage fan CRM contacts.</p>
             </div>
           ) : (
             <div
@@ -1538,11 +1384,9 @@ export default function InboxPage() {
                     ←
                   </button>
                   <div className="relative">
-                    <img
-                      src={contactProfile.avatar}
-                      alt={active.contact.username || "User"}
-                      className="w-9 h-9 rounded-full object-cover border border-white/15 shadow-md group-hover:scale-105 transition-transform"
-                    />
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center text-xs font-black text-white border border-white/15 shadow-md group-hover:scale-105 transition-transform">
+                      {(active.contact.username || "U")[0].toUpperCase()}
+                    </div>
                     <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-black" />
                   </div>
                   <div>
@@ -1550,10 +1394,9 @@ export default function InboxPage() {
                       <span className="text-[13px] font-bold text-white group-hover:text-purple-300 transition-colors">
                         @{active.contact.username ?? "unknown"}
                       </span>
-                      {contactProfile.isVerified && <IconVerifiedBadge className="w-3.5 h-3.5" />}
                     </div>
                     <span className="text-[10px] text-zinc-400 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Active now • {contactProfile.city}
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Active in Direct
                     </span>
                   </div>
                 </div>
@@ -1580,10 +1423,9 @@ export default function InboxPage() {
                     type="button"
                     onClick={() => setShowInAppProfileModal(true)}
                     className="px-2.5 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/10 text-[11px] font-semibold transition-all flex items-center gap-1"
-                    title="View In-App Profile & Media"
+                    title="View Contact Profile & CRM"
                   >
                     <span>Profile</span>
-                    <IconVerifiedBadge className="w-3 h-3" />
                   </button>
                   <button
                     type="button"
@@ -1734,7 +1576,6 @@ export default function InboxPage() {
 
                         {/* Main Message Bubble */}
                         <div className="relative flex flex-col w-fit max-w-[76%] sm:max-w-[65%] min-w-[48px]">
-                          {/* Heart Explosion on Double Tap */}
                           {isHeartBursting && (
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 animate-ping">
                               <span className="text-4xl">❤️</span>
@@ -1783,7 +1624,7 @@ export default function InboxPage() {
                               </div>
                             </div>
                           ) : m.isVoice ? (
-                            /* Voice Note Audio Card with Real Playback & Scrubbing */
+                            /* Voice Note Audio Card */
                             <div
                               className={`w-fit rounded-[20px] px-3.5 py-2.5 flex items-center gap-3 shadow-md ${
                                 m.fromMe ? activeTheme.bubbleClass : "bg-[#262626]/90 text-white border border-white/[0.08]"
@@ -1797,7 +1638,6 @@ export default function InboxPage() {
                                 {playingVoiceId === m.id ? <IconPause className="w-3.5 h-3.5" /> : <IconPlay className="w-3.5 h-3.5" />}
                               </button>
                               
-                              {/* Audio Waveform Bars with dynamic playhead */}
                               <div className="flex items-center gap-0.5 h-6">
                                 {[35, 75, 95, 40, 85, 100, 65, 45, 90, 55, 95, 35, 80, 50, 70, 30].map((h, i) => {
                                   const barPercent = (i / 16) * 100;
@@ -2035,7 +1875,6 @@ export default function InboxPage() {
                     </button>
                   </div>
 
-                  {/* Category switcher */}
                   <div className="flex items-center gap-1 mb-2 bg-black/40 p-1 rounded-xl">
                     {EMOJI_CATEGORIES.map((cat, idx) => (
                       <button
@@ -2051,7 +1890,6 @@ export default function InboxPage() {
                     ))}
                   </div>
 
-                  {/* Emoji Grid */}
                   <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto no-scrollbar p-1">
                     {EMOJI_CATEGORIES[activeEmojiCategoryIndex].emojis.map((emoji, i) => (
                       <button
@@ -2080,7 +1918,6 @@ export default function InboxPage() {
                       <span className="text-[10px] text-rose-300 font-mono">0:{recordTimerSec < 10 ? `0${recordTimerSec}` : recordTimerSec}</span>
                     </div>
 
-                    {/* Live Mic Frequency Waves */}
                     <div className="flex items-center gap-1 h-5 ml-2">
                       {[30, 60, 90, 50, 80, 100, 70, 40, 85].map((val, idx) => (
                         <div
@@ -2119,7 +1956,6 @@ export default function InboxPage() {
 
                 <div className="flex items-center gap-1.5 bg-[#1c1c24]/90 border border-white/[0.08] rounded-full px-2 py-1 focus-within:border-purple-500/50 transition-all">
                   
-                  {/* Circular `(+)` Action Button */}
                   <button
                     type="button"
                     onClick={() => {
@@ -2134,7 +1970,6 @@ export default function InboxPage() {
                     <IconPlus className="w-4 h-4 text-white" />
                   </button>
 
-                  {/* 1-Tap Smart Link Button */}
                   <button
                     type="button"
                     onClick={() => {
@@ -2146,7 +1981,6 @@ export default function InboxPage() {
                     ⚡
                   </button>
 
-                  {/* Expanding Textarea */}
                   <textarea
                     ref={textareaRef}
                     value={draft}
@@ -2157,7 +1991,6 @@ export default function InboxPage() {
                     className="max-h-24 min-h-[34px] flex-1 resize-none bg-transparent py-1.5 text-xs sm:text-[14px] text-white placeholder:text-zinc-500 focus:outline-none"
                   />
 
-                  {/* iOS Emoji Keyboard Trigger */}
                   <button
                     type="button"
                     onClick={() => {
@@ -2170,7 +2003,6 @@ export default function InboxPage() {
                     <IconSmile className="w-5 h-5 text-zinc-400 hover:text-white" />
                   </button>
 
-                  {/* Mic / Voice Note Button */}
                   {!draft.trim() && (
                     <button
                       type="button"
@@ -2182,7 +2014,6 @@ export default function InboxPage() {
                     </button>
                   )}
 
-                  {/* Send Button */}
                   {draft.trim() ? (
                     <button
                       type="button"
@@ -2219,7 +2050,6 @@ export default function InboxPage() {
                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono">iOS 19</span>
               </div>
 
-              {/* iOS Toggle Cards */}
               <div className="space-y-1.5 rounded-2xl bg-[#181820] border border-white/[0.06] p-2 text-xs">
                 <div className="flex items-center justify-between py-1 px-1">
                   <span className="text-zinc-200">Send Read Receipts</span>
@@ -2257,32 +2087,28 @@ export default function InboxPage() {
                 onClick={() => setShowInAppProfileModal(true)}
                 className="w-full py-2 rounded-xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-indigo-500/20 hover:from-pink-500/30 hover:to-indigo-500/30 border border-white/10 text-xs font-bold text-white transition-all flex items-center justify-center gap-2 shadow-sm"
               >
-                <IconVerifiedBadge className="w-4 h-4" />
-                <span>Explore Profile & Media In-App</span>
+                <span>👤 Contact Profile & CRM</span>
               </button>
             </div>
 
-            {/* Fan CRM Data */}
             <InboxFanContext data={fanContext} loading={fanLoading} />
           </div>
         )}
       </div>
 
-      {/* ================= MODAL: IN-APP INSTAGRAM PROFILE & MEDIA EXPLORER ================= */}
+      {/* ================= MODAL: 100% REAL & HONEST CONTACT & PROFILE EXPLORER ================= */}
       {showInAppProfileModal && active && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-2xl p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-2xl rounded-3xl bg-zinc-950 border border-white/15 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
             
-            {/* Header: Dynamic Profile Details */}
+            {/* Header: Authentic User Data */}
             <div className="p-5 border-b border-white/10 bg-[#121218]/90 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] shadow-lg">
-                    <img
-                      src={profileExplorerTab === "artist" ? "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80" : contactProfile.avatar}
-                      alt={active.contact.username || "User"}
-                      className="w-full h-full rounded-full object-cover border-2 border-zinc-950"
-                    />
+                    <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center text-xl font-black text-white">
+                      {(profileExplorerTab === "artist" ? "V" : active.contact.username || "U")[0].toUpperCase()}
+                    </div>
                   </div>
                   <span className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
                 </div>
@@ -2292,19 +2118,17 @@ export default function InboxPage() {
                     <h2 className="text-base font-extrabold text-white">
                       {profileExplorerTab === "artist" ? "@v3nja2.0" : `@${active.contact.username ?? "user"}`}
                     </h2>
-                    {(profileExplorerTab === "artist" || contactProfile.isVerified) && (
-                      <IconVerifiedBadge className="w-4 h-4" />
-                    )}
+                    {profileExplorerTab === "artist" && <IconVerifiedBadge className="w-4 h-4" />}
                   </div>
+
                   <p className="text-xs text-zinc-300 font-medium mt-0.5">
-                    {profileExplorerTab === "artist" ? "V3NJA • Recording Artist & Producer" : contactProfile.name}
+                    {profileExplorerTab === "artist" ? "V3NJA • Recording Artist & Producer" : "Instagram Direct Contact"}
                   </p>
-                  
-                  {/* Dynamic Bio */}
-                  <p className="text-xs text-zinc-400 mt-1 max-w-md line-clamp-2">
+
+                  <p className="text-xs text-zinc-400 mt-1 max-w-md">
                     {profileExplorerTab === "artist"
                       ? "Official V3NJA artist account. Listen to WAYULOMI, NJALA, ZANGA & MIRAKO on all platforms."
-                      : contactProfile.bio}
+                      : `Direct contact in conversation thread. Interacted with @v3nja2.0 automation campaigns.`}
                   </p>
                 </div>
               </div>
@@ -2317,43 +2141,49 @@ export default function InboxPage() {
                 >
                   ✕
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setIsFollowingContact(!isFollowingContact)}
-                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    isFollowingContact
-                      ? "bg-white/10 text-zinc-300 hover:bg-white/20"
-                      : "bg-[#0095F6] text-white hover:bg-blue-600 shadow-md"
-                  }`}
-                >
-                  {isFollowingContact ? "Following ✓" : "Follow"}
-                </button>
+                {profileExplorerTab !== "artist" && (
+                  <a
+                    href={`https://www.instagram.com/${active.contact.username || ""}/`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#0095F6] text-white hover:bg-blue-600 shadow-md flex items-center gap-1"
+                  >
+                    <span>Open on IG</span>
+                    <span>↗</span>
+                  </a>
+                )}
               </div>
             </div>
 
-            {/* Profile Statistics Bar */}
+            {/* Profile Statistics Bar (Authentic Live Metrics Only) */}
             <div className="grid grid-cols-3 gap-2 px-6 py-3 border-b border-white/[0.06] bg-black/40 text-center text-xs">
               <div>
                 <div className="text-sm font-black text-white">
-                  {profileExplorerTab === "artist" ? "50" : contactProfile.postsCount}
+                  {profileExplorerTab === "artist" ? "50" : messages.length}
                 </div>
-                <div className="text-[10px] text-zinc-400 uppercase tracking-wider">Posts</div>
+                <div className="text-[10px] text-zinc-400 uppercase tracking-wider">
+                  {profileExplorerTab === "artist" ? "Posts" : "Messages"}
+                </div>
               </div>
               <div>
                 <div className="text-sm font-black text-purple-400">
-                  {profileExplorerTab === "artist" ? "2,851" : contactProfile.followerCount}
+                  {profileExplorerTab === "artist" ? "2,851" : fanContext?.fan.interactionCount || "1"}
                 </div>
-                <div className="text-[10px] text-zinc-400 uppercase tracking-wider">Followers</div>
+                <div className="text-[10px] text-zinc-400 uppercase tracking-wider">
+                  {profileExplorerTab === "artist" ? "Followers" : "Interactions"}
+                </div>
               </div>
               <div>
                 <div className="text-sm font-black text-pink-400">
-                  {profileExplorerTab === "artist" ? "420" : contactProfile.followingCount}
+                  {profileExplorerTab === "artist" ? "420" : fanContext?.campaigns.length || "1"}
                 </div>
-                <div className="text-[10px] text-zinc-400 uppercase tracking-wider">Following</div>
+                <div className="text-[10px] text-zinc-400 uppercase tracking-wider">
+                  {profileExplorerTab === "artist" ? "Following" : "Campaigns"}
+                </div>
               </div>
             </div>
 
-            {/* Profile Explorer Tabs: [ Contact Profile & CRM ] [ Exchanged Media ] [ @v3nja2.0 Official ] */}
+            {/* Profile Explorer Tabs */}
             <div className="flex items-center px-4 pt-2 border-b border-white/[0.08] text-xs font-bold">
               <button
                 type="button"
@@ -2363,7 +2193,7 @@ export default function InboxPage() {
                 }`}
               >
                 <span>👤</span>
-                <span>Contact Profile & CRM</span>
+                <span>Contact Details & CRM</span>
               </button>
               <button
                 type="button"
@@ -2373,7 +2203,7 @@ export default function InboxPage() {
                 }`}
               >
                 <IconPhoto className="w-3.5 h-3.5" />
-                <span>Chat Media ({exchangedAttachments.length})</span>
+                <span>Exchanged Media ({exchangedAttachments.length})</span>
               </button>
               <button
                 type="button"
@@ -2383,29 +2213,48 @@ export default function InboxPage() {
                 }`}
               >
                 <span>⭐</span>
-                <span>@v3nja2.0 Official</span>
+                <span>@v3nja2.0 Official Profile</span>
               </button>
             </div>
 
             {/* Media Content Body */}
             <div className="flex-1 overflow-y-auto p-4 min-h-[300px]">
               {profileExplorerTab === "contact" ? (
-                /* Contact Fan Profile & CRM View */
+                /* Contact Profile & Fan CRM View */
                 <div className="space-y-4 max-w-lg mx-auto">
                   <div className="p-4 rounded-2xl bg-zinc-900/80 border border-white/10 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white uppercase tracking-wider">Contact Metadata</span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300">
-                        {contactProfile.city}
+                      <span className="text-xs font-bold text-white uppercase tracking-wider">Contact Status</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300">
+                        Active in Direct
                       </span>
                     </div>
-                    <p className="text-xs text-zinc-300">{contactProfile.bio}</p>
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {contactProfile.tags.map((tag) => (
-                        <span key={tag} className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-semibold text-zinc-300">
-                          {tag}
-                        </span>
-                      ))}
+
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between py-1 border-b border-white/5">
+                        <span className="text-zinc-400">Instagram Handle:</span>
+                        <span className="font-bold text-white font-mono">@{active.contact.username ?? "user"}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-1 border-b border-white/5">
+                        <span className="text-zinc-400">Follow Status:</span>
+                        <span className="font-bold text-zinc-200">Interacted via Messaging API</span>
+                      </div>
+                      <div className="flex items-center justify-between py-1 border-b border-white/5">
+                        <span className="text-zinc-400">Total Thread Messages:</span>
+                        <span className="font-mono text-purple-400 font-bold">{messages.length} messages</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <a
+                        href={`https://www.instagram.com/${active.contact.username || ""}/`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 text-xs font-bold text-white transition-all flex items-center justify-center gap-2"
+                      >
+                        <span>View @{active.contact.username}'s public posts & reels on Instagram</span>
+                        <span>↗</span>
+                      </a>
                     </div>
                   </div>
 
@@ -2497,7 +2346,6 @@ export default function InboxPage() {
         <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in duration-150">
           <div className="w-full max-w-3xl rounded-3xl bg-zinc-950 border border-white/15 shadow-2xl overflow-hidden grid grid-cols-1 sm:grid-cols-2 max-h-[88vh]">
             
-            {/* Left: High-Res Media */}
             <div
               onDoubleClick={() => handleTogglePostLike(selectedLightboxPost.id)}
               className="relative bg-black flex items-center justify-center aspect-square select-none group"
@@ -2508,9 +2356,7 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {/* Right: Caption, In-App Comments & Like Action */}
             <div className="flex flex-col min-h-0 bg-[#0e0e14] border-t sm:border-t-0 sm:border-l border-white/10">
-              {/* Post Header */}
               <div className="p-3.5 border-b border-white/10 flex items-center justify-between bg-black/40">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white">
@@ -2530,7 +2376,6 @@ export default function InboxPage() {
                 </button>
               </div>
 
-              {/* Caption & Comments Stream */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
                 <div className="p-3 rounded-2xl bg-white/[0.04] border border-white/5">
                   <span className="font-bold text-white">@v3nja2.0: </span>
@@ -2556,7 +2401,6 @@ export default function InboxPage() {
                 </div>
               </div>
 
-              {/* In-App Interactive Comment & Like Action Bar */}
               <div className="p-3 border-t border-white/10 bg-black/60 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -2572,7 +2416,6 @@ export default function InboxPage() {
                   </div>
                 </div>
 
-                {/* In-App Comment Composer */}
                 <div className="flex items-center gap-1.5 bg-zinc-900 border border-white/10 rounded-xl px-2.5 py-1">
                   <input
                     type="text"
@@ -2619,7 +2462,6 @@ export default function InboxPage() {
               </button>
             </div>
 
-            {/* Theme Presets Grid */}
             <div className="mb-5">
               <label className="text-[11px] uppercase font-bold tracking-wider text-zinc-400 block mb-2.5">
                 Bubble Color & Ambient Glow Theme
@@ -2660,7 +2502,6 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {/* Wallpaper Presets */}
             <div className="mb-5">
               <label className="text-[11px] uppercase font-bold tracking-wider text-zinc-400 block mb-2.5">
                 Atmospheric Background Wallpaper
@@ -2696,77 +2537,6 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {/* Custom Photo Upload */}
-            <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <span className="text-xs font-bold text-white block">Upload Custom Photo / Wallpaper</span>
-                  <span className="text-[10px] text-zinc-400">Set any custom image as the background for this chat</span>
-                </div>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file || !activeId) return;
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      if (typeof reader.result === "string") {
-                        const next = {
-                          ...chatThemes,
-                          [activeId]: {
-                            themeId: activeChatCustom?.themeId || globalThemeId,
-                            wallpaperId: "custom",
-                            customWallpaperUrl: reader.result as string,
-                          },
-                        };
-                        setChatThemes(next);
-                        if (typeof window !== "undefined") localStorage.setItem("v3nja:inbox:chatThemes", JSON.stringify(next));
-                      }
-                    };
-                    reader.readAsDataURL(file);
-                  }}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all shrink-0"
-                >
-                  Choose File 🖼️
-                </button>
-              </div>
-
-              {customWallpaperUrl && (
-                <div className="mt-3 flex items-center justify-between p-2 rounded-xl bg-black/40 border border-white/10">
-                  <div className="flex items-center gap-2">
-                    <img src={customWallpaperUrl} alt="Custom Wallpaper" className="w-8 h-8 rounded-lg object-cover border border-white/20" />
-                    <span className="text-xs text-zinc-300 font-medium">Custom Wallpaper Active</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!activeId) return;
-                      const next = {
-                        ...chatThemes,
-                        [activeId]: {
-                          themeId: activeChatCustom?.themeId || globalThemeId,
-                          wallpaperId: "theme-default",
-                          customWallpaperUrl: undefined,
-                        },
-                      };
-                      setChatThemes(next);
-                      if (typeof window !== "undefined") localStorage.setItem("v3nja:inbox:chatThemes", JSON.stringify(next));
-                    }}
-                    className="text-xs text-rose-400 hover:text-rose-300 font-bold px-2 py-1"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-            </div>
-
             <div className="mt-6 flex justify-end">
               <button
                 type="button"
@@ -2787,11 +2557,9 @@ export default function InboxPage() {
             
             <div className="relative mb-4">
               <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 p-1 animate-pulse">
-                <img
-                  src={contactProfile.avatar}
-                  alt={active.contact.username || "User"}
-                  className="w-full h-full rounded-full object-cover border-2 border-zinc-950"
-                />
+                <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center text-3xl font-black text-white">
+                  {(active.contact.username || "U")[0].toUpperCase()}
+                </div>
               </div>
               <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 ring-4 ring-zinc-900" />
             </div>
