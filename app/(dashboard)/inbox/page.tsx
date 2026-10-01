@@ -1,11 +1,21 @@
 "use client";
 
 /**
- * Next-Gen iOS-Style Instagram Direct Inbox
+ * Authentic iOS & Instagram Direct Messaging Suite (V3NJA WRLD)
  *
- * Ultra-sleek messaging interface with real-time Meta Graph API sync,
- * emoji reactions, inline message replying/quoting, copy, unsend,
- * quick emoji picker, and persistent Fan CRM context.
+ * Full iOS / Instagram Direct design system:
+ * - Real Instagram Twilight, iOS iMessage Blue, Cyberpunk, Sunset, and Emerald themes
+ * - Authentic iOS SF Pro typography, precise bubble curvature, and micro-interactions
+ * - Single-line tight-fitting pill bubbles for short messages (zero unwanted wrapping)
+ * - Double-tap / double-click to Heart with bursting heart animation
+ * - Instagram Direct Stories & Notes top bar
+ * - Interactive Instagram floating reaction capsule & quick reactions
+ * - Rich Smart Link preview cards for v3nja-official.web.app links
+ * - Audio Voice Note player & recorder simulation
+ * - Saved quick replies (Canned Responses) drawer
+ * - Interactive Audio & Video Calling simulation modal
+ * - Live Meta Graph API direct dispatch with instant receipts
+ * - Integrated Fan Context CRM
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,13 +30,136 @@ const POLL_MS = 10_000;
 const CACHE_MAX_AGE_MS = 60_000;
 const convCacheKey = (accountId: string) => `inbox:convs:${accountId}`;
 const msgCacheKey = (conversationId: string) => `inbox:msgs:${conversationId}`;
+const THEME_STORAGE_KEY = "v3nja:inbox:theme";
 
-const QUICK_EMOJIS = ["🔥", "🎧", "🎵", "❤️", "🙏🏾", "🚀", "😂", "✨", "💯", "👏", "💥", "💿", "🎤", "👑", "👀", "⚡"];
-const REACTION_EMOJIS = ["❤️", "🔥", "😂", "👏", "😮", "🎵"];
+// Authentic Instagram & iOS Themes
+export interface ChatTheme {
+  id: string;
+  name: string;
+  badge: string;
+  bubbleClass: string;
+  accentColor: string;
+  swatchGradient: string;
+  textSelection: string;
+}
+
+export const CHAT_THEMES: ChatTheme[] = [
+  {
+    id: "instagram-twilight",
+    name: "Instagram Twilight",
+    badge: "Official IG",
+    bubbleClass: "bg-gradient-to-r from-[#0084FF] via-[#7F38EC] to-[#E1306C] text-white",
+    accentColor: "#7F38EC",
+    swatchGradient: "linear-gradient(135deg, #0084FF 0%, #7F38EC 50%, #E1306C 100%)",
+    textSelection: "selection:bg-pink-500 selection:text-white",
+  },
+  {
+    id: "ios-imessage",
+    name: "Apple iMessage",
+    badge: "Cupertino Blue",
+    bubbleClass: "bg-[#007AFF] text-white",
+    accentColor: "#007AFF",
+    swatchGradient: "linear-gradient(135deg, #007AFF 0%, #0056B3 100%)",
+    textSelection: "selection:bg-blue-600 selection:text-white",
+  },
+  {
+    id: "ios-sms",
+    name: "Apple SMS Green",
+    badge: "Cupertino Green",
+    bubbleClass: "bg-[#34C759] text-white",
+    accentColor: "#34C759",
+    swatchGradient: "linear-gradient(135deg, #34C759 0%, #28A745 100%)",
+    textSelection: "selection:bg-emerald-600 selection:text-white",
+  },
+  {
+    id: "cyberpunk-cyan",
+    name: "Cyberpunk Neon",
+    badge: "Cyan Wave",
+    bubbleClass: "bg-gradient-to-r from-[#00F2FE] via-[#4FACFE] to-[#8E2DE2] text-white",
+    accentColor: "#00F2FE",
+    swatchGradient: "linear-gradient(135deg, #00F2FE 0%, #8E2DE2 100%)",
+    textSelection: "selection:bg-cyan-500 selection:text-black",
+  },
+  {
+    id: "sunset-glow",
+    name: "Sunset Peach",
+    badge: "Warm Sunset",
+    bubbleClass: "bg-gradient-to-r from-[#FF5858] via-[#F857A6] to-[#FF5858] text-white",
+    accentColor: "#F857A6",
+    swatchGradient: "linear-gradient(135deg, #FF5858 0%, #F857A6 100%)",
+    textSelection: "selection:bg-rose-500 selection:text-white",
+  },
+  {
+    id: "emerald-mint",
+    name: "Emerald Mint",
+    badge: "Fresh Mint",
+    bubbleClass: "bg-gradient-to-r from-[#0BA360] via-[#10B981] to-[#3CBA92] text-white",
+    accentColor: "#10B981",
+    swatchGradient: "linear-gradient(135deg, #0BA360 0%, #3CBA92 100%)",
+    textSelection: "selection:bg-emerald-500 selection:text-white",
+  },
+  {
+    id: "midnight-noir",
+    name: "Apple Noir Stealth",
+    badge: "Matte Dark",
+    bubbleClass: "bg-gradient-to-b from-[#3A3A3C] to-[#2C2C2E] border border-white/10 text-white",
+    accentColor: "#8E8E93",
+    swatchGradient: "linear-gradient(135deg, #3A3A3C 0%, #1C1C1E 100%)",
+    textSelection: "selection:bg-zinc-600 selection:text-white",
+  },
+  {
+    id: "berry-lavender",
+    name: "Berry Lavender",
+    badge: "Fuchsia",
+    bubbleClass: "bg-gradient-to-r from-[#8A2387] via-[#E94057] to-[#F27121] text-white",
+    accentColor: "#E94057",
+    swatchGradient: "linear-gradient(135deg, #8A2387 0%, #F27121 100%)",
+    textSelection: "selection:bg-fuchsia-600 selection:text-white",
+  },
+];
+
+// Curated Instagram quick emojis & standard reactions
+const QUICK_EMOJIS = ["❤️", "🔥", "😂", "👏", "😮", "🎵", "🙏🏾", "🚀", "✨", "💯", "🎧", "💿", "🎤", "👀", "⚡", "👑"];
+const REACTION_EMOJIS = ["❤️", "😂", "😮", "😢", "🔥", "👏"];
+
+// Instagram Saved Responses (Canned Quick Replies)
+const SAVED_REPLIES = [
+  {
+    label: "🎵 Wayulomi Smart Link",
+    text: "Stream my latest official single WAYULOMI here: https://v3nja-official.web.app/wayulomi 🔥",
+  },
+  {
+    label: "👕 Official Merch Store",
+    text: "Check out the official V3NJA merch drops at: https://v3nja-official.web.app/merch 🚀",
+  },
+  {
+    label: "🔥 Fan Love / Thanks",
+    text: "Appreciate the massive love and support! More music dropping soon 🙏🏾✨",
+  },
+  {
+    label: "🎧 Njala Track Link",
+    text: "Listen to NJALA on all streaming platforms: https://v3nja-official.web.app/njala 🎧",
+  },
+  {
+    label: "⚡ Booking / Inquiries",
+    text: "For features, management, and bookings, reach out directly or check: https://v3nja-official.web.app ⚡",
+  },
+];
+
+// Instagram Story / Note mockup items
+const STORY_NOTES = [
+  { id: "self", username: "Your note", note: "Dropping heat soon 🔥", isSelf: true },
+  { id: "v3nja", username: "v3nja2.0", note: "WAYULOMI Live 🎵", hasUnseen: true },
+  { id: "fan1", username: "urban_dj", note: "On repeat 🎧", hasUnseen: true },
+  { id: "fan2", username: "music_plug", note: "Fire beat 💥", hasUnseen: false },
+  { id: "fan3", username: "blantyre_vibes", note: "V3NJA WRLD 🚀", hasUnseen: true },
+];
 
 interface ExtendedMessage extends ThreadMessage {
   replyTo?: { text: string; username?: string | null };
   reactions?: string[];
+  isVoice?: boolean;
+  voiceDuration?: string;
 }
 
 function formatTime(iso: string | null): string {
@@ -38,6 +171,23 @@ function formatTime(iso: string | null): string {
   return sameDay
     ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+// Helper to detect smart link URLs in messages
+function extractSmartLink(text: string): { url: string; title: string; slug: string } | null {
+  const match = text.match(/https:\/\/v3nja-official\.web\.app\/([a-zA-Z0-9_-]+)/i);
+  if (match) {
+    const slug = match[1].toLowerCase();
+    let title = "V3NJA Official";
+    if (slug === "wayulomi") title = "WAYULOMI — Official Single";
+    else if (slug === "njala") title = "NJALA — Official Single";
+    else if (slug === "zanga") title = "ZANGA — Official Single";
+    else if (slug === "mirako") title = "MIRAKO — Official Single";
+    else if (slug === "merch") title = "Official Merch Store";
+    else title = `${slug.toUpperCase()} — V3NJA`;
+    return { url: match[0], title, slug };
+  }
+  return null;
 }
 
 export default function InboxPage() {
@@ -60,16 +210,72 @@ export default function InboxPage() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<{ id: string; text: string; username?: string | null } | null>(null);
+  
+  // Theme state
+  const [selectedThemeId, setSelectedThemeId] = useState<string>("instagram-twilight");
+  const [showThemePicker, setShowThemePicker] = useState(false);
+
+  // Drawers & Modals
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showSavedReplies, setShowSavedReplies] = useState(false);
+  const [showInfoSidebar, setShowInfoSidebar] = useState(true);
+  const [activeCallModal, setActiveCallModal] = useState<"audio" | "video" | null>(null);
+  const [callDurationSec, setCallDurationSec] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
+
+  // Micro-interactions
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showInfoSidebar, setShowInfoSidebar] = useState(true);
+  const [heartAnimId, setHeartAnimId] = useState<string | null>(null);
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [recordTimerSec, setRecordTimerSec] = useState(0);
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const activeTheme = CHAT_THEMES.find((t) => t.id === selectedThemeId) ?? CHAT_THEMES[0];
   const active = conversations.find((c) => c.id === activeId) ?? null;
 
+  // Load saved theme on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved && CHAT_THEMES.some((t) => t.id === saved)) {
+      setSelectedThemeId(saved);
+    }
+  }, []);
+
+  function handleSelectTheme(themeId: string) {
+    setSelectedThemeId(themeId);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(THEME_STORAGE_KEY, themeId);
+    }
+    setShowThemePicker(false);
+  }
+
+  // Voice note recording timer
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isRecordingVoice) {
+      setRecordTimerSec(0);
+      interval = setInterval(() => setRecordTimerSec((prev) => prev + 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isRecordingVoice]);
+
+  // Call simulation timer
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (activeCallModal) {
+      setCallDurationSec(0);
+      interval = setInterval(() => setCallDurationSec((prev) => prev + 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [activeCallModal]);
+
+  // Initial Instagram Accounts Fetch
   useEffect(() => {
     fetch("/api/instagram/accounts")
       .then((r) => r.json())
@@ -209,13 +415,14 @@ export default function InboxPage() {
     setSendError(null);
     setReplyingTo(null);
     setShowEmojiPicker(false);
+    setShowSavedReplies(false);
     const cached = readCache<ThreadMessage[]>(msgCacheKey(id), CACHE_MAX_AGE_MS);
     setMessages(cached.data ?? []);
     setThreadLoading(!cached.data);
   }
 
-  async function handleSend() {
-    const text = draft.trim();
+  async function handleSend(customText?: string) {
+    const text = (customText ?? draft).trim();
     if (!text || !active?.contact.id || sending) return;
     setSending(true);
     setSendError(null);
@@ -234,9 +441,10 @@ export default function InboxPage() {
     };
 
     setMessages((prev) => [...prev, optimistic]);
-    setDraft("");
+    if (!customText) setDraft("");
     setReplyingTo(null);
     setShowEmojiPicker(false);
+    setShowSavedReplies(false);
 
     try {
       const res = await fetch("/api/instagram/conversations", {
@@ -250,20 +458,41 @@ export default function InboxPage() {
       });
       const data = await res.json();
       if (data.success) {
-        window.setTimeout(() => void loadMessages(active.id, true), 800);
+        window.setTimeout(() => void loadMessages(active.id, true), 700);
         void loadConversations(true);
       } else {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-        setDraft(text);
+        if (!customText) setDraft(text);
         setSendError(data.error ?? "Failed to send message");
       }
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-      setDraft(text);
+      if (!customText) setDraft(text);
       setSendError("Failed to deliver message via Meta API");
     } finally {
       setSending(false);
     }
+  }
+
+  // Quick Like Heart (Instagram standard behavior when input is empty)
+  function handleSendQuickHeart() {
+    void handleSend("❤️");
+  }
+
+  // Voice Note sending simulation
+  function handleFinishVoiceRecord() {
+    setIsRecordingVoice(false);
+    const durationStr = `0:${recordTimerSec < 10 ? `0${recordTimerSec}` : recordTimerSec}`;
+    const optimistic: ExtendedMessage = {
+      id: `optimistic-voice-${Date.now()}`,
+      text: "🎤 Voice Message",
+      fromMe: true,
+      fromUsername: null,
+      createdTime: new Date().toISOString(),
+      isVoice: true,
+      voiceDuration: durationStr === "0:00" ? "0:04" : durationStr,
+    };
+    setMessages((prev) => [...prev, optimistic]);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -291,6 +520,13 @@ export default function InboxPage() {
         return { ...m, reactions: next };
       })
     );
+  }
+
+  // Double-tap heart animation
+  function handleDoubleTapHeart(messageId: string) {
+    setHeartAnimId(messageId);
+    handleReact(messageId, "❤️");
+    setTimeout(() => setHeartAnimId(null), 1000);
   }
 
   function handleCopy(id: string, text: string) {
@@ -321,37 +557,116 @@ export default function InboxPage() {
   const unreadCount = conversations.filter((c) => c.unread).length;
 
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 font-[-apple-system,BlinkMacSystemFont,"SF_Pro_Text","SF_Pro_Display",system-ui,-apple-system,"Segoe_UI",Roboto,Helvetica,Arial,sans-serif] ${activeTheme.textSelection}`}>
       {/* Top Header */}
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
-            <span>Instagram Direct Messages</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/15 border border-orange-500/30 text-orange-400">
-              LIVE CRM
-            </span>
-          </h1>
-          <p className="text-xs text-zinc-400">Manage 2-way fan conversations, clients, and automated campaign handoffs</p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pink-500 via-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
+            <span className="text-xl">💬</span>
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+              <span>Instagram Direct</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 border border-white/15 text-white/90 backdrop-blur-md">
+                iOS Native UI
+              </span>
+            </h1>
+            <p className="text-xs text-zinc-400">Real-time Meta Direct sync, artist link delivery & fan conversations</p>
+          </div>
         </div>
-        {accounts.length > 1 && (
-          <AccountSelect accounts={accounts} value={selectedAccountId} onChange={setSelectedAccountId} includeAll={false} />
-        )}
+
+        <div className="flex items-center gap-2">
+          {/* Theme Selector Button */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowThemePicker(!showThemePicker)}
+              className="px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 text-xs font-semibold text-zinc-200 hover:text-white transition-all flex items-center gap-2 shadow-sm"
+            >
+              <span className="w-3 h-3 rounded-full" style={{ background: activeTheme.swatchGradient }} />
+              <span className="hidden sm:inline">{activeTheme.name}</span>
+              <span className="text-[10px] text-zinc-400">🎨</span>
+            </button>
+
+            {/* Theme Picker Popover */}
+            {showThemePicker && (
+              <div className="absolute right-0 top-11 z-50 w-64 rounded-2xl bg-zinc-900/95 border border-white/15 p-2 shadow-2xl backdrop-blur-2xl">
+                <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400 border-b border-white/10 mb-1">
+                  Chat Themes & Bubble Color
+                </div>
+                <div className="space-y-1">
+                  {CHAT_THEMES.map((theme) => (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      onClick={() => handleSelectTheme(theme.id)}
+                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-left text-xs transition-all ${
+                        selectedThemeId === theme.id ? "bg-white/15 text-white font-bold" : "text-zinc-300 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-4 h-4 rounded-full shadow-sm shrink-0" style={{ background: theme.swatchGradient }} />
+                        <span>{theme.name}</span>
+                      </div>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300 font-mono">
+                        {theme.badge}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {accounts.length > 1 && (
+            <AccountSelect accounts={accounts} value={selectedAccountId} onChange={setSelectedAccountId} includeAll={false} />
+          )}
+        </div>
       </div>
 
       {/* Main Container */}
-      <div className="grid h-[calc(100dvh-11.5rem)] grid-cols-1 overflow-hidden rounded-3xl border border-white/[0.08] bg-[#0c0c12] shadow-2xl backdrop-blur-2xl sm:grid-cols-[290px_1fr] lg:grid-cols-[290px_1fr_310px]">
-        {/* ================= COLUMN 1: CONVERSATIONS LIST ================= */}
-        <div className={`min-h-0 flex-col border-b border-white/[0.08] sm:flex sm:border-b-0 sm:border-r bg-zinc-950/60 ${active ? "hidden sm:flex" : "flex"}`}>
+      <div className="grid h-[calc(100dvh-11.5rem)] grid-cols-1 overflow-hidden rounded-3xl border border-white/[0.08] bg-[#000000] shadow-2xl backdrop-blur-2xl sm:grid-cols-[290px_1fr] lg:grid-cols-[290px_1fr_310px]">
+        {/* ================= COLUMN 1: CONVERSATIONS LIST & NOTES ================= */}
+        <div className={`min-h-0 flex-col border-b border-white/[0.08] sm:flex sm:border-b-0 sm:border-r border-zinc-800 bg-[#0f0f13] ${active ? "hidden sm:flex" : "flex"}`}>
+          
+          {/* Instagram Story & Profile Notes Bar */}
+          <div className="px-3 pt-3 pb-2 border-b border-white/[0.06] bg-[#14141a]/90">
+            <div className="flex items-center gap-3 overflow-x-auto pb-1.5 no-scrollbar">
+              {STORY_NOTES.map((story) => (
+                <div key={story.id} className="flex flex-col items-center shrink-0 cursor-pointer group">
+                  <div className="relative mb-1">
+                    <div className={`w-12 h-12 rounded-full p-[2px] transition-transform group-hover:scale-105 ${
+                      story.hasUnseen ? "bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]" : "bg-zinc-700/60"
+                    }`}>
+                      <div className="w-full h-full rounded-full bg-zinc-900 border-2 border-black flex items-center justify-center text-xs font-black text-white">
+                        {story.username[0].toUpperCase()}
+                      </div>
+                    </div>
+                    {/* Story Note Floating Pill */}
+                    {story.note && (
+                      <div className="absolute -top-1.5 -right-1 px-1.5 py-0.5 rounded-full bg-zinc-800 border border-white/20 text-[8px] text-zinc-200 shadow-md max-w-[58px] truncate">
+                        {story.note}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-400 max-w-[50px] truncate text-center">
+                    {story.isSelf ? "Your note" : story.username}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Search Box */}
-          <div className="p-3 border-b border-white/[0.06] bg-zinc-950/80">
+          <div className="p-3 border-b border-white/[0.06] bg-[#0f0f13]">
             <div className="relative">
               <span className="absolute left-3 top-2.5 text-xs text-zinc-500">🔍</span>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search chats or messages…"
-                className="w-full bg-zinc-900/90 border border-white/[0.08] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-orange-500/50"
+                placeholder="Search direct messages…"
+                className="w-full bg-[#1c1c24] border border-white/[0.08] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-purple-500/50"
               />
               {searchQuery && (
                 <button onClick={() => setSearchQuery("")} className="absolute right-2.5 top-2 text-xs text-zinc-400 hover:text-white">
@@ -361,7 +676,7 @@ export default function InboxPage() {
             </div>
 
             {/* Folder Tabs */}
-            <div className="flex items-center gap-1 p-0.5 rounded-xl bg-zinc-900/80 border border-white/[0.06] text-[11px] font-semibold mt-2.5">
+            <div className="flex items-center gap-1 p-0.5 rounded-xl bg-[#181820] border border-white/[0.06] text-[11px] font-semibold mt-2.5">
               {(["primary", "unread", "general", "requests"] as const).map((tab) => (
                 <button
                   key={tab}
@@ -369,13 +684,13 @@ export default function InboxPage() {
                   onClick={() => setActiveTab(tab)}
                   className={`flex-1 py-1 rounded-lg text-center capitalize transition-all ${
                     activeTab === tab
-                      ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold shadow-sm"
+                      ? "bg-white/15 text-white font-bold shadow-sm"
                       : "text-zinc-400 hover:text-white"
                   }`}
                 >
                   {tab}
                   {tab === "unread" && unreadCount > 0 && (
-                    <span className="ml-1 px-1 py-0.2 rounded-full text-[9px] bg-white text-orange-600 font-mono font-black">
+                    <span className="ml-1 px-1.5 py-0.2 rounded-full text-[9px] bg-purple-500 text-white font-mono font-black">
                       {unreadCount}
                     </span>
                   )}
@@ -401,16 +716,16 @@ export default function InboxPage() {
                   type="button"
                   onClick={() => openConversation(c.id)}
                   className={`block w-full px-3.5 py-3 text-left transition-all relative ${
-                    c.id === activeId ? "bg-white/[0.08] border-l-4 border-orange-500" : "hover:bg-white/[0.03]"
+                    c.id === activeId ? "bg-white/[0.09] border-l-3 border-purple-500" : "hover:bg-white/[0.03]"
                   }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="relative shrink-0">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center text-xs font-black text-white shadow-inner">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 border border-white/10 flex items-center justify-center text-xs font-black text-white shadow-md">
                         {(c.contact.username || "U")[0].toUpperCase()}
                       </div>
                       {c.unread && (
-                        <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-orange-500 ring-2 ring-zinc-950" />
+                        <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-blue-500 ring-2 ring-black" />
                       )}
                     </div>
 
@@ -422,8 +737,8 @@ export default function InboxPage() {
                         <span className="shrink-0 text-[10px] text-zinc-500 font-mono">{formatTime(c.updatedTime)}</span>
                       </div>
                       {c.lastMessage && (
-                        <p className={`mt-0.5 truncate text-[11px] ${c.unread ? "text-zinc-200 font-semibold" : "text-zinc-400"}`}>
-                          {c.lastMessage.fromMe ? <span className="text-orange-400 font-medium">You: </span> : ""}
+                        <p className={`mt-0.5 truncate text-[11.5px] ${c.unread ? "text-zinc-200 font-semibold" : "text-zinc-400"}`}>
+                          {c.lastMessage.fromMe ? <span className="text-purple-400 font-medium">You: </span> : ""}
                           {c.lastMessage.text || "(Media)"}
                         </p>
                       )}
@@ -435,56 +750,72 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {/* ================= COLUMN 2: iOS-STYLE CHAT THREAD ================= */}
+        {/* ================= COLUMN 2: AUTHENTIC iOS & INSTAGRAM CHAT THREAD ================= */}
         <div className={`min-h-0 flex-col ${active ? "flex" : "hidden sm:flex"}`}>
           {!active ? (
-            <div className="flex flex-1 flex-col items-center justify-center p-8 text-center bg-radial from-orange-500/[0.02] to-transparent">
-              <div className="w-16 h-16 rounded-3xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-2xl mb-3 shadow-inner">
+            <div className="flex flex-1 flex-col items-center justify-center p-8 text-center bg-[#07070a]">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-pink-500/20 via-purple-500/20 to-blue-500/20 border border-white/10 flex items-center justify-center text-3xl mb-4 shadow-2xl">
                 💬
               </div>
-              <h3 className="text-sm font-bold text-white mb-1">Your Direct Messages</h3>
-              <p className="text-xs text-zinc-500 max-w-sm">Select any conversation on the left to read history, react, send links, and chat live.</p>
+              <h3 className="text-base font-bold text-white mb-1">Your Direct Messages</h3>
+              <p className="text-xs text-zinc-400 max-w-sm">Select any conversation to chat live, deliver smart links, react, or trigger voice notes.</p>
             </div>
           ) : (
-            <div className="flex flex-1 flex-col min-h-0 bg-[#09090e]">
+            <div className="flex flex-1 flex-col min-h-0 bg-[#000000]">
+              
               {/* iOS Chat Header */}
-              <div className="flex shrink-0 items-center justify-between border-b border-white/[0.08] px-4 py-3 bg-zinc-950/80 backdrop-blur-xl">
+              <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/80 px-4 py-2.5 bg-[#0f0f13]/90 backdrop-blur-xl">
                 <div className="flex items-center gap-3">
                   <button type="button" onClick={() => setActiveId(null)} className="rounded-lg p-1.5 text-xs font-bold text-zinc-400 hover:text-white sm:hidden bg-white/[0.05]">
                     ←
                   </button>
                   <div className="relative">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-xs font-extrabold text-white shadow-lg">
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-xs font-extrabold text-white shadow-md">
                       {(active.contact.username || "U")[0].toUpperCase()}
                     </div>
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-black" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-white">@{active.contact.username ?? "unknown"}</span>
-                      <span className="text-[10px] text-blue-400">✓</span>
+                      <span className="text-[13px] font-bold text-white">@{active.contact.username ?? "unknown"}</span>
+                      <span className="text-[11px] text-[#0095F6]">✓</span>
                     </div>
-                    <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-medium">
-                      Active on Instagram
+                    <span className="text-[10px] text-zinc-400 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Active now
                     </span>
                   </div>
                 </div>
 
-                {/* Header Action Shortcuts */}
-                <div className="flex items-center gap-2">
+                {/* Header Action Shortcuts (Call, Video, Profile, Info) */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setActiveCallModal("audio")}
+                    className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center text-xs transition-all"
+                    title="Audio Call"
+                  >
+                    📞
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveCallModal("video")}
+                    className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center text-xs transition-all"
+                    title="Video Call"
+                  >
+                    📹
+                  </button>
                   <a
                     href={`https://www.instagram.com/${active.contact.username || ""}/`}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-2.5 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/10 text-[11px] font-semibold transition-all flex items-center gap-1"
+                    className="hidden sm:flex px-2.5 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/10 text-[11px] font-semibold transition-all items-center gap-1"
                   >
                     <span>Profile</span>
                     <span className="text-[10px]">↗</span>
                   </a>
-
                   <button
                     onClick={() => setShowInfoSidebar(!showInfoSidebar)}
-                    className="w-7 h-7 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/10 flex items-center justify-center text-xs font-bold transition-all"
+                    className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 border border-white/10 flex items-center justify-center text-xs font-bold transition-all"
                     title="Toggle Fan Details"
                   >
                     ℹ️
@@ -493,27 +824,33 @@ export default function InboxPage() {
               </div>
 
               {/* Messages Stream */}
-              <div ref={scrollRef} className="min-h-0 flex-1 space-y-3.5 overflow-y-auto p-4 sm:p-5 bg-[radial-gradient(#ffffff05_1px,transparent_1px)] [background-size:16px_16px]">
+              <div ref={scrollRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-4 sm:p-5 bg-[#000000]">
                 {threadLoading && messages.length === 0 ? (
-                  <div className="flex items-center justify-center h-40 text-xs text-zinc-500 animate-pulse">Loading message stream…</div>
+                  <div className="flex items-center justify-center h-40 text-xs text-zinc-500 animate-pulse">Loading conversation…</div>
                 ) : messages.length === 0 ? (
                   <div className="flex items-center justify-center h-40 text-xs text-zinc-500">No previous messages in this conversation.</div>
                 ) : (
-                  messages.map((m) => {
+                  messages.map((m, idx) => {
                     const isHovered = hoveredMessageId === m.id;
                     const isCopied = copiedId === m.id;
+                    const isHeartBursting = heartAnimId === m.id;
+                    const smartLink = extractSmartLink(m.text);
+                    const prevMsg = messages[idx - 1];
+                    const nextMsg = messages[idx + 1];
+                    const isConsecutivePrev = prevMsg && prevMsg.fromMe === m.fromMe;
+                    const isConsecutiveNext = nextMsg && nextMsg.fromMe === m.fromMe;
 
                     return (
                       <div
                         key={m.id}
                         onMouseEnter={() => setHoveredMessageId(m.id)}
                         onMouseLeave={() => setHoveredMessageId(null)}
-                        className={`flex flex-col group ${m.fromMe ? "items-end" : "items-start"}`}
+                        className={`flex flex-col group relative ${m.fromMe ? "items-end" : "items-start"}`}
                       >
-                        {/* iOS Hover Reaction / Action Bar */}
+                        {/* iOS / Instagram Floating Reaction Capsule */}
                         <div
-                          className={`flex items-center gap-1 mb-1 px-2 py-0.5 rounded-full bg-zinc-900/90 border border-white/10 shadow-lg backdrop-blur transition-all ${
-                            isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1 pointer-events-none h-0 p-0 m-0 border-0 overflow-hidden"
+                          className={`flex items-center gap-1 mb-1 px-2 py-0.5 rounded-full bg-[#1e1e24]/95 border border-white/15 shadow-2xl backdrop-blur-xl z-20 transition-all ${
+                            isHovered ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-1 pointer-events-none h-0 p-0 m-0 border-0 overflow-hidden"
                           }`}
                         >
                           {REACTION_EMOJIS.map((emoji) => (
@@ -521,12 +858,12 @@ export default function InboxPage() {
                               key={emoji}
                               type="button"
                               onClick={() => handleReact(m.id, emoji)}
-                              className="text-xs hover:scale-130 transition-transform px-0.5"
+                              className="text-sm hover:scale-130 active:scale-95 transition-transform px-0.5"
                             >
                               {emoji}
                             </button>
                           ))}
-                          <div className="w-[1px] h-3 bg-white/10 mx-1" />
+                          <div className="w-[1px] h-3 bg-white/20 mx-1" />
                           <button
                             type="button"
                             onClick={() => setReplyingTo({ id: m.id, text: m.text, username: m.fromUsername || active.contact.username })}
@@ -552,44 +889,116 @@ export default function InboxPage() {
                           )}
                         </div>
 
-                        {/* Quoted Message Preview if applicable */}
+                        {/* Quoted Message Tag */}
                         {m.replyTo && (
-                          <div className={`mb-1 px-3 py-1 rounded-xl text-[10px] max-w-[70%] border-l-2 bg-white/[0.03] text-zinc-400 ${m.fromMe ? "border-orange-400 text-right" : "border-zinc-500"}`}>
+                          <div className={`mb-1 px-2.5 py-1 rounded-xl text-[10px] max-w-[70%] border-l-2 bg-white/[0.04] text-zinc-400 ${
+                            m.fromMe ? "border-purple-400 text-right" : "border-zinc-500 text-left"
+                          }`}>
                             <span className="font-bold text-zinc-300 block">Replying to {m.replyTo.username ? `@${m.replyTo.username}` : "message"}:</span>
                             <span className="truncate block">{m.replyTo.text}</span>
                           </div>
                         )}
 
-                        {/* Main Message Bubble */}
-                        <div className="relative group/bubble">
-                          <div
-                            className={`max-w-[82%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 text-xs sm:text-[13px] leading-relaxed shadow-md backdrop-blur transition-all ${
-                              m.fromMe
-                                ? "bg-gradient-to-br from-[#ff5500] via-[#ff7700] to-[#ee0979] text-white font-medium rounded-tr-xs"
-                                : "bg-[#1c1c26]/90 border border-white/[0.08] text-zinc-100 rounded-tl-xs"
-                            }`}
-                          >
-                            <p className="whitespace-pre-wrap break-words">{m.text}</p>
-                            
-                            <div className="flex items-center justify-end gap-1 mt-1 text-[9px]">
-                              <span className={m.fromMe ? "text-white/80" : "text-zinc-500"}>{formatTime(m.createdTime)}</span>
-                              {m.fromMe && (
-                                <span className="text-white font-bold" title="Delivered to Instagram">
-                                  ✓✓
-                                </span>
-                              )}
+                        {/* Main Message Bubble (Tight fitting w-fit for single-line perfection) */}
+                        <div className="relative inline-flex flex-col group/bubble max-w-[76%] sm:max-w-[68%]">
+                          {/* Heart Explosion on Double Tap */}
+                          {isHeartBursting && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 animate-ping">
+                              <span className="text-4xl">❤️</span>
                             </div>
-                          </div>
+                          )}
 
-                          {/* Reaction Badges on Bubble */}
+                          {/* Voice Note Audio Card */}
+                          {m.isVoice ? (
+                            <div
+                              className={`rounded-[20px] px-3.5 py-2.5 flex items-center gap-3 shadow-md ${
+                                m.fromMe ? activeTheme.bubbleClass : "bg-[#262626] text-white border border-white/[0.08]"
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setPlayingVoiceId(playingVoiceId === m.id ? null : m.id)}
+                                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-sm shrink-0 transition-all"
+                              >
+                                {playingVoiceId === m.id ? "⏸" : "▶"}
+                              </button>
+                              <div className="flex items-center gap-0.5 h-6">
+                                {[40, 70, 90, 30, 80, 100, 60, 40, 85, 50, 95, 30, 70, 45].map((h, i) => (
+                                  <div
+                                    key={i}
+                                    style={{ height: `${h}%` }}
+                                    className={`w-[2.5px] rounded-full transition-all ${
+                                      playingVoiceId === m.id ? "bg-white animate-pulse" : "bg-white/60"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-[11px] font-mono font-medium ml-1 shrink-0 opacity-90">
+                                {m.voiceDuration || "0:14"}
+                              </span>
+                            </div>
+                          ) : (
+                            /* Regular Text Bubble */
+                            <div
+                              onDoubleClick={() => handleDoubleTapHeart(m.id)}
+                              className={`relative inline-block px-3.5 py-2 text-[14px] leading-[1.38] select-text transition-all ${
+                                m.fromMe
+                                  ? `${activeTheme.bubbleClass} shadow-md ${
+                                      isConsecutiveNext ? "rounded-[20px] rounded-br-[6px]" : "rounded-[20px] rounded-br-[3px]"
+                                    } ${isConsecutivePrev ? "rounded-tr-[6px]" : ""}`
+                                  : `bg-[#262626] text-[#F5F5F7] border border-white/[0.04] shadow-md ${
+                                      isConsecutiveNext ? "rounded-[20px] rounded-bl-[6px]" : "rounded-[20px] rounded-bl-[3px]"
+                                    } ${isConsecutivePrev ? "rounded-tl-[6px]" : ""}`
+                              }`}
+                            >
+                              <span className="whitespace-pre-wrap break-words">{m.text}</span>
+                            </div>
+                          )}
+
+                          {/* Instagram Smart Link Rich Preview Card */}
+                          {smartLink && (
+                            <a
+                              href={smartLink.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-1.5 block rounded-2xl bg-[#1c1c24] border border-white/10 hover:border-purple-500/50 p-2.5 transition-all shadow-lg group/link"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center text-lg text-white shadow-md shrink-0">
+                                  {smartLink.slug === "merch" ? "👕" : "🎵"}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-xs font-bold text-white truncate group-hover/link:text-purple-300">
+                                    {smartLink.title}
+                                  </div>
+                                  <div className="text-[10px] text-zinc-400 font-mono truncate">v3nja-official.web.app</div>
+                                </div>
+                                <span className="text-xs text-purple-400 shrink-0 font-bold">↗</span>
+                              </div>
+                            </a>
+                          )}
+
+                          {/* Reaction Badge Floating on Bubble */}
                           {m.reactions && m.reactions.length > 0 && (
-                            <div className={`absolute -bottom-2 ${m.fromMe ? "right-2" : "left-2"} flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-zinc-900 border border-white/20 shadow-md text-[10px]`}>
+                            <div className={`absolute -bottom-2.5 ${m.fromMe ? "right-2" : "left-2"} flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-[#1e1e24] border border-white/20 shadow-lg text-[10px] z-10`}>
                               {m.reactions.map((r, i) => (
                                 <span key={i}>{r}</span>
                               ))}
                             </div>
                           )}
                         </div>
+
+                        {/* Micro Delivery Time / Seen Receipt under last message */}
+                        {(!isConsecutiveNext || idx === messages.length - 1) && (
+                          <div className={`flex items-center gap-1 mt-1 text-[9px] px-1 text-zinc-500`}>
+                            <span>{formatTime(m.createdTime)}</span>
+                            {m.fromMe && (
+                              <span className="text-zinc-400 font-bold" title="Delivered to Instagram Direct">
+                                • Delivered ✓✓
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })
@@ -598,9 +1007,9 @@ export default function InboxPage() {
 
               {/* Replying Banner */}
               {replyingTo && (
-                <div className="px-4 py-2 bg-zinc-900 border-t border-white/[0.08] flex items-center justify-between text-xs">
+                <div className="px-4 py-2 bg-[#14141a] border-t border-white/[0.08] flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-orange-400 font-bold">↳ Replying to @{replyingTo.username ?? "user"}:</span>
+                    <span className="text-purple-400 font-bold">↳ Replying to @{replyingTo.username ?? "user"}:</span>
                     <span className="truncate text-zinc-400">{replyingTo.text}</span>
                   </div>
                   <button onClick={() => setReplyingTo(null)} className="text-zinc-400 hover:text-white font-bold px-2">
@@ -609,16 +1018,41 @@ export default function InboxPage() {
                 </div>
               )}
 
+              {/* Saved Canned Replies Drawer */}
+              {showSavedReplies && (
+                <div className="px-3 py-2 bg-[#121218] border-t border-white/[0.08] space-y-1 max-h-44 overflow-y-auto">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 px-1 mb-1">
+                    ⚡ Instant Saved Replies (Canned Responses)
+                  </div>
+                  {SAVED_REPLIES.map((reply, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => void handleSend(reply.text)}
+                      className="w-full text-left p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 transition-all text-xs flex items-center justify-between group"
+                    >
+                      <div className="min-w-0 flex-1 pr-2">
+                        <div className="font-bold text-white text-[11px]">{reply.label}</div>
+                        <div className="text-[10px] text-zinc-400 truncate">{reply.text}</div>
+                      </div>
+                      <span className="text-purple-400 font-bold text-xs shrink-0 group-hover:translate-x-0.5 transition-transform">
+                        Send ↗
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Quick Emojis Drawer */}
               {showEmojiPicker && (
-                <div className="px-4 py-2.5 bg-zinc-900/90 border-t border-white/[0.08] flex items-center gap-2 overflow-x-auto">
+                <div className="px-4 py-2 bg-[#121218] border-t border-white/[0.08] flex items-center gap-2 overflow-x-auto no-scrollbar">
                   <span className="text-[10px] uppercase font-bold text-zinc-400 shrink-0">Quick Emojis:</span>
                   {QUICK_EMOJIS.map((emoji) => (
                     <button
                       key={emoji}
                       type="button"
                       onClick={() => insertEmoji(emoji)}
-                      className="text-base hover:scale-130 transition-transform px-1 py-0.5"
+                      className="text-base hover:scale-130 active:scale-95 transition-transform px-1 py-0.5"
                     >
                       {emoji}
                     </button>
@@ -626,43 +1060,111 @@ export default function InboxPage() {
                 </div>
               )}
 
+              {/* Voice Recording Active Bar */}
+              {isRecordingVoice && (
+                <div className="px-4 py-2.5 bg-rose-950/80 border-t border-rose-500/30 flex items-center justify-between text-xs backdrop-blur-md">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
+                    <span className="font-bold text-rose-300">Recording Voice Note… (0:{recordTimerSec < 10 ? `0${recordTimerSec}` : recordTimerSec})</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsRecordingVoice(false)}
+                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-zinc-300 font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleFinishVoiceRecord}
+                      className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold"
+                    >
+                      Send 🎙️
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* iOS Pill Composer */}
-              <div className="shrink-0 p-3 bg-zinc-950/90 border-t border-white/[0.08] backdrop-blur-xl">
+              <div className="shrink-0 p-3 bg-[#0a0a0f] border-t border-zinc-800/80 backdrop-blur-2xl">
                 {sendError && <p className="mb-2 text-xs text-rose-400 px-2 font-medium">{sendError}</p>}
 
-                <div className="flex items-center gap-2 bg-zinc-900/90 border border-white/[0.1] rounded-2xl pl-3 pr-1.5 py-1.5 focus-within:border-orange-500/60 focus-within:ring-1 focus-within:ring-orange-500/40 transition-all">
+                <div className="flex items-center gap-1.5 bg-[#1c1c24] border border-white/[0.08] rounded-full px-2 py-1 focus-within:border-purple-500/50 transition-all">
+                  
+                  {/* Saved Replies Action Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSavedReplies(!showSavedReplies);
+                      setShowEmojiPicker(false);
+                    }}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs transition-all ${
+                      showSavedReplies ? "bg-purple-500/20 text-purple-400" : "text-zinc-400 hover:text-white"
+                    }`}
+                    title="Saved Canned Replies"
+                  >
+                    ⚡
+                  </button>
+
                   {/* Emoji Button */}
                   <button
                     type="button"
-                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm transition-all ${
-                      showEmojiPicker ? "bg-orange-500/20 text-orange-400" : "text-zinc-400 hover:text-white"
+                    onClick={() => {
+                      setShowEmojiPicker(!showEmojiPicker);
+                      setShowSavedReplies(false);
+                    }}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs transition-all ${
+                      showEmojiPicker ? "bg-purple-500/20 text-purple-400" : "text-zinc-400 hover:text-white"
                     }`}
                     title="Insert Emojis"
                   >
                     😊
                   </button>
 
+                  {/* Voice Note Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsRecordingVoice(true)}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs text-zinc-400 hover:text-white transition-all"
+                    title="Record Voice Note"
+                  >
+                    🎙️
+                  </button>
+
+                  {/* Expanding Textarea */}
                   <textarea
                     ref={textareaRef}
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={handleKeyDown}
                     rows={1}
-                    placeholder="Message… (Enter to send)"
-                    className="max-h-28 min-h-[36px] flex-1 resize-none bg-transparent py-1.5 text-xs sm:text-[13px] text-white placeholder:text-zinc-500 focus:outline-none"
+                    placeholder="Message…"
+                    className="max-h-24 min-h-[34px] flex-1 resize-none bg-transparent py-1.5 text-xs sm:text-[13.5px] text-white placeholder:text-zinc-500 focus:outline-none"
                   />
 
-                  {/* Send Button */}
-                  <button
-                    type="button"
-                    onClick={() => void handleSend()}
-                    disabled={sending || !draft.trim()}
-                    className="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white font-black hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100 transition-all shadow-md flex items-center justify-center shrink-0 text-sm"
-                    title="Send to Instagram"
-                  >
-                    {sending ? "…" : "↑"}
-                  </button>
+                  {/* Right Action: Quick Heart ❤️ when empty, Send ↑ when typing */}
+                  {draft.trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleSend()}
+                      disabled={sending}
+                      className="w-7 h-7 rounded-full text-white font-black hover:scale-105 active:scale-95 disabled:opacity-30 transition-all shadow-md flex items-center justify-center shrink-0 text-xs"
+                      style={{ background: activeTheme.swatchGradient }}
+                      title="Send message"
+                    >
+                      {sending ? "…" : "↑"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSendQuickHeart}
+                      className="w-7 h-7 rounded-full text-rose-500 hover:scale-120 active:scale-90 transition-transform flex items-center justify-center shrink-0 text-base"
+                      title="Send instant Like ❤️"
+                    >
+                      ❤️
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -671,11 +1173,78 @@ export default function InboxPage() {
 
         {/* ================= COLUMN 3: FAN CONTEXT CRM ================= */}
         {active && showInfoSidebar && (
-          <div className="hidden lg:flex min-h-0 flex-col border-l border-white/[0.08] bg-zinc-950/70 overflow-y-auto">
+          <div className="hidden lg:flex min-h-0 flex-col border-l border-zinc-800 bg-[#0c0c12] overflow-y-auto">
             <InboxFanContext data={fanContext} loading={fanLoading} />
           </div>
         )}
       </div>
+
+      {/* ================= AUDIO / VIDEO CALL SIMULATION MODAL ================= */}
+      {activeCallModal && active && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+          <div className="w-full max-w-sm rounded-3xl bg-zinc-900 border border-white/15 p-6 shadow-2xl flex flex-col items-center text-center">
+            
+            {/* Caller Avatar */}
+            <div className="relative mb-4">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 p-1 animate-pulse">
+                <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center text-2xl font-black text-white">
+                  {(active.contact.username || "U")[0].toUpperCase()}
+                </div>
+              </div>
+              <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 ring-4 ring-zinc-900" />
+            </div>
+
+            <h3 className="text-base font-bold text-white mb-0.5">@{active.contact.username}</h3>
+            <p className="text-xs text-zinc-400 mb-6 font-mono">
+              {activeCallModal === "video" ? "Instagram Video Call" : "Instagram Audio Call"} • {Math.floor(callDurationSec / 60)}:{(callDurationSec % 60).toString().padStart(2, "0")}
+            </p>
+
+            {/* Video View Placeholder if in Video Mode */}
+            {activeCallModal === "video" && (
+              <div className="w-full h-32 rounded-2xl bg-zinc-950 border border-white/10 mb-6 flex items-center justify-center text-xs text-zinc-500 font-medium">
+                {isVideoOff ? "Camera is Off" : "HD Video Stream Connected"}
+              </div>
+            )}
+
+            {/* In-Call Controls */}
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setIsMuted(!isMuted)}
+                className={`w-12 h-12 rounded-full flex items-center justify-center text-lg transition-all ${
+                  isMuted ? "bg-white text-black" : "bg-white/10 text-white hover:bg-white/20"
+                }`}
+                title={isMuted ? "Unmute" : "Mute"}
+              >
+                {isMuted ? "🔇" : "🎙️"}
+              </button>
+
+              {activeCallModal === "video" && (
+                <button
+                  type="button"
+                  onClick={() => setIsVideoOff(!isVideoOff)}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center text-lg transition-all ${
+                    isVideoOff ? "bg-white text-black" : "bg-white/10 text-white hover:bg-white/20"
+                  }`}
+                  title="Toggle Video"
+                >
+                  {isVideoOff ? "🚫" : "📹"}
+                </button>
+              )}
+
+              {/* End Call Button */}
+              <button
+                type="button"
+                onClick={() => setActiveCallModal(null)}
+                className="w-14 h-14 rounded-full bg-rose-600 hover:bg-rose-500 active:scale-95 text-white flex items-center justify-center text-xl shadow-lg shadow-rose-600/40 transition-all"
+                title="End Call"
+              >
+                📞
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
