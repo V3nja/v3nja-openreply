@@ -243,11 +243,20 @@ export default function InstagramFeedPage() {
                         : "bg-zinc-700/60"
                     }`}
                   >
-                    <img
-                      src={st.avatarUrl}
-                      alt={st.username}
-                      className="w-full h-full rounded-full object-cover border-2 border-black"
-                    />
+                    <div className="w-full h-full rounded-full bg-zinc-900 border-2 border-black flex items-center justify-center text-sm font-bold text-white relative overflow-hidden">
+                      <span>{st.username[0].toUpperCase()}</span>
+                      {st.avatarUrl && (
+                        <img
+                          src={getProxiedImageUrl(st.avatarUrl)}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          className="absolute inset-0 w-full h-full rounded-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = "none";
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
                 <span className="text-[11px] text-zinc-300 font-medium max-w-[64px] truncate text-center">
@@ -278,13 +287,22 @@ export default function InstagramFeedPage() {
                   <div className="flex items-center gap-3">
                     <Link
                       href={`/inbox?user=${post.authorUsername}`}
-                      className="w-10 h-10 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600 block shadow-sm"
+                      className="w-10 h-10 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600 block shadow-sm overflow-hidden"
                     >
-                      <img
-                        src={post.authorAvatar}
-                        alt={post.authorUsername}
-                        className="w-full h-full rounded-full object-cover border-2 border-black"
-                      />
+                      <div className="w-full h-full rounded-full bg-zinc-900 border-2 border-black flex items-center justify-center text-xs font-bold text-white relative overflow-hidden">
+                        <span>{post.authorUsername[0].toUpperCase()}</span>
+                        {post.authorAvatar && (
+                          <img
+                            src={getProxiedImageUrl(post.authorAvatar)}
+                            alt=""
+                            referrerPolicy="no-referrer"
+                            className="absolute inset-0 w-full h-full rounded-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        )}
+                      </div>
                     </Link>
                     <div>
                       <div className="flex items-center gap-1.5">
@@ -318,22 +336,31 @@ export default function InstagramFeedPage() {
                 {/* Media Container with Double Tap Heart */}
                 <div
                   onDoubleClick={() => handleDoubleTapLike(post.id)}
-                  className="relative aspect-square bg-black flex items-center justify-center select-none overflow-hidden group cursor-pointer"
+                  className="relative aspect-square bg-gradient-to-tr from-purple-950/40 via-zinc-900 to-black flex items-center justify-center select-none overflow-hidden group cursor-pointer"
                 >
+                  <div className="flex flex-col items-center justify-center p-3 text-center text-zinc-500 select-none">
+                    <span className="text-3xl mb-1">📷</span>
+                    <span className="text-xs font-bold text-zinc-400">View Instagram Post</span>
+                  </div>
+
                   {post.mediaType === "VIDEO" ? (
                     <video
-                      src={post.videoUrl || post.mediaUrl}
-                      poster={post.thumbnailUrl}
+                      src={getProxiedImageUrl(post.videoUrl || post.mediaUrl)}
+                      poster={getProxiedImageUrl(post.thumbnailUrl || "")}
                       controls
                       playsInline
                       loop
-                      className="w-full h-full object-contain"
+                      className="absolute inset-0 w-full h-full object-contain"
                     />
                   ) : (
                     <img
-                      src={post.mediaUrl}
-                      alt="Post Media"
-                      className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300"
+                      src={getProxiedImageUrl(post.mediaUrl)}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = "none";
+                      }}
                     />
                   )}
 
@@ -449,11 +476,18 @@ export default function InstagramFeedPage() {
           <div className="p-4 rounded-3xl bg-zinc-950/80 border border-white/[0.08] flex items-center justify-between shadow-xl">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full p-[2px] bg-gradient-to-tr from-pink-500 to-purple-600 shadow-md">
-                <img
-                  src={getProxiedImageUrl("https://scontent-sea5-1.cdninstagram.com/v/t51.82787-19/799754867_18082733579698157_1761305583527068474_n.jpg")}
-                  alt="V3NJA"
-                  className="w-full h-full rounded-full object-cover border-2 border-black"
-                />
+                <div className="w-full h-full rounded-full bg-zinc-900 border-2 border-black flex items-center justify-center text-sm font-bold text-white relative overflow-hidden">
+                  <span>V</span>
+                  <img
+                    src={getProxiedImageUrl("https://scontent-sea5-1.cdninstagram.com/v/t51.82787-19/799754867_18082733579698157_1761305583527068474_n.jpg")}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    className="absolute inset-0 w-full h-full rounded-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = "none";
+                    }}
+                  />
+                </div>
               </div>
               <div>
                 <span className="text-xs font-extrabold text-white block">v3nja2.0</span>
@@ -481,11 +515,20 @@ export default function InstagramFeedPage() {
               {suggestedProfiles.map((sug) => (
                 <div key={sug.username} className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={sug.avatarUrl}
-                      alt={sug.username}
-                      className="w-9 h-9 rounded-full object-cover border border-white/10 shrink-0"
-                    />
+                    <div className="w-9 h-9 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center text-xs font-bold text-white shrink-0 relative overflow-hidden">
+                      <span>{sug.username[0].toUpperCase()}</span>
+                      {sug.avatarUrl && (
+                        <img
+                          src={getProxiedImageUrl(sug.avatarUrl)}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          className="absolute inset-0 w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = "none";
+                          }}
+                        />
+                      )}
+                    </div>
                     <div className="min-w-0">
                       <span className="text-xs font-bold text-white truncate block">
                         {sug.username}
@@ -530,11 +573,20 @@ export default function InstagramFeedPage() {
 
               <div className="flex items-center justify-between text-white text-xs">
                 <div className="flex items-center gap-2">
-                  <img
-                    src={activeStoryViewer.avatarUrl}
-                    alt={activeStoryViewer.username}
-                    className="w-7 h-7 rounded-full object-cover border border-white"
-                  />
+                  <div className="w-7 h-7 rounded-full bg-zinc-900 border border-white flex items-center justify-center text-[10px] font-bold text-white relative overflow-hidden">
+                    <span>{activeStoryViewer.username[0].toUpperCase()}</span>
+                    {activeStoryViewer.avatarUrl && (
+                      <img
+                        src={getProxiedImageUrl(activeStoryViewer.avatarUrl)}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = "none";
+                        }}
+                      />
+                    )}
+                  </div>
                   <span className="font-bold">@{activeStoryViewer.username}</span>
                 </div>
                 <button
@@ -548,11 +600,15 @@ export default function InstagramFeedPage() {
             </div>
 
             {/* Media Background */}
-            <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-zinc-950 flex items-center justify-center">
               <img
-                src={activeStoryViewer.stories[activeStoryViewer.currentIndex]?.mediaUrl}
-                alt="Story"
+                src={getProxiedImageUrl(activeStoryViewer.stories[activeStoryViewer.currentIndex]?.mediaUrl)}
+                alt=""
+                referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = "none";
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
             </div>

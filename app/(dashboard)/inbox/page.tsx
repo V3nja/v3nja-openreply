@@ -1283,16 +1283,18 @@ export default function InboxPage() {
                             : "bg-zinc-700/60"
                         }`}
                       >
-                        <div className="w-full h-full rounded-full bg-[#181820] border-2 border-black flex items-center justify-center text-xs font-black text-white overflow-hidden">
-                          {c.contact.profilePic ? (
+                        <div className="w-full h-full rounded-full bg-[#181820] border-2 border-black flex items-center justify-center text-xs font-black text-white overflow-hidden relative">
+                          <span className="font-bold">{(c.contact.username || "U")[0].toUpperCase()}</span>
+                          {c.contact.profilePic && (
                             <img
                               src={getProxiedImageUrl(c.contact.profilePic)}
-                              alt={c.contact.username || "User"}
+                              alt=""
                               referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover rounded-full"
+                              className="absolute inset-0 w-full h-full object-cover rounded-full"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = "none";
+                              }}
                             />
-                          ) : (
-                            (c.contact.username || "U")[0].toUpperCase()
                           )}
                         </div>
                       </div>
@@ -1397,16 +1399,18 @@ export default function InboxPage() {
                   >
                     <div className="flex items-start gap-3">
                       <div className="relative shrink-0">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center text-xs font-black text-white shadow-md overflow-hidden">
-                          {c.contact.profilePic ? (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center text-xs font-black text-white shadow-md overflow-hidden relative">
+                          <span className="font-bold">{initial}</span>
+                          {c.contact.profilePic && (
                             <img
                               src={getProxiedImageUrl(c.contact.profilePic)}
-                              alt={c.contact.username || "User"}
+                              alt=""
                               referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover rounded-full"
+                              className="absolute inset-0 w-full h-full object-cover rounded-full"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = "none";
+                              }}
                             />
-                          ) : (
-                            initial
                           )}
                         </div>
                         {c.unread && (
@@ -1476,16 +1480,18 @@ export default function InboxPage() {
                     ←
                   </button>
                   <div className="relative">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center text-xs font-black text-white border border-white/15 shadow-md group-hover:scale-105 transition-transform overflow-hidden">
-                      {contactProfileData?.avatarUrl || active.contact.profilePic ? (
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center text-xs font-black text-white border border-white/15 shadow-md group-hover:scale-105 transition-transform overflow-hidden relative">
+                      <span className="font-bold">{(active.contact.username || "U")[0].toUpperCase()}</span>
+                      {(contactProfileData?.avatarUrl || active.contact.profilePic) && (
                         <img
                           src={getProxiedImageUrl(contactProfileData?.avatarUrl || active.contact.profilePic || "")}
-                          alt={active.contact.username || "User"}
+                          alt=""
                           referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover rounded-full"
+                          className="absolute inset-0 w-full h-full object-cover rounded-full"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = "none";
+                          }}
                         />
-                      ) : (
-                        (active.contact.username || "U")[0].toUpperCase()
                       )}
                     </div>
                     <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-black" />
@@ -2219,18 +2225,20 @@ export default function InboxPage() {
                   className="relative cursor-pointer group"
                 >
                   <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] shadow-lg group-hover:scale-105 transition-transform overflow-hidden">
-                    {contactProfileData?.avatarUrl ? (
-                      <img
-                        src={getProxiedImageUrl(contactProfileData.avatarUrl)}
-                        alt={active.contact.username || "User"}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full rounded-full object-cover border-2 border-zinc-950"
-                      />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-zinc-900 border-2 border-zinc-950 flex items-center justify-center text-lg font-black text-white">
-                        {(active.contact.username || "U")[0].toUpperCase()}
-                      </div>
-                    )}
+                    <div className="w-full h-full rounded-full bg-zinc-900 border-2 border-zinc-950 flex items-center justify-center text-lg font-black text-white relative overflow-hidden">
+                      <span className="font-bold">{(active.contact.username || "U")[0].toUpperCase()}</span>
+                      {contactProfileData?.avatarUrl && (
+                        <img
+                          src={getProxiedImageUrl(contactProfileData.avatarUrl)}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          className="absolute inset-0 w-full h-full object-cover rounded-full"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = "none";
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
                   <span className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
                 </div>
@@ -2318,7 +2326,20 @@ export default function InboxPage() {
                     className="flex flex-col items-center shrink-0 cursor-pointer group"
                   >
                     <div className="w-14 h-14 rounded-full p-[2px] bg-zinc-800 group-hover:bg-gradient-to-tr from-pink-500 to-purple-600 transition-all overflow-hidden">
-                      <img src={getProxiedImageUrl(hl.coverUrl)} alt={hl.title} referrerPolicy="no-referrer" className="w-full h-full rounded-full object-cover border-2 border-black" />
+                      <div className="w-full h-full rounded-full bg-zinc-900 border-2 border-black flex items-center justify-center text-xs font-bold text-white relative overflow-hidden">
+                        <span>★</span>
+                        {hl.coverUrl && (
+                          <img
+                            src={getProxiedImageUrl(hl.coverUrl)}
+                            alt=""
+                            referrerPolicy="no-referrer"
+                            className="absolute inset-0 w-full h-full object-cover rounded-full"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        )}
+                      </div>
                     </div>
                     <span className="text-[10px] text-zinc-400 mt-1 max-w-[56px] truncate">{hl.title}</span>
                   </div>
@@ -2345,18 +2366,20 @@ export default function InboxPage() {
                       className="flex flex-col items-center p-2 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-white/10 shrink-0 w-24 text-center cursor-pointer transition-all hover:scale-[1.02] group shadow-sm"
                     >
                       <div className="w-10 h-10 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600 mb-1 overflow-hidden">
-                        {sug.avatarUrl ? (
-                          <img
-                            src={getProxiedImageUrl(sug.avatarUrl)}
-                            alt={sug.username}
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover rounded-full"
-                          />
-                        ) : (
-                          <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center text-[10px] font-bold text-white">
-                            {sug.username[0].toUpperCase()}
-                          </div>
-                        )}
+                        <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center text-[10px] font-bold text-white relative overflow-hidden">
+                          <span>{sug.username[0].toUpperCase()}</span>
+                          {sug.avatarUrl && (
+                            <img
+                              src={getProxiedImageUrl(sug.avatarUrl)}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                              className="absolute inset-0 w-full h-full object-cover rounded-full"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = "none";
+                              }}
+                            />
+                          )}
+                        </div>
                       </div>
                       <span className="text-[10px] font-bold text-white truncate max-w-[80px] block">
                         @{sug.username}
@@ -2433,22 +2456,30 @@ export default function InboxPage() {
                       <div
                         key={post.id}
                         onClick={() => setSelectedLightboxPost(post)}
-                        className="group/item relative aspect-square rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 cursor-pointer shadow-md hover:border-purple-500/60 transition-all"
+                        className="group/item relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-tr from-purple-950/40 via-zinc-900 to-black border border-white/10 cursor-pointer shadow-md hover:border-purple-500/60 transition-all flex items-center justify-center"
                       >
+                        <div className="flex flex-col items-center justify-center p-2 text-center text-zinc-500 select-none">
+                          <span className="text-xl mb-1">📷</span>
+                          <span className="text-[10px] font-bold text-zinc-400">Photo</span>
+                        </div>
+
                         <img
                           src={getProxiedImageUrl(post.thumbnailUrl || post.mediaUrl)}
-                          alt="Post"
+                          alt=""
                           referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300"
+                          className="absolute inset-0 w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = "none";
+                          }}
                         />
                         
                         {post.mediaType === "VIDEO" && (
-                          <span className="absolute top-2 right-2 text-xs bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-lg text-white">
+                          <span className="absolute top-2 right-2 text-xs bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-lg text-white z-10">
                             ▶
                           </span>
                         )}
 
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/item:opacity-100 flex items-center justify-center gap-4 text-white text-xs font-bold transition-opacity">
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/item:opacity-100 flex items-center justify-center gap-4 text-white text-xs font-bold transition-opacity z-10">
                           <span className="flex items-center gap-1">❤️ {post.likeCount}</span>
                           <span className="flex items-center gap-1">💬 {post.commentsCount}</span>
                         </div>
@@ -2469,21 +2500,29 @@ export default function InboxPage() {
                       <div
                         key={reel.id}
                         onClick={() => setSelectedLightboxPost(reel)}
-                        className="group/item relative aspect-[9/16] rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 cursor-pointer shadow-md hover:border-purple-500/60 transition-all"
+                        className="group/item relative aspect-[9/16] rounded-2xl overflow-hidden bg-gradient-to-tr from-pink-950/40 via-zinc-900 to-black border border-white/10 cursor-pointer shadow-md hover:border-purple-500/60 transition-all flex items-center justify-center"
                       >
+                        <div className="flex flex-col items-center justify-center p-2 text-center text-zinc-500 select-none">
+                          <span className="text-xl mb-1">🎬</span>
+                          <span className="text-[10px] font-bold text-zinc-400">Play Reel</span>
+                        </div>
+
                         <img
                           src={getProxiedImageUrl(reel.thumbnailUrl || reel.mediaUrl)}
-                          alt="Reel"
+                          alt=""
                           referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300"
+                          className="absolute inset-0 w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = "none";
+                          }}
                         />
                         
-                        <div className="absolute bottom-2 left-2 text-[10px] font-bold bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-lg text-white flex items-center gap-1">
+                        <div className="absolute bottom-2 left-2 text-[10px] font-bold bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-lg text-white flex items-center gap-1 z-10">
                           <span>▶</span>
                           <span>{reel.viewsCount ? (reel.viewsCount >= 1000 ? `${(reel.viewsCount / 1000).toFixed(1)}K` : `${reel.viewsCount}`) : "Play"}</span>
                         </div>
 
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/item:opacity-100 flex items-center justify-center gap-3 text-white text-xs font-bold transition-opacity">
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/item:opacity-100 flex items-center justify-center gap-3 text-white text-xs font-bold transition-opacity z-10">
                           <span>❤️ {reel.likeCount}</span>
                           <span>💬 {reel.commentsCount}</span>
                         </div>
@@ -2706,16 +2745,18 @@ export default function InboxPage() {
               {/* Post Header */}
               <div className="p-3.5 border-b border-white/10 flex items-center justify-between bg-black/40">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white overflow-hidden">
-                    {contactProfileData?.avatarUrl ? (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white overflow-hidden relative">
+                    <span>{(active.contact.username || "U")[0].toUpperCase()}</span>
+                    {contactProfileData?.avatarUrl && (
                       <img
                         src={getProxiedImageUrl(contactProfileData.avatarUrl)}
-                        alt={active.contact.username || "User"}
+                        alt=""
                         referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover rounded-full"
+                        className="absolute inset-0 w-full h-full object-cover rounded-full"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = "none";
+                        }}
                       />
-                    ) : (
-                      (active.contact.username || "U")[0].toUpperCase()
                     )}
                   </div>
                   <div>
