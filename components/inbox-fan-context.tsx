@@ -46,7 +46,7 @@ export default function InboxFanContext({ data, loading }: { data: InboxFanConte
       const payload = await response.json();
       if (payload.success) setLocalTags(payload.data.tags);
     } catch {
-      // Keep the current UI state on transient network failures.
+      // Keep UI state on transient network failures
     } finally {
       setTagBusy(null);
     }
@@ -156,15 +156,5 @@ export default function InboxFanContext({ data, loading }: { data: InboxFanConte
         </div>
       )}
     </div>
-  );
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </aside>
   );
 }
