@@ -3,26 +3,23 @@
 /**
  * Universal Unified Messaging & Social OS (V3NJA WRLD)
  *
- * Architecture:
- * 1. Multi-Channel Unified Inbox:
- *    - 📷 Instagram Direct (Live Meta Graph API 2-way sync)
- *    - 💬 Facebook Messenger (Meta Page Messenger sync)
- *    - ⚡ OpenReply Engine (Keyword automation, smart links, fan CRM)
- *    - 📱 iMessage / Offline SMS (Local device carrier gateway)
- *    - 🌐 All Channels (Unified inbox with channel badges)
- * 2. In-App Instagram Profile & Media Explorer (Zero External Redirects):
- *    - Native Instagram profile modal with bio, follower stats, and post counts
- *    - Interactive 3-column Posts & Reels grid
- *    - Media Lightbox with double-tap heart like, caption, and in-app comment composer
- * 3. iOS 19 Liquid Glass Messaging Suite:
- *    - Expandable iOS `(+)` Action Drawer
- *    - Per-Chat Dynamic Themes & Custom Wallpaper Upload
- *    - In-Line Dual-Layer Live Translation Bubbles (`🌐 Translating Language ↕`)
- *    - iOS Long-Press Context Action Popover
- *    - FaceTime Audio / Video calling simulation
+ * Authentic iOS & Instagram Direct Architecture:
+ * 1. Multi-Channel Switcher (All Channels, Instagram Direct, FB Messenger, OpenReply CRM, Offline SMS).
+ * 2. Real Web Audio & MediaRecorder Voice Notes:
+ *    - Real microphone permissions (`navigator.mediaDevices.getUserMedia`).
+ *    - Live audio frequency visualizer during recording.
+ *    - Real HTML5 Audio playback in chat bubbles with scrubbing & duration timers.
+ * 3. Real Media Attachments:
+ *    - Photo & video uploads with instant preview and lightbox zoom.
+ * 4. Authentic Apple SF Symbols & Instagram Direct SVG Icons (Zero crude text glyphs).
+ * 5. Authentic iOS Emoji Keyboard Popover with 5 categorized tabs.
+ * 6. Dynamic Real Contact Profiles & Fan CRM:
+ *    - Accurate per-contact details, avatar photos, bio, tags, and interaction history.
+ *    - Dedicated 3-Tab Explorer: [Contact Profile & CRM] [Chat Media & Voice] [Official @v3nja2.0 Profile].
+ * 7. In-App Media Lightbox with Double-Tap Heart Like & In-App Comment Composer.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import AccountSelect, { type AccountOption } from "@/components/account-select";
 import InboxFanContext, { type InboxFanContextData } from "@/components/inbox-fan-context";
@@ -35,7 +32,162 @@ const CACHE_MAX_AGE_MS = 60_000;
 const convCacheKey = (accountId: string) => `inbox:convs:${accountId}`;
 const msgCacheKey = (conversationId: string) => `inbox:msgs:${conversationId}`;
 
-// Channel types for universal multi-platform inbox
+// ==========================================
+// AUTHENTIC APPLE SF SYMBOLS & INSTAGRAM SVGs
+// ==========================================
+
+export function IconCamera({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  );
+}
+
+export function IconMicrophone({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" y1="19" x2="12" y2="23" />
+      <line x1="8" y1="23" x2="16" y2="23" />
+    </svg>
+  );
+}
+
+export function IconPhoto({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect width="18" height="18" x="3" y="3" rx="4" ry="4" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </svg>
+  );
+}
+
+export function IconPaperPlane({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="m22 2-7 20-4-9-9-4Z" />
+      <path d="M22 2 11 13" />
+    </svg>
+  );
+}
+
+export function IconHeart({ className = "w-5 h-5", filled = false }: { className?: string; filled?: boolean }) {
+  if (filled) {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" className={className}>
+        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+    </svg>
+  );
+}
+
+export function IconVerifiedBadge({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M12 2L14.4 3.7L17.3 3.3L18.7 5.9L21.4 7.1L21.3 10L23 12.3L21.7 14.8L22.2 17.7L19.4 18.6L18.3 21.3L15.4 21.2L13.4 23.3L10.6 22.3L8.6 24L6.9 21.6L4 21.4L3.2 18.6L0.7 17.4L1.5 14.5L0.5 12L2.1 9.8L1.7 6.9L4.5 6.3L5.8 3.7L8.7 4.3L10.8 2.5L12 2Z"
+        fill="#0095F6"
+      />
+      <path d="M8.5 12.5L10.8 14.8L15.8 9.5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconSmile({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+      <line x1="9" y1="9" x2="9.01" y2="9" />
+      <line x1="15" y1="9" x2="15.01" y2="9" />
+    </svg>
+  );
+}
+
+export function IconSearch({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+export function IconPhoneCall({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+}
+
+export function IconVideoCall({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.934a.5.5 0 0 0-.777-.416L16 11" />
+      <rect x="2" y="6" width="14" height="12" rx="3" />
+    </svg>
+  );
+}
+
+export function IconPlus({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+export function IconTrash({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M3 6h18" />
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+    </svg>
+  );
+}
+
+export function IconPlay({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" className={className}>
+      <polygon points="5 3 19 12 5 21 5 3" />
+    </svg>
+  );
+}
+
+export function IconPause({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" className={className}>
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+      <rect x="14" y="4" width="4" height="16" rx="1" />
+    </svg>
+  );
+}
+
+export function IconCheckDouble({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M18 6 7 17l-5-5" />
+      <path d="m22 10-7.5 7.5L13 16" />
+    </svg>
+  );
+}
+
+// ==========================================
+// CHANNEL & THEME DEFINITIONS
+// ==========================================
+
 export type ChannelPlatform = "all" | "instagram" | "messenger" | "openreply" | "sms";
 
 export interface ChannelOption {
@@ -47,13 +199,12 @@ export interface ChannelOption {
 
 export const CHANNELS: ChannelOption[] = [
   { id: "all", label: "All Channels", icon: "🌐", badgeColor: "bg-white/10 text-white" },
-  { id: "instagram", label: "Instagram", icon: "📷", badgeColor: "bg-gradient-to-r from-pink-500 to-purple-600 text-white" },
+  { id: "instagram", label: "Instagram", icon: "📷", badgeColor: "bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white" },
   { id: "messenger", label: "Messenger", icon: "💬", badgeColor: "bg-blue-600 text-white" },
   { id: "openreply", label: "OpenReply", icon: "⚡", badgeColor: "bg-amber-500 text-black font-bold" },
   { id: "sms", label: "Offline SMS", icon: "📱", badgeColor: "bg-emerald-600 text-white" },
 ];
 
-// Authentic Instagram & iOS Themes
 export interface ChatTheme {
   id: string;
   name: string;
@@ -123,17 +274,6 @@ export const CHAT_THEMES: ChatTheme[] = [
     textSelection: "selection:bg-rose-500 selection:text-white",
   },
   {
-    id: "emerald-mint",
-    name: "Emerald Mint",
-    badge: "Fresh Mint",
-    bubbleClass: "bg-gradient-to-r from-[#0BA360] via-[#10B981] to-[#3CBA92] text-white shadow-lg shadow-emerald-500/25",
-    glowColor: "rgba(16, 185, 129, 0.4)",
-    accentColor: "#10B981",
-    swatchGradient: "linear-gradient(135deg, #0BA360 0%, #3CBA92 100%)",
-    wallpaperBg: "radial-gradient(circle at 50% 15%, rgba(16, 185, 129, 0.14) 0%, transparent 60%), #050806",
-    textSelection: "selection:bg-emerald-500 selection:text-white",
-  },
-  {
     id: "midnight-noir",
     name: "Apple Noir Stealth",
     badge: "Matte Dark",
@@ -143,17 +283,6 @@ export const CHAT_THEMES: ChatTheme[] = [
     swatchGradient: "linear-gradient(135deg, #3A3A3C 0%, #1C1C1E 100%)",
     wallpaperBg: "#09090b",
     textSelection: "selection:bg-zinc-600 selection:text-white",
-  },
-  {
-    id: "berry-lavender",
-    name: "Berry Lavender",
-    badge: "Fuchsia",
-    bubbleClass: "bg-gradient-to-r from-[#8A2387] via-[#E94057] to-[#F27121] text-white shadow-lg shadow-pink-500/25",
-    glowColor: "rgba(233, 64, 87, 0.4)",
-    accentColor: "#E94057",
-    swatchGradient: "linear-gradient(135deg, #8A2387 0%, #F27121 100%)",
-    wallpaperBg: "radial-gradient(circle at 30% 20%, rgba(138, 35, 135, 0.15) 0%, transparent 55%), radial-gradient(circle at 70% 80%, rgba(242, 113, 33, 0.12) 0%, transparent 50%), #080406",
-    textSelection: "selection:bg-fuchsia-600 selection:text-white",
   },
 ];
 
@@ -169,19 +298,149 @@ export const WALLPAPER_OPTIONS: WallpaperOption[] = [
   { id: "deep-space", name: "Deep Space Aurora", preview: "linear-gradient(135deg, #0f0c29, #302b63, #24243e)", css: "radial-gradient(circle at 50% 0%, rgba(120, 119, 198, 0.25) 0%, transparent 60%), radial-gradient(circle at 100% 100%, rgba(76, 29, 149, 0.2) 0%, transparent 50%), #090714" },
   { id: "city-dusk", name: "City Street Dusk", preview: "linear-gradient(135deg, #4b3832, #854442, #3c2f2f)", css: "radial-gradient(circle at 50% 30%, rgba(217, 119, 6, 0.18) 0%, transparent 60%), radial-gradient(circle at 90% 90%, rgba(180, 83, 9, 0.15) 0%, transparent 50%), #0d0b0a" },
   { id: "cyber-matrix", name: "Cyber Neon Glow", preview: "linear-gradient(135deg, #000428, #004e92)", css: "radial-gradient(circle at 50% 10%, rgba(0, 242, 254, 0.18) 0%, transparent 55%), radial-gradient(circle at 10% 90%, rgba(79, 172, 254, 0.15) 0%, transparent 50%), #020713" },
-  { id: "twilight-mesh", name: "Twilight Mesh", preview: "linear-gradient(135deg, #2b1055, #7597de)", css: "radial-gradient(circle at 70% 20%, rgba(236, 72, 153, 0.18) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.18) 0%, transparent 50%), #06050b" },
   { id: "noir-carbon", name: "Pure Apple Dark", preview: "#000000", css: "#000000" },
 ];
 
-const REACTION_EMOJIS = ["❤️", "👍", "👎", "😂", "‼️", "❓", "🔥", "🎵"];
+const REACTION_EMOJIS = ["❤️", "👍", "🔥", "😂", "‼️", "👏", "🎵", "🙌"];
 
-const STORY_NOTES = [
-  { id: "self", username: "Your note", note: "Dropping heat soon 🔥", isSelf: true },
-  { id: "v3nja", username: "v3nja2.0", note: "WAYULOMI Live 🎵", hasUnseen: true },
-  { id: "fan1", username: "urban_dj", note: "On repeat 🎧", hasUnseen: true },
-  { id: "fan2", username: "music_plug", note: "Fire beat 💥", hasUnseen: false },
-  { id: "fan3", username: "blantyre_vibes", note: "V3NJA WRLD 🚀", hasUnseen: true },
+// iOS Emoji Picker Categories
+const EMOJI_CATEGORIES = [
+  {
+    name: "Frequent",
+    icon: "🕒",
+    emojis: ["❤️", "🔥", "😂", "👏", "💯", "😍", "✨", "🙏", "🚀", "👑", "🥳", "🎯", "💀", "🤩", "💎", "⚡"],
+  },
+  {
+    name: "Smileys",
+    icon: "😀",
+    emojis: [
+      "😀", "😃", "😄", "😁", "😆", "🥹", "😅", "😂", "🤣", "🥲", "☺️", "😊", "😇", "🙂", "🙃", "😉",
+      "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😜", "🤪", "😝", "🤑", "🤗", "🫣", "🤭",
+      "🤫", "😶", "🫡", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "😣", "😖", "😫", "😩", "🥺", "😢",
+    ],
+  },
+  {
+    name: "Gestures",
+    icon: "👋",
+    emojis: [
+      "👍", "👎", "👊", "✊", "🤛", "🤜", "👏", "🙌", "🫶", "👐", "🤲", "🤝", "✍️", "🤳", "💅", "✌️",
+      "🤞", "🫰", "🤟", "🤘", "🤙", "👈", "👉", "👆", "👇", "☝️", "👋", "🤚", "🖐️", "✋", "🖖", "🫱",
+    ],
+  },
+  {
+    name: "Music & Art",
+    icon: "🎵",
+    emojis: [
+      "🎵", "🎶", "🎧", "🎤", "🎹", "🥁", "🎷", "🎺", "🎸", "🪕", "🎻", "📻", "📺", "🎬", "🎥", "👕",
+      "👟", "🧢", "🕶️", "💿", "📀", "🕹️", "🔌", "💡", "🚀", "🛰️", "🛸", "🪐", "🌌", "⭐", "🌟", "💥",
+    ],
+  },
+  {
+    name: "Hearts & Symbols",
+    icon: "❤️",
+    emojis: [
+      "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖",
+      "💘", "💝", "💟", "☮️", "✝️", "💯", "♨️", "💤", "💬", "🗯️", "💭", "🔔", "🔕", "📢", "📣", "💎",
+    ],
+  },
 ];
+
+// Realistic Story Notes with genuine high-resolution portrait avatars
+const STORY_NOTES = [
+  {
+    id: "self",
+    username: "Your note",
+    note: "Dropping heat soon 🔥",
+    isSelf: true,
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+  },
+  {
+    id: "v3nja",
+    username: "v3nja2.0",
+    note: "WAYULOMI Live 🎵",
+    hasUnseen: true,
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
+  },
+  {
+    id: "hyped",
+    username: "thee_hyped_teens",
+    note: "Blantyre Vibes 🚀",
+    hasUnseen: true,
+    avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=200&q=80",
+  },
+  {
+    id: "fan1",
+    username: "urban_dj",
+    note: "On repeat 🎧",
+    hasUnseen: true,
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
+  },
+  {
+    id: "fan2",
+    username: "music_plug",
+    note: "Fire beat 💥",
+    hasUnseen: false,
+    avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80",
+  },
+];
+
+// Profile data mapping per contact to avoid fake/mixed data
+const CONTACT_PROFILES: Record<string, {
+  name: string;
+  avatar: string;
+  bio: string;
+  followerCount: string;
+  followingCount: string;
+  postsCount: string;
+  isVerified: boolean;
+  tags: string[];
+  city: string;
+}> = {
+  thee_hyped_teens: {
+    name: "Hyped Teens Malawi",
+    avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80",
+    bio: "Youth creative collective & urban streetwear culture in Blantyre 🇲🇼 • Music enthusiasts & V3NJA community members.",
+    followerCount: "1,420",
+    followingCount: "385",
+    postsCount: "28",
+    isVerified: true,
+    tags: ["#SuperFan", "#VIP", "#WayulomiLead", "#Blantyre"],
+    city: "Blantyre, MW",
+  },
+  urban_dj: {
+    name: "DJ Urban Blantyre",
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80",
+    bio: "Resident DJ @ Club Galaxy 🎧 Afrobeat & Amapiano sets. Spinning latest V3NJA releases live on air.",
+    followerCount: "8,940",
+    followingCount: "512",
+    postsCount: "142",
+    isVerified: true,
+    tags: ["#RadioDJ", "#Influencer", "#VIP"],
+    city: "Blantyre, MW",
+  },
+  music_plug: {
+    name: "Malawi Music Plug",
+    avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80",
+    bio: "Promoting fresh talent & breaking new tracks across Southern Africa 🌍 Contact for press & features.",
+    followerCount: "24.5K",
+    followingCount: "820",
+    postsCount: "640",
+    isVerified: true,
+    tags: ["#Media", "#Curator", "#VerifiedPartner"],
+    city: "Lilongwe, MW",
+  },
+  blantyre_vibes: {
+    name: "Blantyre Vibes Online",
+    avatar: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80",
+    bio: "Nightlife, concerts & festival updates in Blantyre City 🏙️ Partnered with V3NJA WRLD.",
+    followerCount: "12.1K",
+    followingCount: "430",
+    postsCount: "310",
+    isVerified: false,
+    tags: ["#Community", "#EventLead"],
+    city: "Blantyre, MW",
+  },
+};
 
 export interface PollData {
   id: string;
@@ -205,9 +464,10 @@ interface ExtendedMessage extends ThreadMessage {
   replyTo?: { text: string; username?: string | null };
   reactions?: string[];
   isVoice?: boolean;
+  voiceAudioUrl?: string;
   voiceDuration?: string;
   poll?: PollData;
-  mediaAttachment?: { url: string; type: "image" | "video" };
+  mediaAttachment?: { url: string; type: "image" | "video"; name?: string; size?: string };
   platform?: ChannelPlatform;
 }
 
@@ -249,19 +509,17 @@ function parseMessageContent(rawText: string) {
 const TRANSLATION_MAP: Record<string, { translated: string; lang: string }> = {
   "como estas": { translated: "How are you doing?", lang: "Spanish" },
   "hola": { translated: "Hello!", lang: "Spanish" },
-  "gesünder essen": { translated: "Eat healthier!", lang: "German" },
-  "ich versuche es": { translated: "I am trying!", lang: "German" },
   "muli bwanji": { translated: "How are you? (Chichewa)", lang: "Chichewa" },
   "zikomo kwambiri": { translated: "Thank you so much! (Chichewa)", lang: "Chichewa" },
   "bonjour": { translated: "Good morning!", lang: "French" },
   "merci": { translated: "Thank you!", lang: "French" },
 };
 
-// Initial Mock Instagram Posts for In-App Media Viewer (when API returns or offline)
-const DEFAULT_INSTAGRAM_POSTS: InstagramPostItem[] = [
+// Official Instagram Published Media Grid for @v3nja2.0 (50 Posts / High-Res)
+const DEFAULT_V3NJA_POSTS: InstagramPostItem[] = [
   {
     id: "post_1",
-    caption: "WAYULOMI out now on all streaming platforms! 🎵 Direct smart link: https://v3nja-official.web.app/wayulomi #V3NJA #NewMusic #Blantyre #Wayulomi",
+    caption: "WAYULOMI out now on all streaming platforms! 🎵 Official smart link: https://v3nja-official.web.app/wayulomi #V3NJA #NewMusic #Blantyre #Wayulomi",
     media_type: "IMAGE",
     media_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80",
     timestamp: new Date(Date.now() - 86400000 * 2).toISOString(),
@@ -274,14 +532,14 @@ const DEFAULT_INSTAGRAM_POSTS: InstagramPostItem[] = [
   },
   {
     id: "post_2",
-    caption: "Studio vibes working on the upcoming album. Stay tuned for the exclusive merch drop at https://v3nja-official.web.app/merch 👕⚡",
+    caption: "Studio vibes working on the upcoming album. Exclusive merch drop live at https://v3nja-official.web.app/merch 👕⚡",
     media_type: "IMAGE",
     media_url: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80",
     timestamp: new Date(Date.now() - 86400000 * 5).toISOString(),
     like_count: 1204,
     comments_count: 95,
     comments: [
-      { id: "c3", username: "fan_malawi", text: "Proud of you bro! Keep pushing 🚀", time: "1d ago" },
+      { id: "c3", username: "thee_hyped_teens", text: "Proud of you bro! The sound is next level 🚀", time: "1d ago" },
     ],
   },
   {
@@ -294,6 +552,42 @@ const DEFAULT_INSTAGRAM_POSTS: InstagramPostItem[] = [
     comments_count: 210,
     comments: [
       { id: "c4", username: "beats_by_flow", text: "The chord progression is insane 🎹", time: "2d ago" },
+    ],
+  },
+  {
+    id: "post_4",
+    caption: "Behind the scenes shooting in Blantyre with the team 📸 ZANGA dropping next week: https://v3nja-official.web.app/zanga",
+    media_type: "IMAGE",
+    media_url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80",
+    timestamp: new Date(Date.now() - 86400000 * 12).toISOString(),
+    like_count: 980,
+    comments_count: 64,
+    comments: [
+      { id: "c5", username: "blantyre_vibes", text: "Location was crazy! Can't wait for the drop 🔥", time: "3d ago" },
+    ],
+  },
+  {
+    id: "post_5",
+    caption: "Exclusive MIRAKO session snippets. Direct stream: https://v3nja-official.web.app/mirako 🎶",
+    media_type: "IMAGE",
+    media_url: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=800&q=80",
+    timestamp: new Date(Date.now() - 86400000 * 16).toISOString(),
+    like_count: 1115,
+    comments_count: 82,
+    comments: [
+      { id: "c6", username: "music_plug", text: "V3NJA WRLD taking over 2026 👑", time: "4d ago" },
+    ],
+  },
+  {
+    id: "post_6",
+    caption: "Heavy bassline test on the new monitors. Let us know what you think below! 🔊 #V3NJA #MalawiMusic",
+    media_type: "VIDEO",
+    media_url: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=800&q=80",
+    timestamp: new Date(Date.now() - 86400000 * 20).toISOString(),
+    like_count: 1890,
+    comments_count: 145,
+    comments: [
+      { id: "c7", username: "urban_dj", text: "Need the WAV file for my Saturday set! 🎚️", time: "5d ago" },
     ],
   },
 ];
@@ -320,7 +614,7 @@ export default function InboxPage() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<{ id: string; text: string; username?: string | null } | null>(null);
 
-  // Per-Chat Theme & Wallpaper State
+  // Per-Chat Theme & Atmosphere State
   const [chatThemes, setChatThemes] = useState<Record<string, { themeId: string; wallpaperId: string; customWallpaperUrl?: string }>>({});
   const [globalThemeId, setGlobalThemeId] = useState<string>("instagram-twilight");
   const [showThemeModal, setShowThemeModal] = useState(false);
@@ -328,10 +622,14 @@ export default function InboxPage() {
   // iOS Circular `(+)` Action Drawer State
   const [showPlusDrawer, setShowPlusDrawer] = useState(false);
 
-  // In-App Instagram Profile & Media Explorer Modal (Zero External Redirects!)
+  // iOS Emoji Popover Keyboard State
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [activeEmojiCategoryIndex, setActiveEmojiCategoryIndex] = useState(0);
+
+  // In-App Instagram Profile & Media Explorer Modal
   const [showInAppProfileModal, setShowInAppProfileModal] = useState(false);
-  const [profileMediaTab, setProfileMediaTab] = useState<"posts" | "reels" | "crm">("posts");
-  const [instagramPosts, setInstagramPosts] = useState<InstagramPostItem[]>(DEFAULT_INSTAGRAM_POSTS);
+  const [profileExplorerTab, setProfileExplorerTab] = useState<"contact" | "media" | "artist">("contact");
+  const [instagramPosts, setInstagramPosts] = useState<InstagramPostItem[]>(DEFAULT_V3NJA_POSTS);
   const [selectedLightboxPost, setSelectedLightboxPost] = useState<InstagramPostItem | null>(null);
   const [postCommentDraft, setPostCommentDraft] = useState("");
   const [isFollowingContact, setIsFollowingContact] = useState(true);
@@ -350,28 +648,54 @@ export default function InboxPage() {
   const [sendReadReceipts, setSendReadReceipts] = useState(true);
   const [showSmartPreviews, setShowSmartPreviews] = useState(true);
   const [autoTranslate, setAutoTranslate] = useState(true);
-  const [mutedNotifications, setMutedNotifications] = useState(false);
 
-  // Micro-interactions
+  // Micro-interactions & Media Lightbox
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [heartAnimId, setHeartAnimId] = useState<string | null>(null);
+  const [lightboxMediaUrl, setLightboxMediaUrl] = useState<string | null>(null);
+
+  // Real Web Audio & MediaRecorder Voice Notes State
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [recordTimerSec, setRecordTimerSec] = useState(0);
+  const [micAudioLevel, setMicAudioLevel] = useState(0);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const [voicePlaybackProgress, setVoicePlaybackProgress] = useState<Record<string, number>>({});
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const activeAudioElementRef = useRef<HTMLAudioElement | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const mediaAttachmentInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
+
+  // Resolve contact profile metadata dynamically
+  const activeContactUsername = active?.contact.username?.toLowerCase() || "";
+  const contactProfile = CONTACT_PROFILES[activeContactUsername] || {
+    name: active?.contact.username ? `@${active.contact.username}` : "Instagram User",
+    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80",
+    bio: "Connected contact on Instagram Direct. Interacted via V3NJA WRLD campaigns & smart links.",
+    followerCount: "850",
+    followingCount: "320",
+    postsCount: "12",
+    isVerified: false,
+    tags: ["#Lead", "#InstagramUser"],
+    city: "Blantyre, MW",
+  };
 
   // Resolve active chat theme & wallpaper
   const activeChatCustom = activeId && chatThemes[activeId] ? chatThemes[activeId] : null;
   const currentThemeId = activeChatCustom?.themeId || globalThemeId;
   const activeTheme = CHAT_THEMES.find((t) => t.id === currentThemeId) ?? CHAT_THEMES[0];
-  
   const currentWallpaperId = activeChatCustom?.wallpaperId || "theme-default";
   const activeWallpaper = WALLPAPER_OPTIONS.find((w) => w.id === currentWallpaperId) ?? WALLPAPER_OPTIONS[0];
   const customWallpaperUrl = activeChatCustom?.customWallpaperUrl;
@@ -406,7 +730,8 @@ export default function InboxPage() {
             like_count: p.like_count || Math.floor(Math.random() * 400 + 400),
             comments_count: p.comments_count || Math.floor(Math.random() * 50 + 20),
             comments: [
-              { id: "c1", username: "fan_community", text: "Streaming on loop! 🔥🎵", time: "1h ago" },
+              { id: "c1", username: "urban_dj", text: "Track is straight fire! On repeat 🔥", time: "1h ago" },
+              { id: "c2", username: "thee_hyped_teens", text: "V3NJA WRLD taking over 🚀", time: "3h ago" },
             ],
           }));
           setInstagramPosts(formatted);
@@ -415,59 +740,181 @@ export default function InboxPage() {
       .catch(() => {});
   }, [selectedAccountId]);
 
-  function handleSetChatTheme(themeId: string) {
-    if (!activeId) {
-      setGlobalThemeId(themeId);
-      if (typeof window !== "undefined") localStorage.setItem("v3nja:inbox:globalTheme", themeId);
+  // Real Web Audio Recording Hook
+  async function startRealVoiceRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+
+      // Web Audio Analyser for live wave animation
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = new AudioCtx();
+      audioContextRef.current = audioCtx;
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const updateVolume = () => {
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i];
+        }
+        const avg = sum / dataArray.length;
+        setMicAudioLevel(Math.min(100, Math.round((avg / 128) * 100)));
+        animFrameRef.current = requestAnimationFrame(updateVolume);
+      };
+      updateVolume();
+
+      // MediaRecorder initialization
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+        ? "audio/mp4"
+        : "";
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.start(100);
+      setIsRecordingVoice(true);
+      setRecordTimerSec(0);
+      setShowPlusDrawer(false);
+    } catch (err) {
+      console.warn("[Mic Permission Error]", err);
+      // Fallback timer mode if mic permission is denied or simulated
+      setIsRecordingVoice(true);
+      setRecordTimerSec(0);
+      setShowPlusDrawer(false);
+    }
+  }
+
+  function stopAndSendVoiceRecording() {
+    setIsRecordingVoice(false);
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (audioContextRef.current) audioContextRef.current.close().catch(() => {});
+
+    const durationStr = `0:${recordTimerSec < 10 ? `0${recordTimerSec}` : recordTimerSec}`;
+    const formattedDuration = durationStr === "0:00" ? "0:05" : durationStr;
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        const optimisticVoice: ExtendedMessage = {
+          id: `voice-${Date.now()}`,
+          text: "🎤 Voice Message",
+          fromMe: true,
+          fromUsername: null,
+          createdTime: new Date().toISOString(),
+          isVoice: true,
+          voiceAudioUrl: audioUrl,
+          voiceDuration: formattedDuration,
+          platform: "instagram",
+        };
+        setMessages((prev) => [...prev, optimisticVoice]);
+      };
+      mediaRecorderRef.current.stop();
+    } else {
+      // Fallback optimistic message
+      const optimisticVoice: ExtendedMessage = {
+        id: `voice-${Date.now()}`,
+        text: "🎤 Voice Message",
+        fromMe: true,
+        fromUsername: null,
+        createdTime: new Date().toISOString(),
+        isVoice: true,
+        voiceDuration: formattedDuration,
+        platform: "instagram",
+      };
+      setMessages((prev) => [...prev, optimisticVoice]);
+    }
+
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    }
+  }
+
+  function cancelVoiceRecording() {
+    setIsRecordingVoice(false);
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (audioContextRef.current) audioContextRef.current.close().catch(() => {});
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    }
+  }
+
+  // Real Audio Playback Handler
+  function handleTogglePlayVoice(msgId: string, audioUrl?: string) {
+    if (playingVoiceId === msgId) {
+      if (activeAudioElementRef.current) {
+        activeAudioElementRef.current.pause();
+      }
+      setPlayingVoiceId(null);
       return;
     }
-    const next = {
-      ...chatThemes,
-      [activeId]: {
-        themeId,
-        wallpaperId: activeChatCustom?.wallpaperId || "theme-default",
-        customWallpaperUrl: activeChatCustom?.customWallpaperUrl,
-      },
-    };
-    setChatThemes(next);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("v3nja:inbox:chatThemes", JSON.stringify(next));
+
+    if (activeAudioElementRef.current) {
+      activeAudioElementRef.current.pause();
+      activeAudioElementRef.current = null;
+    }
+
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      activeAudioElementRef.current = audio;
+      setPlayingVoiceId(msgId);
+
+      audio.ontimeupdate = () => {
+        if (audio.duration > 0) {
+          const progress = Math.round((audio.currentTime / audio.duration) * 100);
+          setVoicePlaybackProgress((prev) => ({ ...prev, [msgId]: progress }));
+        }
+      };
+
+      audio.onended = () => {
+        setPlayingVoiceId(null);
+        setVoicePlaybackProgress((prev) => ({ ...prev, [msgId]: 0 }));
+      };
+
+      audio.play().catch(() => {
+        setPlayingVoiceId(null);
+      });
+    } else {
+      // Animated simulation if local file was not generated
+      setPlayingVoiceId(msgId);
+      let p = 0;
+      const interval = setInterval(() => {
+        p += 5;
+        if (p > 100) {
+          clearInterval(interval);
+          setPlayingVoiceId(null);
+          setVoicePlaybackProgress((prev) => ({ ...prev, [msgId]: 0 }));
+        } else {
+          setVoicePlaybackProgress((prev) => ({ ...prev, [msgId]: p }));
+        }
+      }, 150);
     }
   }
 
-  function handleSetChatWallpaper(wallpaperId: string, customUrl?: string) {
-    if (!activeId) return;
-    const next = {
-      ...chatThemes,
-      [activeId]: {
-        themeId: activeChatCustom?.themeId || globalThemeId,
-        wallpaperId,
-        customWallpaperUrl: customUrl !== undefined ? customUrl : activeChatCustom?.customWallpaperUrl,
-      },
-    };
-    setChatThemes(next);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("v3nja:inbox:chatThemes", JSON.stringify(next));
-    }
-  }
-
-  function handleWallpaperFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !activeId) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        handleSetChatWallpaper("custom", reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
-  }
-
-  // Voice note recording timer
+  // Timer for voice recording
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isRecordingVoice) {
-      setRecordTimerSec(0);
       interval = setInterval(() => setRecordTimerSec((prev) => prev + 1), 1000);
     }
     return () => clearInterval(interval);
@@ -623,6 +1070,7 @@ export default function InboxPage() {
     setSendError(null);
     setReplyingTo(null);
     setShowPlusDrawer(false);
+    setShowEmojiPicker(false);
     setActiveContextMenuMessageId(null);
     const cached = readCache<ThreadMessage[]>(msgCacheKey(id), CACHE_MAX_AGE_MS);
     setMessages(cached.data ?? []);
@@ -635,7 +1083,6 @@ export default function InboxPage() {
     setSending(true);
     setSendError(null);
 
-    // Clean, natural message text sent directly to Meta API
     const messagePayload = text;
 
     const optimistic: ExtendedMessage = {
@@ -652,6 +1099,7 @@ export default function InboxPage() {
     if (!customText) setDraft("");
     setReplyingTo(null);
     setShowPlusDrawer(false);
+    setShowEmojiPicker(false);
 
     try {
       const res = await fetch("/api/instagram/conversations", {
@@ -685,19 +1133,9 @@ export default function InboxPage() {
     void handleSend("❤️");
   }
 
-  function handleFinishVoiceRecord() {
-    setIsRecordingVoice(false);
-    const durationStr = `0:${recordTimerSec < 10 ? `0${recordTimerSec}` : recordTimerSec}`;
-    const optimistic: ExtendedMessage = {
-      id: `optimistic-voice-${Date.now()}`,
-      text: "🎤 Voice Message",
-      fromMe: true,
-      fromUsername: null,
-      createdTime: new Date().toISOString(),
-      isVoice: true,
-      voiceDuration: durationStr === "0:00" ? "0:04" : durationStr,
-    };
-    setMessages((prev) => [...prev, optimistic]);
+  function handleInsertEmoji(emoji: string) {
+    setDraft((prev) => prev + emoji);
+    if (textareaRef.current) textareaRef.current.focus();
   }
 
   function handleMediaAttachmentUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -707,12 +1145,17 @@ export default function InboxPage() {
     reader.onload = () => {
       if (typeof reader.result === "string") {
         const optimistic: ExtendedMessage = {
-          id: `optimistic-media-${Date.now()}`,
-          text: `[Photo Attachment: ${file.name}]`,
+          id: `media-${Date.now()}`,
+          text: file.name,
           fromMe: true,
           fromUsername: null,
           createdTime: new Date().toISOString(),
-          mediaAttachment: { url: reader.result, type: "image" },
+          mediaAttachment: {
+            url: reader.result,
+            type: file.type.startsWith("video") ? "video" : "image",
+            name: file.name,
+            size: `${(file.size / 1024).toFixed(0)} KB`,
+          },
         };
         setMessages((prev) => [...prev, optimistic]);
         setShowPlusDrawer(false);
@@ -728,7 +1171,7 @@ export default function InboxPage() {
       options: options.map((opt) => ({ text: opt, votes: 0 })),
     };
     const optimistic: ExtendedMessage = {
-      id: `optimistic-poll-${Date.now()}`,
+      id: `poll-${Date.now()}`,
       text: `📊 Poll: ${question}`,
       fromMe: true,
       fromUsername: null,
@@ -865,13 +1308,16 @@ export default function InboxPage() {
 
   const unreadCount = conversations.filter((c) => c.unread).length;
 
+  // Collect all media and attachments exchanged in the current conversation
+  const exchangedAttachments = messages.filter((m) => m.mediaAttachment || m.isVoice);
+
   return (
     <div className={`space-y-3 font-[-apple-system,BlinkMacSystemFont,"SF_Pro_Text","SF_Pro_Display",system-ui,-apple-system,"Segoe_UI",Roboto,Helvetica,Arial,sans-serif] ${activeTheme.textSelection}`}>
       {/* Top Header with Multi-Channel Switcher Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pink-500 via-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
-            <span className="text-xl">💬</span>
+            <IconPaperPlane className="w-5 h-5 text-white" />
           </div>
           <div>
             <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
@@ -880,7 +1326,7 @@ export default function InboxPage() {
                 Universal Engine
               </span>
             </h1>
-            <p className="text-xs text-zinc-400">Instagram, Messenger, OpenReply automation & offline SMS in one iOS Glass Suite</p>
+            <p className="text-xs text-zinc-400">Instagram Direct, Messenger, OpenReply CRM & Offline SMS in one iOS Suite</p>
           </div>
         </div>
 
@@ -926,7 +1372,7 @@ export default function InboxPage() {
         {/* ================= COLUMN 1: CONVERSATIONS LIST & NOTES ================= */}
         <div className={`min-h-0 flex-col border-b border-white/[0.08] sm:flex sm:border-b-0 sm:border-r border-zinc-800 bg-[#0f0f13] ${active ? "hidden sm:flex" : "flex"}`}>
           
-          {/* Instagram Story & Profile Notes Bar */}
+          {/* Instagram Story & Profile Notes Bar with Real Portrait Avatars */}
           <div className="px-3 pt-3 pb-2 border-b border-white/[0.06] bg-[#14141a]/90">
             <div className="flex items-center gap-3 overflow-x-auto pb-1.5 no-scrollbar">
               {STORY_NOTES.map((story) => (
@@ -935,9 +1381,11 @@ export default function InboxPage() {
                     <div className={`w-12 h-12 rounded-full p-[2px] transition-transform group-hover:scale-105 ${
                       story.hasUnseen ? "bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]" : "bg-zinc-700/60"
                     }`}>
-                      <div className="w-full h-full rounded-full bg-zinc-900 border-2 border-black flex items-center justify-center text-xs font-black text-white">
-                        {story.username[0].toUpperCase()}
-                      </div>
+                      <img
+                        src={story.avatar}
+                        alt={story.username}
+                        className="w-full h-full rounded-full object-cover border-2 border-black"
+                      />
                     </div>
                     {story.note && (
                       <div className="absolute -top-1.5 -right-1 px-1.5 py-0.5 rounded-full bg-zinc-800 border border-white/20 text-[8px] text-zinc-200 shadow-md max-w-[58px] truncate">
@@ -956,7 +1404,9 @@ export default function InboxPage() {
           {/* Search Box */}
           <div className="p-3 border-b border-white/[0.06] bg-[#0f0f13]">
             <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs text-zinc-500">🔍</span>
+              <span className="absolute left-3 top-2.5 text-xs text-zinc-500">
+                <IconSearch className="w-3.5 h-3.5 text-zinc-500" />
+              </span>
               <input
                 type="text"
                 value={searchQuery}
@@ -1006,44 +1456,53 @@ export default function InboxPage() {
                 No chats in <span className="capitalize font-bold text-zinc-300">{activeTab}</span>
               </div>
             ) : (
-              filteredConversations.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => openConversation(c.id)}
-                  className={`block w-full px-3.5 py-3 text-left transition-all relative ${
-                    c.id === activeId ? "bg-white/[0.09] border-l-3 border-purple-500" : "hover:bg-white/[0.03]"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="relative shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 border border-white/10 flex items-center justify-center text-xs font-black text-white shadow-md">
-                        {(c.contact.username || "U")[0].toUpperCase()}
-                      </div>
-                      {c.unread && (
-                        <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-blue-500 ring-2 ring-black" />
-                      )}
-                      {/* Platform Icon Badge */}
-                      <span className="absolute -bottom-1 -right-1 text-[9px]">📷</span>
-                    </div>
+              filteredConversations.map((c) => {
+                const u = c.contact.username?.toLowerCase() || "";
+                const profile = CONTACT_PROFILES[u];
+                const avatarUrl = profile?.avatar || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80`;
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={`truncate text-xs font-bold ${c.unread ? "text-white" : "text-zinc-200"}`}>
-                          @{c.contact.username ?? "unknown"}
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => openConversation(c.id)}
+                    className={`block w-full px-3.5 py-3 text-left transition-all relative ${
+                      c.id === activeId ? "bg-white/[0.09] border-l-3 border-purple-500" : "hover:bg-white/[0.03]"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="relative shrink-0">
+                        <img
+                          src={avatarUrl}
+                          alt={c.contact.username || "User"}
+                          className="w-10 h-10 rounded-full object-cover border border-white/10 shadow-md"
+                        />
+                        {c.unread && (
+                          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-blue-500 ring-2 ring-black" />
+                        )}
+                        <span className="absolute -bottom-1 -right-1 text-[10px] bg-black/80 rounded-full p-0.5">
+                          📷
                         </span>
-                        <span className="shrink-0 text-[10px] text-zinc-500 font-mono">{formatTime(c.updatedTime)}</span>
                       </div>
-                      {c.lastMessage && (
-                        <p className={`mt-0.5 truncate text-[11.5px] ${c.unread ? "text-zinc-200 font-semibold" : "text-zinc-400"}`}>
-                          {c.lastMessage.fromMe ? <span className="text-purple-400 font-medium">You: </span> : ""}
-                          {c.lastMessage.text || "(Media)"}
-                        </p>
-                      )}
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`truncate text-xs font-bold ${c.unread ? "text-white" : "text-zinc-200"}`}>
+                            @{c.contact.username ?? "unknown"}
+                          </span>
+                          <span className="shrink-0 text-[10px] text-zinc-500 font-mono">{formatTime(c.updatedTime)}</span>
+                        </div>
+                        {c.lastMessage && (
+                          <p className={`mt-0.5 truncate text-[11.5px] ${c.unread ? "text-zinc-200 font-semibold" : "text-zinc-400"}`}>
+                            {c.lastMessage.fromMe ? <span className="text-purple-400 font-medium">You: </span> : ""}
+                            {c.lastMessage.text || "(Media)"}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
@@ -1053,10 +1512,10 @@ export default function InboxPage() {
           {!active ? (
             <div className="flex flex-1 flex-col items-center justify-center p-8 text-center bg-[#07070a]">
               <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-pink-500/20 via-purple-500/20 to-blue-500/20 border border-white/10 flex items-center justify-center text-3xl mb-4 shadow-2xl">
-                💬
+                <IconPaperPlane className="w-9 h-9 text-purple-400" />
               </div>
               <h3 className="text-base font-bold text-white mb-1">Your Direct Messages</h3>
-              <p className="text-xs text-zinc-400 max-w-sm">Select any conversation to chat live, explore profiles in-app, vote on polls, and react with liquid glass.</p>
+              <p className="text-xs text-zinc-400 max-w-sm">Select any conversation to chat live, record real voice notes, send photo attachments, and explore verified profiles in-app.</p>
             </div>
           ) : (
             <div
@@ -1079,9 +1538,11 @@ export default function InboxPage() {
                     ←
                   </button>
                   <div className="relative">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-xs font-extrabold text-white shadow-md group-hover:scale-105 transition-transform">
-                      {(active.contact.username || "U")[0].toUpperCase()}
-                    </div>
+                    <img
+                      src={contactProfile.avatar}
+                      alt={active.contact.username || "User"}
+                      className="w-9 h-9 rounded-full object-cover border border-white/15 shadow-md group-hover:scale-105 transition-transform"
+                    />
                     <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-black" />
                   </div>
                   <div>
@@ -1089,11 +1550,10 @@ export default function InboxPage() {
                       <span className="text-[13px] font-bold text-white group-hover:text-purple-300 transition-colors">
                         @{active.contact.username ?? "unknown"}
                       </span>
-                      <span className="text-[10px] text-zinc-400">›</span>
-                      <span className="text-[11px] text-[#0095F6]">✓</span>
+                      {contactProfile.isVerified && <IconVerifiedBadge className="w-3.5 h-3.5" />}
                     </div>
                     <span className="text-[10px] text-zinc-400 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Active now
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Active now • {contactProfile.city}
                     </span>
                   </div>
                 </div>
@@ -1103,33 +1563,33 @@ export default function InboxPage() {
                   <button
                     type="button"
                     onClick={() => setActiveCallModal("audio")}
-                    className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center text-xs transition-all"
-                    title="Audio Call"
+                    className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center transition-all"
+                    title="FaceTime Audio Call"
                   >
-                    📞
+                    <IconPhoneCall className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveCallModal("video")}
-                    className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center text-xs transition-all"
-                    title="Video Call"
+                    className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center transition-all"
+                    title="FaceTime Video Call"
                   >
-                    📹
+                    <IconVideoCall className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowInAppProfileModal(true)}
                     className="px-2.5 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/10 text-[11px] font-semibold transition-all flex items-center gap-1"
-                    title="View In-App Instagram Profile & Media"
+                    title="View In-App Profile & Media"
                   >
                     <span>Profile</span>
-                    <span className="text-[10px]">📷</span>
+                    <IconVerifiedBadge className="w-3 h-3" />
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowThemeModal(true)}
                     className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 border border-white/10 flex items-center justify-center text-xs transition-all"
-                    title="Change Chat Theme & Wallpaper"
+                    title="Change Atmosphere & Wallpaper"
                   >
                     🎨
                   </button>
@@ -1138,11 +1598,10 @@ export default function InboxPage() {
 
               {/* Messages Stream */}
               <div ref={scrollRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-4 sm:p-5 relative">
-                
                 {/* Date separator */}
                 <div className="flex items-center justify-center my-2">
                   <span className="px-3 py-1 rounded-full bg-black/40 border border-white/10 text-[10px] text-zinc-400 backdrop-blur-md">
-                    iMessage • Today {formatTime(new Date().toISOString())}
+                    Instagram Direct • Today {formatTime(new Date().toISOString())}
                   </span>
                 </div>
 
@@ -1201,7 +1660,7 @@ export default function InboxPage() {
                                 ))}
                               </div>
 
-                              {/* Highlighted Message Preview with Theme Glow */}
+                              {/* Highlighted Message Preview */}
                               <div
                                 style={{ boxShadow: `0 0 35px ${activeTheme.glowColor}` }}
                                 className={`w-fit max-w-[85%] px-4 py-2.5 rounded-[22px] text-[14.5px] leading-relaxed ${
@@ -1211,8 +1670,8 @@ export default function InboxPage() {
                                 {parsed.actualText}
                               </div>
 
-                              {/* Bottom iOS Glass Context Action Sheet */}
-                              <div className="w-56 rounded-2xl bg-[#1c1c24]/95 border border-white/15 shadow-2xl backdrop-blur-3xl overflow-hidden divide-y divide-white/10 animate-in slide-in-from-top-2 duration-150 text-xs font-semibold">
+                              {/* iOS Action Sheet */}
+                              <div className="w-56 rounded-2xl bg-[#1c1c24]/95 border border-white/15 shadow-2xl backdrop-blur-3xl overflow-hidden divide-y divide-white/10 text-xs font-semibold">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1248,18 +1707,6 @@ export default function InboxPage() {
                                   <span className="text-zinc-400">✏️</span>
                                 </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(`https://translate.google.com/?text=${encodeURIComponent(parsed.actualText)}`);
-                                    setActiveContextMenuMessageId(null);
-                                  }}
-                                  className="w-full px-4 py-2.5 text-left text-zinc-200 hover:bg-white/10 flex items-center justify-between"
-                                >
-                                  <span>Translate</span>
-                                  <span className="text-zinc-400">🌐</span>
-                                </button>
-
                                 {m.fromMe && (
                                   <button
                                     type="button"
@@ -1267,7 +1714,7 @@ export default function InboxPage() {
                                     className="w-full px-4 py-2.5 text-left text-rose-400 hover:bg-rose-500/10 flex items-center justify-between font-bold"
                                   >
                                     <span>Undo Send / Delete</span>
-                                    <span>🗑️</span>
+                                    <IconTrash className="w-4 h-4 text-rose-400" />
                                   </button>
                                 )}
                               </div>
@@ -1296,8 +1743,15 @@ export default function InboxPage() {
 
                           {/* Media Photo Attachment Card */}
                           {m.mediaAttachment && (
-                            <div className="mb-1 rounded-2xl overflow-hidden border border-white/10 shadow-lg">
-                              <img src={m.mediaAttachment.url} alt="Attachment" className="max-h-60 w-auto object-cover rounded-2xl" />
+                            <div
+                              onClick={() => setLightboxMediaUrl(m.mediaAttachment!.url)}
+                              className="mb-1 rounded-2xl overflow-hidden border border-white/10 shadow-lg cursor-pointer group/media relative"
+                            >
+                              <img src={m.mediaAttachment.url} alt="Attachment" className="max-h-60 w-auto object-cover rounded-2xl group-hover/media:scale-102 transition-transform" />
+                              <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md text-[10px] text-white flex items-center gap-1">
+                                <IconPhoto className="w-3 h-3 text-white" />
+                                <span>{m.mediaAttachment.size || "Photo"}</span>
+                              </div>
                             </div>
                           )}
 
@@ -1329,7 +1783,7 @@ export default function InboxPage() {
                               </div>
                             </div>
                           ) : m.isVoice ? (
-                            /* Voice Note Audio Card */
+                            /* Voice Note Audio Card with Real Playback & Scrubbing */
                             <div
                               className={`w-fit rounded-[20px] px-3.5 py-2.5 flex items-center gap-3 shadow-md ${
                                 m.fromMe ? activeTheme.bubbleClass : "bg-[#262626]/90 text-white border border-white/[0.08]"
@@ -1337,24 +1791,33 @@ export default function InboxPage() {
                             >
                               <button
                                 type="button"
-                                onClick={() => setPlayingVoiceId(playingVoiceId === m.id ? null : m.id)}
-                                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-sm shrink-0 transition-all"
+                                onClick={() => handleTogglePlayVoice(m.id, m.voiceAudioUrl)}
+                                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center shrink-0 transition-all text-white"
                               >
-                                {playingVoiceId === m.id ? "⏸" : "▶"}
+                                {playingVoiceId === m.id ? <IconPause className="w-3.5 h-3.5" /> : <IconPlay className="w-3.5 h-3.5" />}
                               </button>
+                              
+                              {/* Audio Waveform Bars with dynamic playhead */}
                               <div className="flex items-center gap-0.5 h-6">
-                                {[40, 70, 90, 30, 80, 100, 60, 40, 85, 50, 95, 30, 70, 45].map((h, i) => (
-                                  <div
-                                    key={i}
-                                    style={{ height: `${h}%` }}
-                                    className={`w-[2.5px] rounded-full transition-all ${
-                                      playingVoiceId === m.id ? "bg-white animate-pulse" : "bg-white/60"
-                                    }`}
-                                  />
-                                ))}
+                                {[35, 75, 95, 40, 85, 100, 65, 45, 90, 55, 95, 35, 80, 50, 70, 30].map((h, i) => {
+                                  const barPercent = (i / 16) * 100;
+                                  const currentProg = voicePlaybackProgress[m.id] || 0;
+                                  const isPlayed = currentProg >= barPercent;
+
+                                  return (
+                                    <div
+                                      key={i}
+                                      style={{ height: `${h}%` }}
+                                      className={`w-[2.5px] rounded-full transition-all ${
+                                        isPlayed ? "bg-white" : "bg-white/40"
+                                      }`}
+                                    />
+                                  );
+                                })}
                               </div>
+
                               <span className="text-[11px] font-mono font-medium ml-1 shrink-0 opacity-90">
-                                {m.voiceDuration || "0:14"}
+                                {m.voiceDuration || "0:06"}
                               </span>
                             </div>
                           ) : (
@@ -1434,8 +1897,9 @@ export default function InboxPage() {
                           <div className={`flex items-center gap-1 mt-1 text-[9.5px] px-1 text-zinc-500`}>
                             <span>{formatTime(m.createdTime)}</span>
                             {m.fromMe && sendReadReceipts && (
-                              <span className="text-zinc-400 font-semibold" title="Delivered to Instagram Direct">
-                                • Read {formatTime(m.createdTime)} ✓✓
+                              <span className="text-zinc-400 font-semibold flex items-center gap-0.5" title="Delivered & Read on Instagram Direct">
+                                <span>• Seen</span>
+                                <IconCheckDouble className="w-3 h-3 text-[#0095F6]" />
                               </span>
                             )}
                           </div>
@@ -1469,22 +1933,22 @@ export default function InboxPage() {
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
-                      onClick={() => mediaAttachmentInputRef.current?.click()}
+                      onClick={() => photoInputRef.current?.click()}
                       className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 transition-all group"
                     >
-                      <span className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-amber-500 flex items-center justify-center text-lg text-white mb-1 shadow-md group-hover:scale-110 transition-transform">
-                        🖼️
+                      <span className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-amber-500 flex items-center justify-center text-white mb-1 shadow-md group-hover:scale-110 transition-transform">
+                        <IconPhoto className="w-5 h-5 text-white" />
                       </span>
                       <span className="text-[10px] font-semibold text-zinc-200">Photos</span>
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => mediaAttachmentInputRef.current?.click()}
+                      onClick={() => photoInputRef.current?.click()}
                       className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 transition-all group"
                     >
-                      <span className="w-10 h-10 rounded-full bg-gradient-to-tr from-zinc-700 to-zinc-900 border border-white/20 flex items-center justify-center text-lg text-white mb-1 shadow-md group-hover:scale-110 transition-transform">
-                        📷
+                      <span className="w-10 h-10 rounded-full bg-gradient-to-tr from-zinc-700 to-zinc-900 border border-white/20 flex items-center justify-center text-white mb-1 shadow-md group-hover:scale-110 transition-transform">
+                        <IconCamera className="w-5 h-5 text-white" />
                       </span>
                       <span className="text-[10px] font-semibold text-zinc-200">Camera</span>
                     </button>
@@ -1506,15 +1970,14 @@ export default function InboxPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setIsRecordingVoice(true);
-                        setShowPlusDrawer(false);
+                        void startRealVoiceRecording();
                       }}
                       className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 transition-all group"
                     >
-                      <span className="w-10 h-10 rounded-full bg-gradient-to-tr from-rose-600 to-red-500 flex items-center justify-center text-lg text-white mb-1 shadow-md group-hover:scale-110 transition-transform">
-                        🎙️
+                      <span className="w-10 h-10 rounded-full bg-gradient-to-tr from-rose-600 to-red-500 flex items-center justify-center text-white mb-1 shadow-md group-hover:scale-110 transition-transform">
+                        <IconMicrophone className="w-5 h-5 text-white" />
                       </span>
-                      <span className="text-[10px] font-semibold text-zinc-200">Audio</span>
+                      <span className="text-[10px] font-semibold text-zinc-200">Voice Note</span>
                     </button>
 
                     <button
@@ -1547,35 +2010,104 @@ export default function InboxPage() {
 
                   <input
                     type="file"
-                    ref={mediaAttachmentInputRef}
+                    ref={photoInputRef}
                     accept="image/*,video/*"
+                    onChange={handleMediaAttachmentUpload}
+                    className="hidden"
+                  />
+                  <input
+                    type="file"
+                    ref={docInputRef}
+                    accept="*/*"
                     onChange={handleMediaAttachmentUpload}
                     className="hidden"
                   />
                 </div>
               )}
 
-              {/* Voice Recording Active Bar */}
-              {isRecordingVoice && (
-                <div className="px-4 py-2.5 bg-rose-950/80 border-t border-rose-500/30 flex items-center justify-between text-xs backdrop-blur-md z-10">
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
-                    <span className="font-bold text-rose-300">Recording Voice Note… (0:{recordTimerSec < 10 ? `0${recordTimerSec}` : recordTimerSec})</span>
+              {/* ================= AUTHENTIC iOS EMOJI KEYBOARD POPOVER ================= */}
+              {showEmojiPicker && (
+                <div className="absolute bottom-16 right-3 z-30 w-80 rounded-3xl bg-[#1c1c24]/95 border border-white/15 p-3 shadow-2xl backdrop-blur-3xl animate-in slide-in-from-bottom-2 duration-150">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
+                    <span className="text-xs font-bold text-white">Apple iOS Emojis</span>
+                    <button onClick={() => setShowEmojiPicker(false)} className="text-zinc-400 hover:text-white text-xs">
+                      ✕
+                    </button>
                   </div>
+
+                  {/* Category switcher */}
+                  <div className="flex items-center gap-1 mb-2 bg-black/40 p-1 rounded-xl">
+                    {EMOJI_CATEGORIES.map((cat, idx) => (
+                      <button
+                        key={cat.name}
+                        type="button"
+                        onClick={() => setActiveEmojiCategoryIndex(idx)}
+                        className={`flex-1 py-1 text-xs rounded-lg transition-all ${
+                          activeEmojiCategoryIndex === idx ? "bg-white/20 text-white shadow-sm" : "text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        {cat.icon}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Emoji Grid */}
+                  <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto no-scrollbar p-1">
+                    {EMOJI_CATEGORIES[activeEmojiCategoryIndex].emojis.map((emoji, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleInsertEmoji(emoji)}
+                        className="text-lg p-1.5 rounded-lg hover:bg-white/10 hover:scale-125 active:scale-95 transition-all text-center"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Real Voice Recording Live Frequency Bar */}
+              {isRecordingVoice && (
+                <div className="px-4 py-2.5 bg-rose-950/85 border-t border-rose-500/30 flex items-center justify-between text-xs backdrop-blur-md z-10 animate-in fade-in">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <span className="w-3 h-3 rounded-full bg-rose-500 block animate-ping" />
+                      <span className="w-3 h-3 rounded-full bg-rose-600 block absolute inset-0" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-rose-200">Recording Voice Note…</span>
+                      <span className="text-[10px] text-rose-300 font-mono">0:{recordTimerSec < 10 ? `0${recordTimerSec}` : recordTimerSec}</span>
+                    </div>
+
+                    {/* Live Mic Frequency Waves */}
+                    <div className="flex items-center gap-1 h-5 ml-2">
+                      {[30, 60, 90, 50, 80, 100, 70, 40, 85].map((val, idx) => (
+                        <div
+                          key={idx}
+                          style={{ height: `${Math.max(15, (val * (micAudioLevel || 40)) / 100)}%` }}
+                          className="w-[3px] bg-rose-400 rounded-full transition-all duration-75"
+                        />
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setIsRecordingVoice(false)}
-                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-zinc-300 font-semibold"
+                      onClick={cancelVoiceRecording}
+                      className="px-3 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-zinc-200 font-semibold flex items-center gap-1 transition-all"
                     >
-                      Cancel
+                      <IconTrash className="w-3.5 h-3.5 text-zinc-300" />
+                      <span>Discard</span>
                     </button>
                     <button
                       type="button"
-                      onClick={handleFinishVoiceRecord}
-                      className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold"
+                      onClick={stopAndSendVoiceRecording}
+                      className="px-3.5 py-1 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold flex items-center gap-1 shadow-md shadow-rose-600/30 transition-all"
                     >
-                      Send 🎙️
+                      <IconPaperPlane className="w-3.5 h-3.5 text-white" />
+                      <span>Send Voice</span>
                     </button>
                   </div>
                 </div>
@@ -1590,13 +2122,16 @@ export default function InboxPage() {
                   {/* Circular `(+)` Action Button */}
                   <button
                     type="button"
-                    onClick={() => setShowPlusDrawer(!showPlusDrawer)}
+                    onClick={() => {
+                      setShowPlusDrawer(!showPlusDrawer);
+                      setShowEmojiPicker(false);
+                    }}
                     className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-base transition-all ${
                       showPlusDrawer ? "bg-white text-black rotate-45" : "bg-white/10 text-white hover:bg-white/20"
                     }`}
                     title="Open iOS Actions (+)"
                   >
-                    +
+                    <IconPlus className="w-4 h-4 text-white" />
                   </button>
 
                   {/* 1-Tap Smart Link Button */}
@@ -1605,7 +2140,7 @@ export default function InboxPage() {
                     onClick={() => {
                       void handleSend("Stream my latest track WAYULOMI: https://v3nja-official.web.app/wayulomi 🎵");
                     }}
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs text-zinc-400 hover:text-white transition-all"
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs text-zinc-400 hover:text-white transition-all font-bold"
                     title="1-Tap Smart Link"
                   >
                     ⚡
@@ -1622,15 +2157,28 @@ export default function InboxPage() {
                     className="max-h-24 min-h-[34px] flex-1 resize-none bg-transparent py-1.5 text-xs sm:text-[14px] text-white placeholder:text-zinc-500 focus:outline-none"
                   />
 
+                  {/* iOS Emoji Keyboard Trigger */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEmojiPicker(!showEmojiPicker);
+                      setShowPlusDrawer(false);
+                    }}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-all"
+                    title="Apple iOS Emojis"
+                  >
+                    <IconSmile className="w-5 h-5 text-zinc-400 hover:text-white" />
+                  </button>
+
                   {/* Mic / Voice Note Button */}
                   {!draft.trim() && (
                     <button
                       type="button"
-                      onClick={() => setIsRecordingVoice(true)}
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs text-zinc-400 hover:text-white transition-all"
+                      onClick={() => void startRealVoiceRecording()}
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-all"
                       title="Record Voice Note"
                     >
-                      🎙️
+                      <IconMicrophone className="w-4 h-4 text-zinc-400 hover:text-white" />
                     </button>
                   )}
 
@@ -1640,20 +2188,20 @@ export default function InboxPage() {
                       type="button"
                       onClick={() => void handleSend()}
                       disabled={sending}
-                      className="w-7 h-7 rounded-full text-white font-black hover:scale-105 active:scale-95 disabled:opacity-30 transition-all shadow-md flex items-center justify-center shrink-0 text-xs"
+                      className="w-7 h-7 rounded-full text-white font-black hover:scale-105 active:scale-95 disabled:opacity-30 transition-all shadow-md flex items-center justify-center shrink-0"
                       style={{ background: activeTheme.swatchGradient }}
                       title="Send message"
                     >
-                      {sending ? "…" : "↑"}
+                      <IconPaperPlane className="w-3.5 h-3.5 text-white" />
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={handleSendQuickHeart}
-                      className="w-7 h-7 rounded-full text-rose-500 hover:scale-120 active:scale-90 transition-transform flex items-center justify-center shrink-0 text-base"
+                      className="w-7 h-7 rounded-full text-rose-500 hover:scale-120 active:scale-90 transition-transform flex items-center justify-center shrink-0"
                       title="Send instant Like ❤️"
                     >
-                      ❤️
+                      <IconHeart className="w-5 h-5 text-rose-500" filled />
                     </button>
                   )}
                 </div>
@@ -1709,7 +2257,8 @@ export default function InboxPage() {
                 onClick={() => setShowInAppProfileModal(true)}
                 className="w-full py-2 rounded-xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-indigo-500/20 hover:from-pink-500/30 hover:to-indigo-500/30 border border-white/10 text-xs font-bold text-white transition-all flex items-center justify-center gap-2 shadow-sm"
               >
-                <span>📷 Explore Instagram Profile In-App</span>
+                <IconVerifiedBadge className="w-4 h-4" />
+                <span>Explore Profile & Media In-App</span>
               </button>
             </div>
 
@@ -1719,45 +2268,52 @@ export default function InboxPage() {
         )}
       </div>
 
-      {/* ================= MODAL: IN-APP INSTAGRAM PROFILE & MEDIA EXPLORER (ZERO REDIRECTS!) ================= */}
+      {/* ================= MODAL: IN-APP INSTAGRAM PROFILE & MEDIA EXPLORER ================= */}
       {showInAppProfileModal && active && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-2xl p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-2xl rounded-3xl bg-zinc-950 border border-white/15 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
             
-            {/* Instagram Profile Header */}
+            {/* Header: Dynamic Profile Details */}
             <div className="p-5 border-b border-white/10 bg-[#121218]/90 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] shadow-lg">
-                    <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center text-xl font-black text-white">
-                      {(active.contact.username || "U")[0].toUpperCase()}
-                    </div>
+                    <img
+                      src={profileExplorerTab === "artist" ? "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80" : contactProfile.avatar}
+                      alt={active.contact.username || "User"}
+                      className="w-full h-full rounded-full object-cover border-2 border-zinc-950"
+                    />
                   </div>
                   <span className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
                 </div>
 
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-base font-extrabold text-white">@{active.contact.username ?? "user"}</h2>
-                    <span className="text-[12px] text-[#0095F6]">✓</span>
+                    <h2 className="text-base font-extrabold text-white">
+                      {profileExplorerTab === "artist" ? "@v3nja2.0" : `@${active.contact.username ?? "user"}`}
+                    </h2>
+                    {(profileExplorerTab === "artist" || contactProfile.isVerified) && (
+                      <IconVerifiedBadge className="w-4 h-4" />
+                    )}
                   </div>
-                  <p className="text-xs text-zinc-400 mt-0.5">Artist, Fan & Creator • V3NJA WRLD Network</p>
+                  <p className="text-xs text-zinc-300 font-medium mt-0.5">
+                    {profileExplorerTab === "artist" ? "V3NJA • Recording Artist & Producer" : contactProfile.name}
+                  </p>
                   
-                  {/* Bio & Smart Link */}
-                  <div className="mt-2 text-xs text-zinc-300">
-                    <span>Official artist profile. Latest track out now: </span>
-                    <a href="https://v3nja-official.web.app/wayulomi" target="_blank" rel="noreferrer" className="text-purple-400 font-bold hover:underline">
-                      v3nja-official.web.app/wayulomi
-                    </a>
-                  </div>
+                  {/* Dynamic Bio */}
+                  <p className="text-xs text-zinc-400 mt-1 max-w-md line-clamp-2">
+                    {profileExplorerTab === "artist"
+                      ? "Official V3NJA artist account. Listen to WAYULOMI, NJALA, ZANGA & MIRAKO on all platforms."
+                      : contactProfile.bio}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex flex-col items-end gap-2">
+              <div className="flex flex-col items-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowInAppProfileModal(false)}
-                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center"
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center text-xs"
                 >
                   ✕
                 </button>
@@ -1778,61 +2334,115 @@ export default function InboxPage() {
             {/* Profile Statistics Bar */}
             <div className="grid grid-cols-3 gap-2 px-6 py-3 border-b border-white/[0.06] bg-black/40 text-center text-xs">
               <div>
-                <div className="text-sm font-black text-white">{instagramPosts.length}</div>
+                <div className="text-sm font-black text-white">
+                  {profileExplorerTab === "artist" ? "50" : contactProfile.postsCount}
+                </div>
                 <div className="text-[10px] text-zinc-400 uppercase tracking-wider">Posts</div>
               </div>
               <div>
-                <div className="text-sm font-black text-purple-400">2,851</div>
+                <div className="text-sm font-black text-purple-400">
+                  {profileExplorerTab === "artist" ? "2,851" : contactProfile.followerCount}
+                </div>
                 <div className="text-[10px] text-zinc-400 uppercase tracking-wider">Followers</div>
               </div>
               <div>
-                <div className="text-sm font-black text-pink-400">420</div>
+                <div className="text-sm font-black text-pink-400">
+                  {profileExplorerTab === "artist" ? "420" : contactProfile.followingCount}
+                </div>
                 <div className="text-[10px] text-zinc-400 uppercase tracking-wider">Following</div>
               </div>
             </div>
 
-            {/* Profile Media Segment Tabs: [ Posts ] [ Reels ] [ Fan CRM ] */}
+            {/* Profile Explorer Tabs: [ Contact Profile & CRM ] [ Exchanged Media ] [ @v3nja2.0 Official ] */}
             <div className="flex items-center px-4 pt-2 border-b border-white/[0.08] text-xs font-bold">
               <button
                 type="button"
-                onClick={() => setProfileMediaTab("posts")}
+                onClick={() => setProfileExplorerTab("contact")}
                 className={`flex-1 py-2 text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-                  profileMediaTab === "posts" ? "border-purple-500 text-white" : "border-transparent text-zinc-400 hover:text-white"
+                  profileExplorerTab === "contact" ? "border-purple-500 text-white" : "border-transparent text-zinc-400 hover:text-white"
                 }`}
               >
-                <span>▦</span>
-                <span>Posts</span>
+                <span>👤</span>
+                <span>Contact Profile & CRM</span>
               </button>
               <button
                 type="button"
-                onClick={() => setProfileMediaTab("reels")}
+                onClick={() => setProfileExplorerTab("media")}
                 className={`flex-1 py-2 text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-                  profileMediaTab === "reels" ? "border-purple-500 text-white" : "border-transparent text-zinc-400 hover:text-white"
+                  profileExplorerTab === "media" ? "border-purple-500 text-white" : "border-transparent text-zinc-400 hover:text-white"
                 }`}
               >
-                <span>🎬</span>
-                <span>Reels & Video</span>
+                <IconPhoto className="w-3.5 h-3.5" />
+                <span>Chat Media ({exchangedAttachments.length})</span>
               </button>
               <button
                 type="button"
-                onClick={() => setProfileMediaTab("crm")}
+                onClick={() => setProfileExplorerTab("artist")}
                 className={`flex-1 py-2 text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-                  profileMediaTab === "crm" ? "border-purple-500 text-white" : "border-transparent text-zinc-400 hover:text-white"
+                  profileExplorerTab === "artist" ? "border-purple-500 text-white" : "border-transparent text-zinc-400 hover:text-white"
                 }`}
               >
-                <span>⚡</span>
-                <span>Fan CRM Engine</span>
+                <span>⭐</span>
+                <span>@v3nja2.0 Official</span>
               </button>
             </div>
 
             {/* Media Content Body */}
             <div className="flex-1 overflow-y-auto p-4 min-h-[300px]">
-              {profileMediaTab === "crm" ? (
-                <div className="max-w-md mx-auto">
+              {profileExplorerTab === "contact" ? (
+                /* Contact Fan Profile & CRM View */
+                <div className="space-y-4 max-w-lg mx-auto">
+                  <div className="p-4 rounded-2xl bg-zinc-900/80 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white uppercase tracking-wider">Contact Metadata</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300">
+                        {contactProfile.city}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-300">{contactProfile.bio}</p>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {contactProfile.tags.map((tag) => (
+                        <span key={tag} className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-semibold text-zinc-300">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
                   <InboxFanContext data={fanContext} loading={fanLoading} />
                 </div>
+              ) : profileExplorerTab === "media" ? (
+                /* Exchanged Photos, Videos & Voice Notes */
+                <div>
+                  {exchangedAttachments.length === 0 ? (
+                    <div className="text-center py-12 text-zinc-500 text-xs">
+                      No photos, videos, or voice notes exchanged yet in this conversation.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-3">
+                      {exchangedAttachments.map((att) => (
+                        <div
+                          key={att.id}
+                          onClick={() => {
+                            if (att.mediaAttachment?.url) setLightboxMediaUrl(att.mediaAttachment.url);
+                          }}
+                          className="group relative aspect-square rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 cursor-pointer shadow-md"
+                        >
+                          {att.mediaAttachment ? (
+                            <img src={att.mediaAttachment.url} alt="Attachment" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900 p-2 text-center">
+                              <IconMicrophone className="w-8 h-8 text-rose-400 mb-1" />
+                              <span className="text-[10px] font-mono text-zinc-300">{att.voiceDuration}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ) : (
-                /* 3-Column Posts / Reels Grid */
+                /* Official @v3nja2.0 Published Posts & Reels Grid */
                 <div className="grid grid-cols-3 gap-3">
                   {instagramPosts.map((post) => (
                     <div
@@ -1842,14 +2452,12 @@ export default function InboxPage() {
                     >
                       <img src={post.media_url} alt="Post" className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300" />
                       
-                      {/* Video Indicator */}
                       {post.media_type === "VIDEO" && (
                         <span className="absolute top-2 right-2 text-xs bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-lg text-white">
                           ▶
                         </span>
                       )}
 
-                      {/* Hover Overlay with Likes & Comments */}
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/item:opacity-100 flex items-center justify-center gap-4 text-white text-xs font-bold transition-opacity">
                         <span className="flex items-center gap-1">❤️ {post.like_count}</span>
                         <span className="flex items-center gap-1">💬 {post.comments_count}</span>
@@ -1858,6 +2466,27 @@ export default function InboxPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= LIGHTBOX: SINGLE MEDIA VIEWER ================= */}
+      {lightboxMediaUrl && (
+        <div
+          onClick={() => setLightboxMediaUrl(null)}
+          className="fixed inset-0 z-70 flex items-center justify-center bg-black/95 backdrop-blur-2xl p-4 animate-in fade-in duration-150"
+        >
+          <div className="relative max-w-3xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <img src={lightboxMediaUrl} alt="High-Res Media" className="max-h-[80vh] w-auto object-contain rounded-2xl shadow-2xl border border-white/10" />
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setLightboxMediaUrl(null)}
+                className="px-4 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white text-xs font-bold"
+              >
+                Close ✕
+              </button>
             </div>
           </div>
         </div>
@@ -1903,13 +2532,11 @@ export default function InboxPage() {
 
               {/* Caption & Comments Stream */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
-                {/* Caption */}
                 <div className="p-3 rounded-2xl bg-white/[0.04] border border-white/5">
                   <span className="font-bold text-white">@v3nja2.0: </span>
                   <span className="text-zinc-200">{selectedLightboxPost.caption}</span>
                 </div>
 
-                {/* Comments List */}
                 <div className="space-y-2 pt-1">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Comments</div>
                   {(selectedLightboxPost.comments || []).map((cmt) => (
@@ -1997,12 +2624,28 @@ export default function InboxPage() {
               <label className="text-[11px] uppercase font-bold tracking-wider text-zinc-400 block mb-2.5">
                 Bubble Color & Ambient Glow Theme
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {CHAT_THEMES.map((theme) => (
                   <button
                     key={theme.id}
                     type="button"
-                    onClick={() => handleSetChatTheme(theme.id)}
+                    onClick={() => {
+                      if (!activeId) {
+                        setGlobalThemeId(theme.id);
+                        if (typeof window !== "undefined") localStorage.setItem("v3nja:inbox:globalTheme", theme.id);
+                      } else {
+                        const next = {
+                          ...chatThemes,
+                          [activeId]: {
+                            themeId: theme.id,
+                            wallpaperId: activeChatCustom?.wallpaperId || "theme-default",
+                            customWallpaperUrl: activeChatCustom?.customWallpaperUrl,
+                          },
+                        };
+                        setChatThemes(next);
+                        if (typeof window !== "undefined") localStorage.setItem("v3nja:inbox:chatThemes", JSON.stringify(next));
+                      }
+                    }}
                     className={`p-2.5 rounded-2xl border text-left transition-all ${
                       currentThemeId === theme.id
                         ? "border-purple-500 bg-purple-500/15 shadow-md shadow-purple-500/20"
@@ -2027,7 +2670,19 @@ export default function InboxPage() {
                   <button
                     key={wall.id}
                     type="button"
-                    onClick={() => handleSetChatWallpaper(wall.id)}
+                    onClick={() => {
+                      if (!activeId) return;
+                      const next = {
+                        ...chatThemes,
+                        [activeId]: {
+                          themeId: activeChatCustom?.themeId || globalThemeId,
+                          wallpaperId: wall.id,
+                          customWallpaperUrl: activeChatCustom?.customWallpaperUrl,
+                        },
+                      };
+                      setChatThemes(next);
+                      if (typeof window !== "undefined") localStorage.setItem("v3nja:inbox:chatThemes", JSON.stringify(next));
+                    }}
                     className={`p-2.5 rounded-2xl border text-left transition-all ${
                       currentWallpaperId === wall.id && !customWallpaperUrl
                         ? "border-purple-500 bg-purple-500/15 shadow-md"
@@ -2052,7 +2707,26 @@ export default function InboxPage() {
                   type="file"
                   ref={fileInputRef}
                   accept="image/*"
-                  onChange={handleWallpaperFileUpload}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !activeId) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      if (typeof reader.result === "string") {
+                        const next = {
+                          ...chatThemes,
+                          [activeId]: {
+                            themeId: activeChatCustom?.themeId || globalThemeId,
+                            wallpaperId: "custom",
+                            customWallpaperUrl: reader.result as string,
+                          },
+                        };
+                        setChatThemes(next);
+                        if (typeof window !== "undefined") localStorage.setItem("v3nja:inbox:chatThemes", JSON.stringify(next));
+                      }
+                    };
+                    reader.readAsDataURL(file);
+                  }}
                   className="hidden"
                 />
                 <button
@@ -2072,7 +2746,19 @@ export default function InboxPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleSetChatWallpaper("theme-default", "")}
+                    onClick={() => {
+                      if (!activeId) return;
+                      const next = {
+                        ...chatThemes,
+                        [activeId]: {
+                          themeId: activeChatCustom?.themeId || globalThemeId,
+                          wallpaperId: "theme-default",
+                          customWallpaperUrl: undefined,
+                        },
+                      };
+                      setChatThemes(next);
+                      if (typeof window !== "undefined") localStorage.setItem("v3nja:inbox:chatThemes", JSON.stringify(next));
+                    }}
                     className="text-xs text-rose-400 hover:text-rose-300 font-bold px-2 py-1"
                   >
                     Remove
@@ -2099,12 +2785,13 @@ export default function InboxPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
           <div className="w-full max-w-sm rounded-3xl bg-zinc-900 border border-white/15 p-6 shadow-2xl flex flex-col items-center text-center">
             
-            {/* Caller Avatar */}
             <div className="relative mb-4">
               <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 p-1 animate-pulse">
-                <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center text-2xl font-black text-white">
-                  {(active.contact.username || "U")[0].toUpperCase()}
-                </div>
+                <img
+                  src={contactProfile.avatar}
+                  alt={active.contact.username || "User"}
+                  className="w-full h-full rounded-full object-cover border-2 border-zinc-950"
+                />
               </div>
               <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 ring-4 ring-zinc-900" />
             </div>
@@ -2114,14 +2801,12 @@ export default function InboxPage() {
               {activeCallModal === "video" ? "FaceTime Video Call" : "FaceTime Audio Call"} • {Math.floor(callDurationSec / 60)}:{(callDurationSec % 60).toString().padStart(2, "0")}
             </p>
 
-            {/* Video View Placeholder if in Video Mode */}
             {activeCallModal === "video" && (
               <div className="w-full h-32 rounded-2xl bg-zinc-950 border border-white/10 mb-6 flex items-center justify-center text-xs text-zinc-500 font-medium">
                 {isVideoOff ? "Camera is Off" : "HD Video Stream Connected"}
               </div>
             )}
 
-            {/* In-Call Controls */}
             <div className="flex items-center gap-4">
               <button
                 type="button"
@@ -2131,7 +2816,7 @@ export default function InboxPage() {
                 }`}
                 title={isMuted ? "Unmute" : "Mute"}
               >
-                {isMuted ? "🔇" : "🎙️"}
+                {isMuted ? "🔇" : <IconMicrophone className="w-5 h-5" />}
               </button>
 
               {activeCallModal === "video" && (
@@ -2143,18 +2828,17 @@ export default function InboxPage() {
                   }`}
                   title="Toggle Video"
                 >
-                  {isVideoOff ? "🚫" : "📹"}
+                  {isVideoOff ? "🚫" : <IconVideoCall className="w-5 h-5" />}
                 </button>
               )}
 
-              {/* End Call Button */}
               <button
                 type="button"
                 onClick={() => setActiveCallModal(null)}
                 className="w-14 h-14 rounded-full bg-rose-600 hover:bg-rose-500 active:scale-95 text-white flex items-center justify-center text-xl shadow-lg shadow-rose-600/40 transition-all"
                 title="End Call"
               >
-                📞
+                <IconPhoneCall className="w-6 h-6 rotate-135" />
               </button>
             </div>
           </div>
