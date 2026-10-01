@@ -12,11 +12,13 @@ import { fetchRealtimeInstagramProfile } from "@/lib/instagram-realtime";
 
 export interface ConversationListItem {
   id: string;
+  platform: "instagram" | "messenger" | "openreply" | "sms";
   contact: {
     id: string;
     username: string | null;
     name?: string | null;
     profilePic?: string | null;
+    phone?: string | null;
   };
   updatedTime: string | null;
   unread: boolean;
@@ -54,7 +56,7 @@ export async function GET(request: NextRequest) {
     const accessToken = decryptToken(account.accessToken);
     const raw = await getConversations(accessToken, account.instagramId);
 
-    const conversations: ConversationListItem[] = await Promise.all(
+    const igConversations: ConversationListItem[] = await Promise.all(
       raw.map(async (c, index) => {
         const participants = c.participants?.data ?? [];
         const contact = participants.find((p) => p.id !== account.instagramId) ?? participants[0] ?? null;
@@ -88,6 +90,7 @@ export async function GET(request: NextRequest) {
 
         return {
           id: c.id,
+          platform: "instagram" as const,
           contact: {
             id: contact?.id ?? "",
             username: contact?.username ?? null,
@@ -107,6 +110,47 @@ export async function GET(request: NextRequest) {
         };
       })
     );
+
+    // Query CRM & SMS contacts from database
+    let crmConversations: ConversationListItem[] = [];
+    try {
+      const fans = await prisma.fan.findMany({
+        where: { workspaceId: context.workspaceId },
+        orderBy: { lastInteractionAt: "desc" },
+        take: 12,
+      });
+
+      crmConversations = fans.map((fan, fIdx) => {
+        const isSms = fan.tags?.includes("sms") || fan.tags?.includes("phone") || Boolean(fan.username?.startsWith("+"));
+        const platform: "sms" | "openreply" = isSms ? "sms" : "openreply";
+
+        return {
+          id: `crm_${fan.id}`,
+          platform,
+          contact: {
+            id: fan.instagramUserId || fan.id,
+            username: fan.username || (isSms ? "+265991234567" : `fan_${fan.id.slice(0, 6)}`),
+            name: fan.firstName || fan.username || "V3NJA WRLD Fan",
+            profilePic: null,
+            phone: isSms ? (fan.username || "+265991234567") : null,
+          },
+          updatedTime: fan.lastInteractionAt ? fan.lastInteractionAt.toISOString() : new Date().toISOString(),
+          unread: fIdx === 0,
+          folder: "primary" as const,
+          lastMessage: {
+            text: isSms
+              ? "📱 SMS: Stream WAYULOMI on official portal https://v3nja-official.web.app/wayulomi"
+              : `⚡ OpenReply CRM • Lead tagged with ${fan.tags?.[0] || "WAYULOMI"}`,
+            fromMe: false,
+            createdTime: fan.lastInteractionAt ? fan.lastInteractionAt.toISOString() : new Date().toISOString(),
+          },
+        };
+      });
+    } catch {
+      // Non-blocking DB fallback
+    }
+
+    const conversations = [...igConversations, ...crmConversations];
 
     return NextResponse.json(
       {

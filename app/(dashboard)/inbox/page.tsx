@@ -1100,12 +1100,22 @@ export default function InboxPage() {
   }
 
   const filteredConversations = conversations.filter((c) => {
+    // 1. Channel platform filter
+    if (activeChannel !== "all") {
+      const convPlatform = c.platform || "instagram";
+      if (convPlatform !== activeChannel) return false;
+    }
+
+    // 2. Search query filter
     const matchesSearch =
       !searchQuery.trim() ||
       (c.contact.username || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.contact.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (c.lastMessage?.text || "").toLowerCase().includes(searchQuery.toLowerCase());
 
     if (!matchesSearch) return false;
+
+    // 3. Folder tab filter
     if (activeTab === "all") return true;
     if (activeTab === "unread") return c.unread;
     if (activeTab === "primary") return c.folder === "primary" || !c.folder;
@@ -1114,7 +1124,10 @@ export default function InboxPage() {
     return true;
   });
 
-  const unreadCount = conversations.filter((c) => c.unread).length;
+  const unreadCount = conversations.filter((c) => {
+    if (activeChannel !== "all" && (c.platform || "instagram") !== activeChannel) return false;
+    return c.unread;
+  }).length;
   const exchangedAttachments = messages.filter((m) => m.mediaAttachment || m.isVoice);
 
   return (
@@ -1156,21 +1169,39 @@ export default function InboxPage() {
 
       {/* Unified Channel Selector Strip (Instagram, Messenger, OpenReply, Offline SMS) */}
       <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#0e0e14] border border-white/[0.08] overflow-x-auto no-scrollbar shadow-lg">
-        {CHANNELS.map((ch) => (
-          <button
-            key={ch.id}
-            type="button"
-            onClick={() => setActiveChannel(ch.id)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-              activeChannel === ch.id
-                ? `${ch.badgeColor} shadow-md`
-                : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-            }`}
-          >
-            <span>{ch.icon}</span>
-            <span>{ch.label}</span>
-          </button>
-        ))}
+        {CHANNELS.map((ch) => {
+          const count =
+            ch.id === "all"
+              ? conversations.length
+              : conversations.filter((c) => (c.platform || "instagram") === ch.id).length;
+
+          return (
+            <button
+              key={ch.id}
+              type="button"
+              onClick={() => setActiveChannel(ch.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                activeChannel === ch.id
+                  ? `${ch.badgeColor} shadow-md scale-[1.02]`
+                  : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+              }`}
+            >
+              <span>{ch.icon}</span>
+              <span>{ch.label}</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-black ${
+                  activeChannel === ch.id
+                    ? ch.id === "openreply"
+                      ? "bg-black/20 text-black"
+                      : "bg-white/20 text-white"
+                    : "bg-white/[0.06] text-zinc-400"
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Main Container */}
@@ -1216,36 +1247,45 @@ export default function InboxPage() {
                 </span>
               </div>
 
-              {/* Real Active Contacts */}
-              {conversations.slice(0, 6).map((c) => (
-                <div
-                  key={c.id}
-                  onClick={() => openConversation(c.id)}
-                  className="flex flex-col items-center shrink-0 cursor-pointer group"
-                >
-                  <div className="relative mb-1">
-                    <div className={`w-12 h-12 rounded-full p-[2px] transition-transform group-hover:scale-105 ${
-                      c.unread ? "bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]" : "bg-zinc-700/60"
-                    }`}>
-                      <div className="w-full h-full rounded-full bg-[#181820] border-2 border-black flex items-center justify-center text-xs font-black text-white overflow-hidden">
-                        {c.contact.profilePic ? (
-                          <img
-                            src={c.contact.profilePic}
-                            alt={c.contact.username || "User"}
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover rounded-full"
-                          />
-                        ) : (
-                          (c.contact.username || "U")[0].toUpperCase()
-                        )}
+              {/* Real Active Contacts Filtered by Active Channel */}
+              {(activeChannel === "all"
+                ? conversations
+                : conversations.filter((c) => (c.platform || "instagram") === activeChannel)
+              )
+                .slice(0, 6)
+                .map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => openConversation(c.id)}
+                    className="flex flex-col items-center shrink-0 cursor-pointer group"
+                  >
+                    <div className="relative mb-1">
+                      <div
+                        className={`w-12 h-12 rounded-full p-[2px] transition-transform group-hover:scale-105 ${
+                          c.unread
+                            ? "bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]"
+                            : "bg-zinc-700/60"
+                        }`}
+                      >
+                        <div className="w-full h-full rounded-full bg-[#181820] border-2 border-black flex items-center justify-center text-xs font-black text-white overflow-hidden">
+                          {c.contact.profilePic ? (
+                            <img
+                              src={c.contact.profilePic}
+                              alt={c.contact.username || "User"}
+                              referrerPolicy="no-referrer"
+                              className="w-full h-full object-cover rounded-full"
+                            />
+                          ) : (
+                            (c.contact.username || "U")[0].toUpperCase()
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <span className="text-[10px] text-zinc-400 max-w-[54px] truncate text-center">
+                      @{c.contact.username || "user"}
+                    </span>
                   </div>
-                  <span className="text-[10px] text-zinc-400 max-w-[54px] truncate text-center">
-                    @{c.contact.username || "user"}
-                  </span>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
 
@@ -1300,8 +1340,31 @@ export default function InboxPage() {
             ) : convError ? (
               <p className="px-4 py-8 text-xs text-rose-400 text-center">{convError}</p>
             ) : filteredConversations.length === 0 ? (
-              <div className="px-4 py-12 text-center text-xs text-zinc-500">
-                No chats in <span className="capitalize font-bold text-zinc-300">{activeTab}</span>
+              <div className="px-4 py-12 text-center text-xs text-zinc-500 space-y-1">
+                <p className="text-2xl mb-1">
+                  {activeChannel === "instagram"
+                    ? "📷"
+                    : activeChannel === "messenger"
+                    ? "💬"
+                    : activeChannel === "openreply"
+                    ? "⚡"
+                    : activeChannel === "sms"
+                    ? "📱"
+                    : "💬"}
+                </p>
+                <p className="font-bold text-zinc-300">
+                  No {activeChannel === "all" ? "" : activeChannel.toUpperCase()} chats in{" "}
+                  <span className="capitalize">{activeTab}</span>
+                </p>
+                <p className="text-[11px] text-zinc-500">
+                  {activeChannel === "sms"
+                    ? "Inbound SMS text messages will appear here."
+                    : activeChannel === "messenger"
+                    ? "Facebook Messenger messages will appear here."
+                    : activeChannel === "openreply"
+                    ? "OpenReply CRM campaign leads will appear here."
+                    : "Select another channel or tab above."}
+                </p>
               </div>
             ) : (
               filteredConversations.map((c) => {
@@ -1334,7 +1397,13 @@ export default function InboxPage() {
                           <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-blue-500 ring-2 ring-black" />
                         )}
                         <span className="absolute -bottom-1 -right-1 text-[9px] bg-black/80 rounded-full p-0.5">
-                          📷
+                          {c.platform === "messenger"
+                            ? "💬"
+                            : c.platform === "openreply"
+                            ? "⚡"
+                            : c.platform === "sms"
+                            ? "📱"
+                            : "📷"}
                         </span>
                       </div>
 
@@ -1411,9 +1480,18 @@ export default function InboxPage() {
                         @{active.contact.username ?? "unknown"}
                       </span>
                       {contactProfileData?.isVerified && <IconVerifiedBadge className="w-3.5 h-3.5" />}
+                      <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-white/10 text-zinc-300 border border-white/10">
+                        {active.platform === "messenger"
+                          ? "Messenger"
+                          : active.platform === "openreply"
+                          ? "OpenReply"
+                          : active.platform === "sms"
+                          ? "Offline SMS"
+                          : "Instagram Direct"}
+                      </span>
                     </div>
                     <span className="text-[10px] text-zinc-400 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> In-App Profile & Feed Ready
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live {active.platform === "sms" ? "SMS" : "Direct"} Thread
                     </span>
                   </div>
                 </div>
