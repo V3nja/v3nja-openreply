@@ -79,59 +79,66 @@ export default function InstagramNotificationsDrawer({
 
         {/* Notifications Timeline List */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-          {timeGroups.map((group) => {
-            const itemsInGroup = filteredNotifications.filter((n) => n.timeGroup === group);
-            if (itemsInGroup.length === 0) return null;
+          {filteredNotifications.length === 0 ? (
+            <div className="py-16 text-center text-zinc-500 text-xs">
+              <span className="text-3xl block mb-2">🔔</span>
+              <span>No notifications in this category yet.</span>
+            </div>
+          ) : (
+            timeGroups.map((group) => {
+              const itemsInGroup = filteredNotifications.filter((n) => n.timeGroup === group);
+              if (itemsInGroup.length === 0) return null;
 
-            return (
-              <div key={group} className="space-y-3">
-                <span className="text-sm font-bold text-white block">{group}</span>
-                <div className="space-y-3">
-                  {itemsInGroup.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between gap-3 p-2 rounded-2xl hover:bg-white/[0.04] transition-colors"
-                    >
-                      {/* Actor Avatar */}
-                      <div className="flex items-start gap-3 min-w-0">
-                        <Link
-                          href={`/inbox?user=${item.actorUsername}`}
-                          className="w-11 h-11 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600 shrink-0 block"
-                        >
-                          <img
-                            src={item.actorAvatarUrl}
-                            alt=""
-                            className="w-full h-full rounded-full object-cover border border-black"
-                          />
-                        </Link>
+              return (
+                <div key={group} className="space-y-3">
+                  <span className="text-sm font-bold text-white block">{group}</span>
+                  <div className="space-y-3">
+                    {itemsInGroup.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between gap-3 p-2 rounded-2xl hover:bg-white/[0.04] transition-colors"
+                      >
+                        {/* Actor Avatar */}
+                        <div className="flex items-start gap-3 min-w-0">
+                          <Link
+                            href={`/inbox?user=${item.actorUsername}`}
+                            className="w-11 h-11 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600 shrink-0 block"
+                          >
+                            <img
+                              src={item.actorAvatarUrl}
+                              alt=""
+                              className="w-full h-full rounded-full object-cover border border-black"
+                            />
+                          </Link>
 
-                        {/* Notification Text */}
-                        <div className="text-xs leading-snug">
-                          <span className="text-zinc-200">
-                            {item.text}
-                          </span>
-                          <span className="text-zinc-500 text-[11px] block mt-0.5">
-                            {item.timestamp}
-                          </span>
+                          {/* Notification Text */}
+                          <div className="text-xs leading-snug">
+                            <span className="text-zinc-200">
+                              {item.text}
+                            </span>
+                            <span className="text-zinc-500 text-[11px] block mt-0.5">
+                              {item.timestamp}
+                            </span>
+                          </div>
                         </div>
+
+                        {/* Post Thumbnail Preview */}
+                        {item.targetThumbnailUrl && (
+                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shrink-0">
+                            <img
+                              src={item.targetThumbnailUrl}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
                       </div>
-
-                      {/* Post Thumbnail Preview */}
-                      {item.targetThumbnailUrl && (
-                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shrink-0">
-                          <img
-                            src={item.targetThumbnailUrl}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
     </>

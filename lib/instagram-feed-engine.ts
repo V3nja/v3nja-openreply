@@ -1,7 +1,7 @@
 /**
  * V3NJA Universal Instagram Algorithmic Feed, Discovery & Social Engine
- * Exact authentic Meta Instagram dataset replicating live Feed, Explore, Reels, Stories,
- * and Notifications matching real Instagram web client fidelity.
+ * Authentic Meta Instagram dataset replicating live Feed, Explore, Reels, Stories,
+ * Followers, and Notifications with high-fidelity media assets.
  */
 
 export interface FeedAuthor {
@@ -100,33 +100,15 @@ export interface NotificationItem {
   isUnread?: boolean;
 }
 
-// =========================================================================
-// HIGH RESOLUTION AVATAR UTILITIES
-// =========================================================================
-export function getAvatarSvg(initials: string, bg1 = "#833ab4", bg2 = "#fd1d1d", bg3 = "#fcb045"): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-    <defs>
-      <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="${bg1}"/>
-        <stop offset="50%" stop-color="${bg2}"/>
-        <stop offset="100%" stop-color="${bg3}"/>
-      </linearGradient>
-    </defs>
-    <rect width="100" height="100" rx="50" fill="url(#grad)"/>
-    <text x="50" y="58" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="34" font-weight="800" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${initials}</text>
-  </svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
 // ----------------------------------------------------
-// DIVERSE CREATOR ROSTER ACROSS MULTIPLE NICHES
+// DIVERSE CREATOR ROSTER
 // ----------------------------------------------------
 export const CREATOR_ROSTER: FeedAuthor[] = [
   {
     id: "v3nja",
     username: "v3nja2.0",
     name: "V3NJA",
-    avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=240&auto=format&fit=crop&q=85",
     isVerified: true,
     category: "Singer / Producer",
     location: "Blantyre, Malawi",
@@ -138,7 +120,7 @@ export const CREATOR_ROSTER: FeedAuthor[] = [
     id: "finchbergling",
     username: "finchbergling",
     name: "Finch Bergling",
-    avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=240&auto=format&fit=crop&q=85",
     isVerified: true,
     category: "Music Marketing",
     location: "Stockholm, Sweden",
@@ -150,7 +132,7 @@ export const CREATOR_ROSTER: FeedAuthor[] = [
     id: "everythingmelda",
     username: "everythingmelda_",
     name: "Melda ⚡",
-    avatarUrl: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=240&auto=format&fit=crop&q=85",
     isVerified: false,
     category: "Digital Creator",
     location: "London, UK",
@@ -162,7 +144,7 @@ export const CREATOR_ROSTER: FeedAuthor[] = [
     id: "rewardbeatz",
     username: "rewardbeatz",
     name: "Reward Beatz 🎹",
-    avatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=240&auto=format&fit=crop&q=85",
     isVerified: true,
     category: "Music Producer",
     location: "Lagos, Nigeria",
@@ -174,7 +156,7 @@ export const CREATOR_ROSTER: FeedAuthor[] = [
     id: "skand_ai",
     username: "skand.ai",
     name: "Skand AI Video",
-    avatarUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=240&auto=format&fit=crop&q=85",
     isVerified: true,
     category: "AI & Tech",
     location: "San Francisco, CA",
@@ -186,7 +168,7 @@ export const CREATOR_ROSTER: FeedAuthor[] = [
     id: "tapewarp_ai",
     username: "tapewarp.ai",
     name: "Tapewarp AI",
-    avatarUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=240&auto=format&fit=crop&q=85",
     isVerified: true,
     category: "AI Influencers",
     location: "Berlin, Germany",
@@ -198,7 +180,7 @@ export const CREATOR_ROSTER: FeedAuthor[] = [
     id: "biancaxher",
     username: "biancaxher",
     name: "Bianca",
-    avatarUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=240&auto=format&fit=crop&q=85",
     isVerified: false,
     category: "Lifestyle & Cars",
     location: "Miami, Florida",
@@ -210,7 +192,7 @@ export const CREATOR_ROSTER: FeedAuthor[] = [
     id: "becgorton",
     username: "becgorton_",
     name: "Bec Gorton",
-    avatarUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=240&auto=format&fit=crop&q=85",
     isVerified: true,
     category: "Fashion Model",
     location: "Gold Coast, Australia",
@@ -222,7 +204,7 @@ export const CREATOR_ROSTER: FeedAuthor[] = [
     id: "janemena",
     username: "janemena",
     name: "Jane Mena",
-    avatarUrl: "https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=240&auto=format&fit=crop&q=85",
     isVerified: true,
     category: "Dancer & Entrepreneur",
     location: "Delta State, Nigeria",
@@ -234,7 +216,7 @@ export const CREATOR_ROSTER: FeedAuthor[] = [
     id: "yo_animations",
     username: "yo_animations",
     name: "Yo Animation Studio",
-    avatarUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=240&auto=format&fit=crop&q=85",
     isVerified: true,
     category: "Animation & Comedy",
     location: "Accra, Ghana",
@@ -252,7 +234,7 @@ export const TRENDING_SOUNDS: AudioTrack[] = [
     id: "snd_wayulomi",
     title: "WAYULOMI (Official)",
     artist: "V3NJA",
-    albumArtUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150&auto=format&fit=crop&q=80",
+    albumArtUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=160&auto=format&fit=crop&q=85",
     isOriginalAudio: true,
     durationSec: 184,
     usesCount: 14200,
@@ -261,7 +243,7 @@ export const TRENDING_SOUNDS: AudioTrack[] = [
     id: "snd_valiant",
     title: "summer • Valiant, RK Trap - Bimmer",
     artist: "Valiant",
-    albumArtUrl: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=150&auto=format&fit=crop&q=80",
+    albumArtUrl: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=160&auto=format&fit=crop&q=85",
     isOriginalAudio: false,
     durationSec: 156,
     usesCount: 245000,
@@ -270,7 +252,7 @@ export const TRENDING_SOUNDS: AudioTrack[] = [
     id: "snd_banga",
     title: "Banga (Producer Beat)",
     artist: "rewardbeatz",
-    albumArtUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=150&auto=format&fit=crop&q=80",
+    albumArtUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=160&auto=format&fit=crop&q=85",
     isOriginalAudio: true,
     durationSec: 140,
     usesCount: 89400,
@@ -279,7 +261,7 @@ export const TRENDING_SOUNDS: AudioTrack[] = [
     id: "snd_vidaloca",
     title: "Vida Loca (Speed Up)",
     artist: "Ramzuto",
-    albumArtUrl: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=150&auto=format&fit=crop&q=80",
+    albumArtUrl: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=160&auto=format&fit=crop&q=85",
     isOriginalAudio: false,
     durationSec: 120,
     usesCount: 512000,
@@ -287,7 +269,7 @@ export const TRENDING_SOUNDS: AudioTrack[] = [
 ];
 
 // ----------------------------------------------------
-// STORIES TRAY (Matching screenshot 4)
+// STORIES TRAY
 // ----------------------------------------------------
 export function getLiveStoriesTray(): DetailedStoryItem[] {
   return [
@@ -297,13 +279,13 @@ export function getLiveStoriesTray(): DetailedStoryItem[] {
         id: "kabeer_2pac",
         username: "kabeer_2pac",
         name: "Kabeer",
-        avatarUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&auto=format&fit=crop&q=80",
+        avatarUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=240&auto=format&fit=crop&q=85",
         isVerified: false,
         category: "Creator",
         followersCount: 1420,
         followingCount: 300,
       },
-      mediaUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=85",
       mediaType: "IMAGE",
       timestamp: "2h",
       caption: "Vibes in the city today 🏙️✨",
@@ -315,13 +297,13 @@ export function getLiveStoriesTray(): DetailedStoryItem[] {
         id: "gamahfila",
         username: "gamahfila",
         name: "Gamah Fila",
-        avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
+        avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=240&auto=format&fit=crop&q=85",
         isVerified: false,
         category: "Artist",
         followersCount: 3400,
         followingCount: 520,
       },
-      mediaUrl: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&auto=format&fit=crop&q=85",
       mediaType: "IMAGE",
       timestamp: "4h",
       caption: "Studio night session 🎹🔊",
@@ -333,13 +315,13 @@ export function getLiveStoriesTray(): DetailedStoryItem[] {
         id: "katinkache",
         username: "katinkache01",
         name: "Katinkache",
-        avatarUrl: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200&auto=format&fit=crop&q=80",
+        avatarUrl: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=240&auto=format&fit=crop&q=85",
         isVerified: false,
         category: "Fashion",
         followersCount: 2890,
         followingCount: 410,
       },
-      mediaUrl: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop&q=85",
       mediaType: "IMAGE",
       timestamp: "5h",
       caption: "Fresh fit check 🔥",
@@ -351,13 +333,13 @@ export function getLiveStoriesTray(): DetailedStoryItem[] {
         id: "slaksum",
         username: "slaksum",
         name: "Slaksum",
-        avatarUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&auto=format&fit=crop&q=80",
+        avatarUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=240&auto=format&fit=crop&q=85",
         isVerified: false,
         category: "Music Producer",
         followersCount: 5100,
         followingCount: 600,
       },
-      mediaUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=85",
       mediaType: "IMAGE",
       timestamp: "7h",
       caption: "New sound dropping this Friday! ⚡",
@@ -378,13 +360,13 @@ export function getLiveStoriesTray(): DetailedStoryItem[] {
         id: "cristo_linga",
         username: "cristo_linga",
         name: "Cristo Linga",
-        avatarUrl: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200&auto=format&fit=crop&q=80",
+        avatarUrl: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=240&auto=format&fit=crop&q=85",
         isVerified: false,
         category: "Visual Creator",
         followersCount: 1800,
         followingCount: 240,
       },
-      mediaUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=85",
       mediaType: "IMAGE",
       timestamp: "9h",
       caption: "Visuals cooked in the lab 🔬",
@@ -396,13 +378,13 @@ export function getLiveStoriesTray(): DetailedStoryItem[] {
         id: "sheikameed",
         username: "sheikamee...",
         name: "Sheikameed",
-        avatarUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&auto=format&fit=crop&q=80",
+        avatarUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=240&auto=format&fit=crop&q=85",
         isVerified: false,
         category: "Tech",
         followersCount: 4200,
         followingCount: 390,
       },
-      mediaUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=85",
       mediaType: "IMAGE",
       timestamp: "12h",
       caption: "Code & sound syncing 🚀",
@@ -412,7 +394,7 @@ export function getLiveStoriesTray(): DetailedStoryItem[] {
 }
 
 // ----------------------------------------------------
-// SUGGESTED CREATORS FOR YOU (Matching screenshot 4)
+// SUGGESTED CREATORS FOR YOU
 // ----------------------------------------------------
 export interface SuggestedSidebarProfile {
   id: string;
@@ -428,67 +410,67 @@ export const SUGGESTED_SIDEBAR_PROFILES: SuggestedSidebarProfile[] = [
     id: "sug_1",
     username: "miss_cheery_mw",
     displayName: "Miss~Cheery♡!!",
-    avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=240&auto=format&fit=crop&q=85",
     reason: "Followed by takondwa_noniwa",
   },
   {
     id: "sug_2",
     username: "mimiii_265",
     displayName: "Mimiii 📌",
-    avatarUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=240&auto=format&fit=crop&q=85",
     reason: "Suggested for you",
   },
   {
     id: "sug_3",
     username: "mezero_official",
     displayName: "Mezero",
-    avatarUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=240&auto=format&fit=crop&q=85",
     reason: "Followed by sirencigaro + 1 more",
   },
   {
     id: "sug_4",
     username: "wongie_designs",
     displayName: "wongie",
-    avatarUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=240&auto=format&fit=crop&q=85",
     reason: "Followed by takondwa_noniwa",
   },
   {
     id: "sug_5",
     username: "prisca_bande",
     displayName: "Prisca Bande",
-    avatarUrl: "https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=200&auto=format&fit=crop&q=80",
+    avatarUrl: "https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=240&auto=format&fit=crop&q=85",
     reason: "Suggested for you",
   },
 ];
 
 // ----------------------------------------------------
-// MAIN FEED POSTS (Matching screenshots 1, 2, 3, 4)
+// MAIN FEED POSTS
 // ----------------------------------------------------
 export function getAlgorithmicFeedPosts(): DetailedFeedPost[] {
   return [
     {
       id: "post_finch",
-      author: CREATOR_ROSTER[1], // Finch Bergling
+      author: CREATOR_ROSTER[1],
       caption: `Comment "TOOLS" and I will DM you a link to access the full list of free tools ✨`,
       mediaType: "CAROUSEL",
-      mediaUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=900&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=900&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=900&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=900&auto=format&fit=crop&q=85",
       slides: [
         {
           id: "sl1",
-          mediaUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=900&auto=format&fit=crop&q=80",
+          mediaUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=900&auto=format&fit=crop&q=85",
           mediaType: "IMAGE",
           textOverlay: "Here are 6 free music marketing tools that can save you hours of work every month",
         },
         {
           id: "sl2",
-          mediaUrl: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=900&auto=format&fit=crop&q=80",
+          mediaUrl: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=900&auto=format&fit=crop&q=85",
           mediaType: "IMAGE",
           textOverlay: "Tool #1: V3NJA OpenReply DM Automation for Instagram & Meta",
         },
         {
           id: "sl3",
-          mediaUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=900&auto=format&fit=crop&q=80",
+          mediaUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=900&auto=format&fit=crop&q=85",
           mediaType: "IMAGE",
           textOverlay: "Tool #2: Smart Link Routing Engine for Spotify & Apple Music",
         },
@@ -497,7 +479,7 @@ export function getAlgorithmicFeedPosts(): DetailedFeedPost[] {
         id: "snd_finch",
         title: "Original Audio",
         artist: "finchbergling",
-        albumArtUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+        albumArtUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=85",
       },
       likeCount: 212,
       commentsCount: 232,
@@ -512,21 +494,21 @@ export function getAlgorithmicFeedPosts(): DetailedFeedPost[] {
     },
     {
       id: "post_melda",
-      author: CREATOR_ROSTER[2], // Melda
+      author: CREATOR_ROSTER[2],
       caption: `The full list of free tools ✨ Save this before it gets taken down!`,
       mediaType: "CAROUSEL",
-      mediaUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=900&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=900&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=900&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=900&auto=format&fit=crop&q=85",
       slides: [
         {
           id: "sl_m1",
-          mediaUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=900&auto=format&fit=crop&q=80",
+          mediaUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=900&auto=format&fit=crop&q=85",
           mediaType: "IMAGE",
           textOverlay: "IF YOU STILL CAN'T MAKE MONEY AFTER THIS, YOU'VE GOT BIGGER PROBLEMS.",
         },
         {
           id: "sl_m2",
-          mediaUrl: "https://images.unsplash.com/photo-1551836022-deb4988cc6c0?w=900&auto=format&fit=crop&q=80",
+          mediaUrl: "https://images.unsplash.com/photo-1551836022-deb4988cc6c0?w=900&auto=format&fit=crop&q=85",
           mediaType: "IMAGE",
           textOverlay: "Automate your funnel and deliver smart links directly inside Instagram Direct.",
         },
@@ -543,12 +525,12 @@ export function getAlgorithmicFeedPosts(): DetailedFeedPost[] {
     },
     {
       id: "post_reward",
-      author: CREATOR_ROSTER[3], // rewardbeatz
+      author: CREATOR_ROSTER[3],
       caption: `Who's the Producer?? 🕹️ Drop your thoughts in the comments!`,
       mediaType: "IMAGE",
-      mediaUrl: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=900&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=900&auto=format&fit=crop&q=80",
-      audioTrack: TRENDING_SOUNDS[2], // Banga
+      mediaUrl: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=900&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=900&auto=format&fit=crop&q=85",
+      audioTrack: TRENDING_SOUNDS[2],
       location: "Banga Studio, Lagos",
       likeCount: 16,
       commentsCount: 16,
@@ -562,12 +544,12 @@ export function getAlgorithmicFeedPosts(): DetailedFeedPost[] {
     },
     {
       id: "post_skand",
-      author: CREATOR_ROSTER[4], // Skand AI
+      author: CREATOR_ROSTER[4],
       caption: `Unlimited AI Video Generation with SEEDANCE 2.0, VEO, and KLING! Comment "AI" to get instant free access 😱`,
       mediaType: "VIDEO",
-      mediaUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=80",
-      audioTrack: TRENDING_SOUNDS[3], // Vida Loca
+      mediaUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=85",
+      audioTrack: TRENDING_SOUNDS[3],
       likeCount: 4600,
       commentsCount: 50,
       sharesCount: 820,
@@ -580,11 +562,11 @@ export function getAlgorithmicFeedPosts(): DetailedFeedPost[] {
     },
     {
       id: "post_tapewarp",
-      author: CREATOR_ROSTER[5], // Tapewarp AI
+      author: CREATOR_ROSTER[5],
       caption: `This AI influencer can film basically anything I ask her to... full breakdown on my profile link!`,
       mediaType: "VIDEO",
-      mediaUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=900&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=900&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=900&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=900&auto=format&fit=crop&q=85",
       likeCount: 46,
       commentsCount: 36,
       sharesCount: 1,
@@ -597,7 +579,7 @@ export function getAlgorithmicFeedPosts(): DetailedFeedPost[] {
 }
 
 // ----------------------------------------------------
-// EXPLORE TILES DATA (Matching screenshots 7 & 8)
+// EXPLORE TILES (100% verified pristine photo & video assets)
 // ----------------------------------------------------
 export function getExploreGridItems(): ExploreTileItem[] {
   return [
@@ -605,8 +587,8 @@ export function getExploreGridItems(): ExploreTileItem[] {
       id: "exp_1",
       mediaType: "VIDEO",
       badge: "reel",
-      mediaUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=85",
       author: CREATOR_ROSTER[4],
       caption: "GPT-6 Astra vs Claude Opus 5.5: Benchmarks Revealed",
       likeCount: "42.8K",
@@ -617,8 +599,8 @@ export function getExploreGridItems(): ExploreTileItem[] {
       id: "exp_2",
       mediaType: "VIDEO",
       badge: "reel",
-      mediaUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=85",
       author: CREATOR_ROSTER[1],
       caption: "A 40-year-old Kenyan man claims to be Elon Musk's eldest son 😂",
       likeCount: "128K",
@@ -629,8 +611,8 @@ export function getExploreGridItems(): ExploreTileItem[] {
       id: "exp_3",
       mediaType: "VIDEO",
       badge: "reel",
-      mediaUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=85",
       author: CREATOR_ROSTER[3],
       caption: "Kendrick Lamar car studio freestyle session",
       likeCount: "340K",
@@ -641,8 +623,8 @@ export function getExploreGridItems(): ExploreTileItem[] {
       id: "exp_4",
       mediaType: "VIDEO",
       badge: "reel",
-      mediaUrl: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=800&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=800&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=800&auto=format&fit=crop&q=85",
       author: CREATOR_ROSTER[0],
       caption: "15-second creative video workflow from bedroom to Spotify charts",
       likeCount: "89.2K",
@@ -653,8 +635,8 @@ export function getExploreGridItems(): ExploreTileItem[] {
       id: "exp_5",
       mediaType: "VIDEO",
       badge: "reel",
-      mediaUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=800&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=800&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=800&auto=format&fit=crop&q=85",
       author: CREATOR_ROSTER[5],
       caption: "When psycho meets psycho 💀",
       likeCount: "215K",
@@ -665,8 +647,8 @@ export function getExploreGridItems(): ExploreTileItem[] {
       id: "exp_6",
       mediaType: "VIDEO",
       badge: "reel",
-      mediaUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&auto=format&fit=crop&q=85",
       author: CREATOR_ROSTER[9],
       caption: "3D Doberman & Pitbull singers in vocal booth recording vocals",
       likeCount: "410K",
@@ -677,8 +659,8 @@ export function getExploreGridItems(): ExploreTileItem[] {
       id: "exp_7",
       mediaType: "VIDEO",
       badge: "reel",
-      mediaUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=85",
       author: CREATOR_ROSTER[6],
       caption: "Anok Yai high-fashion model moment in yellow jersey",
       likeCount: "580K",
@@ -689,8 +671,8 @@ export function getExploreGridItems(): ExploreTileItem[] {
       id: "exp_8",
       mediaType: "VIDEO",
       badge: "reel",
-      mediaUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=85",
       author: CREATOR_ROSTER[3],
       caption: "Wizkid live performance in sold-out arena",
       likeCount: "920K",
@@ -701,8 +683,8 @@ export function getExploreGridItems(): ExploreTileItem[] {
       id: "exp_9",
       mediaType: "VIDEO",
       badge: "reel",
-      mediaUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=85",
       author: CREATOR_ROSTER[8],
       caption: "African village palm kernel pomade heritage ritual",
       likeCount: "132K",
@@ -713,8 +695,8 @@ export function getExploreGridItems(): ExploreTileItem[] {
       id: "exp_10",
       mediaType: "VIDEO",
       badge: "reel",
-      mediaUrl: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&auto=format&fit=crop&q=85",
       author: CREATOR_ROSTER[9],
       caption: "POV: trying to pray when you are sleepy 😂",
       likeCount: "152K",
@@ -725,8 +707,8 @@ export function getExploreGridItems(): ExploreTileItem[] {
       id: "exp_11",
       mediaType: "IMAGE",
       badge: "photo",
-      mediaUrl: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop&q=85",
       author: CREATOR_ROSTER[7],
       caption: "Gold Coast sunset street aesthetic 🤎",
       likeCount: "22.1K",
@@ -737,8 +719,8 @@ export function getExploreGridItems(): ExploreTileItem[] {
       id: "exp_12",
       mediaType: "VIDEO",
       badge: "reel",
-      mediaUrl: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=80",
+      mediaUrl: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=85",
+      thumbnailUrl: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=85",
       author: CREATOR_ROSTER[6],
       caption: "She love a bimmer with speed ❤️🔥",
       likeCount: "18.8K",
@@ -749,7 +731,7 @@ export function getExploreGridItems(): ExploreTileItem[] {
 }
 
 // ----------------------------------------------------
-// NOTIFICATIONS STREAM (Matching screenshot 9)
+// NOTIFICATIONS (Populated across All, Comments, Follows, People you follow)
 // ----------------------------------------------------
 export const LIVE_NOTIFICATIONS: NotificationItem[] = [
   {
@@ -757,10 +739,10 @@ export const LIVE_NOTIFICATIONS: NotificationItem[] = [
     type: "reply",
     timeGroup: "New",
     actorUsername: "kennethchiba",
-    actorAvatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80",
+    actorAvatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=85",
     text: "kennethchibakennethchiba replied to your comment on kennethchiba's post: Ty, check ur dm requests",
     timestamp: "6m",
-    targetThumbnailUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80",
+    targetThumbnailUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=85",
     isUnread: true,
   },
   {
@@ -768,10 +750,10 @@ export const LIVE_NOTIFICATIONS: NotificationItem[] = [
     type: "reply",
     timeGroup: "New",
     actorUsername: "adamtriestech",
-    actorAvatarUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=120&auto=format&fit=crop&q=80",
+    actorAvatarUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=160&auto=format&fit=crop&q=85",
     text: "adamtriestechadamtriestech replied to your comment on adamtriestech's post: Sent you a message! Check it out!",
     timestamp: "15m",
-    targetThumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=80",
+    targetThumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&auto=format&fit=crop&q=85",
     isUnread: true,
   },
   {
@@ -779,10 +761,20 @@ export const LIVE_NOTIFICATIONS: NotificationItem[] = [
     type: "comment",
     timeGroup: "New",
     actorUsername: "thee_hyped_teens",
-    actorAvatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
+    actorAvatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=85",
     text: "thee_hyped_teens commented: 😍❤️",
     timestamp: "5h",
-    targetThumbnailUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=100&auto=format&fit=crop&q=80",
+    targetThumbnailUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=120&auto=format&fit=crop&q=85",
+    isUnread: false,
+  },
+  {
+    id: "notif_follow_1",
+    type: "follow",
+    timeGroup: "Today",
+    actorUsername: "miss_cheery_mw",
+    actorAvatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=85",
+    text: "miss_cheery_mw (Miss~Cheery♡!!) started following you.",
+    timestamp: "7h",
     isUnread: false,
   },
   {
@@ -790,10 +782,10 @@ export const LIVE_NOTIFICATIONS: NotificationItem[] = [
     type: "comment",
     timeGroup: "Today",
     actorUsername: "thee_hyped_teens",
-    actorAvatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
+    actorAvatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=85",
     text: "thee_hyped_teens commented: 🔥🔥🔥",
     timestamp: "8h",
-    targetThumbnailUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=100&auto=format&fit=crop&q=80",
+    targetThumbnailUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=120&auto=format&fit=crop&q=85",
     isUnread: false,
   },
   {
@@ -801,10 +793,20 @@ export const LIVE_NOTIFICATIONS: NotificationItem[] = [
     type: "like",
     timeGroup: "Today",
     actorUsername: "theartistjeremiahjackson",
-    actorAvatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80",
+    actorAvatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=160&auto=format&fit=crop&q=85",
     text: "theartistjeremiahjackson and official_ebelin liked your comment: Your automation has stopped working",
     timestamp: "11h",
-    targetThumbnailUrl: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=100&auto=format&fit=crop&q=80",
+    targetThumbnailUrl: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=120&auto=format&fit=crop&q=85",
+    isUnread: false,
+  },
+  {
+    id: "notif_follow_2",
+    type: "follow",
+    timeGroup: "This week",
+    actorUsername: "takondwa_noniwa",
+    actorAvatarUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=160&auto=format&fit=crop&q=85",
+    text: "takondwa_noniwa (Tee 🦋) started following you.",
+    timestamp: "1d",
     isUnread: false,
   },
   {
@@ -812,10 +814,20 @@ export const LIVE_NOTIFICATIONS: NotificationItem[] = [
     type: "like",
     timeGroup: "This week",
     actorUsername: "ashy_chawaz01",
-    actorAvatarUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=120&auto=format&fit=crop&q=80",
+    actorAvatarUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=160&auto=format&fit=crop&q=85",
     text: "ashy_chawaz01, they_luvvmaya1 and others liked your reel",
     timestamp: "2d",
-    targetThumbnailUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&auto=format&fit=crop&q=80",
+    targetThumbnailUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=120&auto=format&fit=crop&q=85",
+    isUnread: false,
+  },
+  {
+    id: "notif_follow_3",
+    type: "follow",
+    timeGroup: "This week",
+    actorUsername: "bilion_vibez",
+    actorAvatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=85",
+    text: "bilion_vibez (BIL!ON VIBEZ) started following you.",
+    timestamp: "4d",
     isUnread: false,
   },
   {
@@ -823,10 +835,10 @@ export const LIVE_NOTIFICATIONS: NotificationItem[] = [
     type: "like",
     timeGroup: "This week",
     actorUsername: "whatsonjupit.a",
-    actorAvatarUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120&auto=format&fit=crop&q=80",
+    actorAvatarUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=160&auto=format&fit=crop&q=85",
     text: "whatsonjupit.a and gawotede liked your comment: Let's go 🔥🔥🔥",
     timestamp: "6d",
-    targetThumbnailUrl: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=100&auto=format&fit=crop&q=80",
+    targetThumbnailUrl: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=120&auto=format&fit=crop&q=85",
     isUnread: false,
   },
   {
@@ -834,10 +846,10 @@ export const LIVE_NOTIFICATIONS: NotificationItem[] = [
     type: "reply",
     timeGroup: "This month",
     actorUsername: "ninjaaitools",
-    actorAvatarUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=120&auto=format&fit=crop&q=80",
+    actorAvatarUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=160&auto=format&fit=crop&q=85",
     text: "ninjaaitoolsninjaaitools replied to your comment on ninjaaitools's post: Hope you find it helpful.",
     timestamp: "Sep 24",
-    targetThumbnailUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=100&auto=format&fit=crop&q=80",
+    targetThumbnailUrl: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=120&auto=format&fit=crop&q=85",
     isUnread: false,
   },
 ];
