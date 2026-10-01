@@ -260,91 +260,142 @@ export default function InboxPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-4">
-        <h1 className="text-lg font-semibold text-foreground">Inbox</h1>
+        <div>
+          <h1 className="text-xl font-bold text-white tracking-tight">Instagram Direct Inbox</h1>
+          <p className="text-xs text-zinc-400 mt-0.5">Live Instagram direct message stream and fan relationship context</p>
+        </div>
         {accounts.length > 1 && (
           <AccountSelect accounts={accounts} value={selectedAccountId} onChange={setSelectedAccountId} includeAll={false} />
         )}
       </div>
 
-      <div className="grid h-[calc(100dvh-11rem)] grid-cols-1 overflow-hidden rounded border border-border sm:grid-cols-[300px_1fr]">
-        <div className={`min-h-0 flex-col border-b border-border sm:flex sm:border-b-0 sm:border-r ${active ? "hidden" : "flex"}`}>
-          <div className="shrink-0 border-b border-border px-4 py-3 text-sm font-semibold text-foreground">Conversations</div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="grid h-[calc(100dvh-12rem)] grid-cols-1 overflow-hidden rounded-2xl border border-white/10 bg-[#0d0d12] shadow-2xl sm:grid-cols-[280px_1fr] lg:grid-cols-[280px_1fr_290px]">
+        {/* Column 1: Conversations list */}
+        <div className={`min-h-0 flex-col border-b border-white/10 sm:flex sm:border-b-0 sm:border-r bg-zinc-950/40 ${active ? "hidden sm:flex" : "flex"}`}>
+          <div className="shrink-0 border-b border-white/10 px-4 py-3.5 text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center justify-between">
+            <span>Conversations</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-300 font-mono">{conversations.length}</span>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-white/[0.04]">
             {convLoading ? (
-              <p className="px-4 py-6 text-sm text-muted">Loading…</p>
+              <p className="px-4 py-6 text-xs text-zinc-500">Loading conversations…</p>
             ) : convError ? (
-              <p className="px-4 py-6 text-sm text-error">{convError}</p>
+              <p className="px-4 py-6 text-xs text-rose-400">{convError}</p>
             ) : conversations.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-muted">No conversations yet.</p>
+              <p className="px-4 py-6 text-xs text-zinc-500">No active conversations yet.</p>
             ) : (
               conversations.map((c) => (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => openConversation(c.id)}
-                  className={`block w-full border-b border-border px-4 py-3 text-left ${c.id === activeId ? "bg-surface-hover" : "hover:bg-surface-hover"}`}
+                  className={`block w-full px-4 py-3 text-left transition-all ${
+                    c.id === activeId ? "bg-white/[0.08] border-l-2 border-orange-500" : "hover:bg-white/[0.04]"
+                  }`}
                 >
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-sm font-medium text-foreground">@{c.contact.username ?? "unknown"}</span>
-                    <span className="shrink-0 text-[11px] text-zinc-500">{formatTime(c.updatedTime)}</span>
+                    <span className="truncate text-xs font-bold text-white">@{c.contact.username ?? "unknown"}</span>
+                    <span className="shrink-0 text-[10px] text-zinc-500">{formatTime(c.updatedTime)}</span>
                   </div>
-                  {c.lastMessage && <p className="mt-0.5 truncate text-xs text-muted">{c.lastMessage.fromMe ? "You: " : ""}{c.lastMessage.text || "(no text)"}</p>}
+                  {c.lastMessage && (
+                    <p className="mt-1 truncate text-xs text-zinc-400">
+                      {c.lastMessage.fromMe ? <span className="text-orange-400/90 font-medium">You: </span> : ""}
+                      {c.lastMessage.text || "(no text)"}
+                    </p>
+                  )}
                 </button>
               ))
             )}
           </div>
         </div>
 
+        {/* Column 2: Chat Stream & Composer */}
         <div className={`min-h-0 flex-col ${active ? "flex" : "hidden sm:flex"}`}>
           {!active ? (
-            <div className="flex flex-1 items-center justify-center p-6 text-sm text-muted">Select a conversation to read and reply.</div>
+            <div className="flex flex-1 items-center justify-center p-6 text-xs text-zinc-500">
+              Select a conversation to read message history and reply.
+            </div>
           ) : (
-            <>
-              <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3 text-sm font-semibold text-foreground">
-                <button type="button" onClick={() => setActiveId(null)} className="-ml-1 rounded px-2 py-1 text-muted hover:text-foreground sm:hidden">Back</button>
-                <span className="truncate">@{active.contact.username ?? "unknown"}</span>
+            <div className="flex flex-1 flex-col min-h-0">
+              {/* Header */}
+              <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3 bg-zinc-950/80 backdrop-blur">
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => setActiveId(null)} className="rounded px-2 py-1 text-xs font-semibold text-zinc-400 hover:text-white sm:hidden">
+                    ← Back
+                  </button>
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-xs font-extrabold text-white shadow-sm">
+                    {(active.contact.username || "U")[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">@{active.contact.username ?? "unknown"}</span>
+                    <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span> Instagram Direct
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div ref={scrollRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
+              {/* Messages Scroll Area */}
+              <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 bg-black/30">
                 {threadLoading && messages.length === 0 ? (
-                  <p className="text-sm text-muted">Loading…</p>
+                  <div className="flex items-center justify-center h-32 text-xs text-zinc-500">Loading conversation…</div>
                 ) : messages.length === 0 ? (
-                  <p className="text-sm text-muted">No messages.</p>
+                  <div className="flex items-center justify-center h-32 text-xs text-zinc-500">No messages in this thread.</div>
                 ) : (
                   messages.map((m) => (
                     <div key={m.id} className={`flex ${m.fromMe ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${m.fromMe ? "bg-accent text-white" : "bg-surface text-foreground border border-border"}`}>
+                      <div
+                        className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed shadow-sm ${
+                          m.fromMe
+                            ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white font-medium"
+                            : "bg-zinc-850 bg-zinc-900 border border-white/10 text-zinc-100"
+                        }`}
+                      >
                         <p className="whitespace-pre-wrap break-words">{m.text}</p>
-                        <p className={`mt-1 text-[10px] ${m.fromMe ? "text-white/70" : "text-zinc-500"}`}>{formatTime(m.createdTime)}</p>
+                        <p className={`mt-1 text-[9px] font-mono ${m.fromMe ? "text-white/80 text-right" : "text-zinc-500"}`}>
+                          {formatTime(m.createdTime)}
+                        </p>
                       </div>
                     </div>
                   ))
                 )}
               </div>
 
-              <div className="shrink-0 border-t border-border p-3">
+              {/* Reply Composer */}
+              <div className="shrink-0 border-t border-white/10 p-3.5 bg-zinc-950/90">
                 {queuedRequestId && (
-                  <p className="mb-2 text-xs text-amber-400">Reply queued for delivery. The Inbox will refresh when Meta confirms it.</p>
+                  <p className="mb-2 text-[11px] text-amber-400">Reply queued for delivery. The Inbox will refresh automatically.</p>
                 )}
-                {sendError && <p className="mb-2 text-xs text-error">{sendError}</p>}
-                <div className="flex items-end gap-2">
+                {sendError && <p className="mb-2 text-[11px] text-rose-400">{sendError}</p>}
+                <div className="flex items-end gap-2.5">
                   <textarea
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={handleKeyDown}
                     rows={1}
-                    placeholder="Write a reply…  (Enter to send, Shift+Enter for a new line)"
-                    className="max-h-32 min-h-[40px] flex-1 resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none"
+                    placeholder="Write a reply… (Enter to send, Shift+Enter for a new line)"
+                    className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-500 focus:border-orange-500/60 focus:outline-none"
                   />
-                  <button type="button" onClick={() => void handleSend()} disabled={sending || !draft.trim()} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50">
-                    {sending ? "Queuing…" : "Send"}
+                  <button
+                    type="button"
+                    onClick={() => void handleSend()}
+                    disabled={sending || !draft.trim()}
+                    className="h-[44px] px-5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-xs font-bold text-white hover:from-orange-600 hover:to-amber-600 disabled:opacity-40 transition-all shadow-md shrink-0 flex items-center justify-center"
+                  >
+                    {sending ? "Sending…" : "Send"}
                   </button>
                 </div>
               </div>
-              <InboxFanContext data={fanContext} loading={fanLoading} />
-            </>
+            </div>
           )}
         </div>
+
+        {/* Column 3: Fan Context Sidebar (Desktop Only) */}
+        {active && (
+          <div className="hidden lg:flex min-h-0 flex-col border-l border-white/10 bg-zinc-950/60 overflow-y-auto">
+            <InboxFanContext data={fanContext} loading={fanLoading} />
+          </div>
+        )}
       </div>
     </div>
   );
