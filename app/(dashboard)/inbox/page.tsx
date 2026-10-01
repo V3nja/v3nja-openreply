@@ -48,7 +48,7 @@ export const CHAT_THEMES: ChatTheme[] = [
     id: "instagram-twilight",
     name: "Instagram Twilight",
     badge: "Official IG",
-    bubbleClass: "bg-gradient-to-r from-[#0084FF] via-[#7F38EC] to-[#E1306C] text-white",
+    bubbleClass: "bg-gradient-to-r from-[#0084FF] via-[#7F38EC] to-[#E1306C] text-white shadow-md",
     accentColor: "#7F38EC",
     swatchGradient: "linear-gradient(135deg, #0084FF 0%, #7F38EC 50%, #E1306C 100%)",
     textSelection: "selection:bg-pink-500 selection:text-white",
@@ -57,7 +57,7 @@ export const CHAT_THEMES: ChatTheme[] = [
     id: "ios-imessage",
     name: "Apple iMessage",
     badge: "Cupertino Blue",
-    bubbleClass: "bg-[#007AFF] text-white",
+    bubbleClass: "bg-[#007AFF] text-white shadow-md",
     accentColor: "#007AFF",
     swatchGradient: "linear-gradient(135deg, #007AFF 0%, #0056B3 100%)",
     textSelection: "selection:bg-blue-600 selection:text-white",
@@ -66,7 +66,7 @@ export const CHAT_THEMES: ChatTheme[] = [
     id: "ios-sms",
     name: "Apple SMS Green",
     badge: "Cupertino Green",
-    bubbleClass: "bg-[#34C759] text-white",
+    bubbleClass: "bg-[#34C759] text-white shadow-md",
     accentColor: "#34C759",
     swatchGradient: "linear-gradient(135deg, #34C759 0%, #28A745 100%)",
     textSelection: "selection:bg-emerald-600 selection:text-white",
@@ -75,7 +75,7 @@ export const CHAT_THEMES: ChatTheme[] = [
     id: "cyberpunk-cyan",
     name: "Cyberpunk Neon",
     badge: "Cyan Wave",
-    bubbleClass: "bg-gradient-to-r from-[#00F2FE] via-[#4FACFE] to-[#8E2DE2] text-white",
+    bubbleClass: "bg-gradient-to-r from-[#00F2FE] via-[#4FACFE] to-[#8E2DE2] text-white shadow-md",
     accentColor: "#00F2FE",
     swatchGradient: "linear-gradient(135deg, #00F2FE 0%, #8E2DE2 100%)",
     textSelection: "selection:bg-cyan-500 selection:text-black",
@@ -84,7 +84,7 @@ export const CHAT_THEMES: ChatTheme[] = [
     id: "sunset-glow",
     name: "Sunset Peach",
     badge: "Warm Sunset",
-    bubbleClass: "bg-gradient-to-r from-[#FF5858] via-[#F857A6] to-[#FF5858] text-white",
+    bubbleClass: "bg-gradient-to-r from-[#FF5858] via-[#F857A6] to-[#FF5858] text-white shadow-md",
     accentColor: "#F857A6",
     swatchGradient: "linear-gradient(135deg, #FF5858 0%, #F857A6 100%)",
     textSelection: "selection:bg-rose-500 selection:text-white",
@@ -93,7 +93,7 @@ export const CHAT_THEMES: ChatTheme[] = [
     id: "emerald-mint",
     name: "Emerald Mint",
     badge: "Fresh Mint",
-    bubbleClass: "bg-gradient-to-r from-[#0BA360] via-[#10B981] to-[#3CBA92] text-white",
+    bubbleClass: "bg-gradient-to-r from-[#0BA360] via-[#10B981] to-[#3CBA92] text-white shadow-md",
     accentColor: "#10B981",
     swatchGradient: "linear-gradient(135deg, #0BA360 0%, #3CBA92 100%)",
     textSelection: "selection:bg-emerald-500 selection:text-white",
@@ -102,7 +102,7 @@ export const CHAT_THEMES: ChatTheme[] = [
     id: "midnight-noir",
     name: "Apple Noir Stealth",
     badge: "Matte Dark",
-    bubbleClass: "bg-gradient-to-b from-[#3A3A3C] to-[#2C2C2E] border border-white/10 text-white",
+    bubbleClass: "bg-gradient-to-b from-[#3A3A3C] to-[#2C2C2E] border border-white/10 text-white shadow-md",
     accentColor: "#8E8E93",
     swatchGradient: "linear-gradient(135deg, #3A3A3C 0%, #1C1C1E 100%)",
     textSelection: "selection:bg-zinc-600 selection:text-white",
@@ -111,7 +111,7 @@ export const CHAT_THEMES: ChatTheme[] = [
     id: "berry-lavender",
     name: "Berry Lavender",
     badge: "Fuchsia",
-    bubbleClass: "bg-gradient-to-r from-[#8A2387] via-[#E94057] to-[#F27121] text-white",
+    bubbleClass: "bg-gradient-to-r from-[#8A2387] via-[#E94057] to-[#F27121] text-white shadow-md",
     accentColor: "#E94057",
     swatchGradient: "linear-gradient(135deg, #8A2387 0%, #F27121 100%)",
     textSelection: "selection:bg-fuchsia-600 selection:text-white",
@@ -188,6 +188,21 @@ function extractSmartLink(text: string): { url: string; title: string; slug: str
     return { url: match[0], title, slug };
   }
   return null;
+}
+
+// Helper to parse legacy quoted replies formatted inside raw message strings
+function parseMessageContent(rawText: string) {
+  const match = rawText.match(/^💬 Replying to:\s*"(.*?)"\n\n([\s\S]*)$/);
+  if (match) {
+    return {
+      quotedText: match[1],
+      actualText: match[2],
+    };
+  }
+  return {
+    quotedText: null,
+    actualText: rawText,
+  };
 }
 
 export default function InboxPage() {
@@ -583,8 +598,8 @@ export default function InboxPage() {
               onClick={() => setShowThemePicker(!showThemePicker)}
               className="px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 text-xs font-semibold text-zinc-200 hover:text-white transition-all flex items-center gap-2 shadow-sm"
             >
-              <span className="w-3 h-3 rounded-full" style={{ background: activeTheme.swatchGradient }} />
-              <span className="hidden sm:inline">{activeTheme.name}</span>
+              <span className="w-3 h-3 rounded-full shrink-0" style={{ background: activeTheme.swatchGradient }} />
+              <span className="hidden sm:inline font-bold">{activeTheme.name}</span>
               <span className="text-[10px] text-zinc-400">🎨</span>
             </button>
 
@@ -834,7 +849,8 @@ export default function InboxPage() {
                     const isHovered = hoveredMessageId === m.id;
                     const isCopied = copiedId === m.id;
                     const isHeartBursting = heartAnimId === m.id;
-                    const smartLink = extractSmartLink(m.text);
+                    const parsed = parseMessageContent(m.text);
+                    const smartLink = extractSmartLink(parsed.actualText);
                     const prevMsg = messages[idx - 1];
                     const nextMsg = messages[idx + 1];
                     const isConsecutivePrev = prevMsg && prevMsg.fromMe === m.fromMe;
@@ -845,7 +861,7 @@ export default function InboxPage() {
                         key={m.id}
                         onMouseEnter={() => setHoveredMessageId(m.id)}
                         onMouseLeave={() => setHoveredMessageId(null)}
-                        className={`flex flex-col group relative ${m.fromMe ? "items-end" : "items-start"}`}
+                        className={`flex flex-col group relative ${m.fromMe ? "items-end" : "items-start"} mb-1`}
                       >
                         {/* iOS / Instagram Floating Reaction Capsule */}
                         <div
@@ -866,14 +882,14 @@ export default function InboxPage() {
                           <div className="w-[1px] h-3 bg-white/20 mx-1" />
                           <button
                             type="button"
-                            onClick={() => setReplyingTo({ id: m.id, text: m.text, username: m.fromUsername || active.contact.username })}
+                            onClick={() => setReplyingTo({ id: m.id, text: parsed.actualText, username: m.fromUsername || active.contact.username })}
                             className="text-[10px] font-semibold text-zinc-300 hover:text-white px-1"
                           >
                             Reply
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleCopy(m.id, m.text)}
+                            onClick={() => handleCopy(m.id, parsed.actualText)}
                             className="text-[10px] font-semibold text-zinc-300 hover:text-white px-1"
                           >
                             {isCopied ? "✓" : "Copy"}
@@ -889,7 +905,7 @@ export default function InboxPage() {
                           )}
                         </div>
 
-                        {/* Quoted Message Tag */}
+                        {/* Quoted Message Tag (if explicit replyTo) */}
                         {m.replyTo && (
                           <div className={`mb-1 px-2.5 py-1 rounded-xl text-[10px] max-w-[70%] border-l-2 bg-white/[0.04] text-zinc-400 ${
                             m.fromMe ? "border-purple-400 text-right" : "border-zinc-500 text-left"
@@ -899,8 +915,8 @@ export default function InboxPage() {
                           </div>
                         )}
 
-                        {/* Main Message Bubble (Tight fitting w-fit for single-line perfection) */}
-                        <div className="relative inline-flex flex-col group/bubble max-w-[76%] sm:max-w-[68%]">
+                        {/* Main Message Bubble (Tight fitting w-fit min-w-[48px] for single-line perfection) */}
+                        <div className="relative flex flex-col w-fit max-w-[76%] sm:max-w-[65%] min-w-[48px]">
                           {/* Heart Explosion on Double Tap */}
                           {isHeartBursting && (
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 animate-ping">
@@ -911,7 +927,7 @@ export default function InboxPage() {
                           {/* Voice Note Audio Card */}
                           {m.isVoice ? (
                             <div
-                              className={`rounded-[20px] px-3.5 py-2.5 flex items-center gap-3 shadow-md ${
+                              className={`w-fit rounded-[20px] px-3.5 py-2.5 flex items-center gap-3 shadow-md ${
                                 m.fromMe ? activeTheme.bubbleClass : "bg-[#262626] text-white border border-white/[0.08]"
                               }`}
                             >
@@ -941,9 +957,9 @@ export default function InboxPage() {
                             /* Regular Text Bubble */
                             <div
                               onDoubleClick={() => handleDoubleTapHeart(m.id)}
-                              className={`relative inline-block px-3.5 py-2 text-[14px] leading-[1.38] select-text transition-all ${
+                              className={`relative w-fit max-w-full px-3.5 py-2 text-[14px] leading-[1.35] select-text transition-all ${
                                 m.fromMe
-                                  ? `${activeTheme.bubbleClass} shadow-md ${
+                                  ? `${activeTheme.bubbleClass} ${
                                       isConsecutiveNext ? "rounded-[20px] rounded-br-[6px]" : "rounded-[20px] rounded-br-[3px]"
                                     } ${isConsecutivePrev ? "rounded-tr-[6px]" : ""}`
                                   : `bg-[#262626] text-[#F5F5F7] border border-white/[0.04] shadow-md ${
@@ -951,7 +967,14 @@ export default function InboxPage() {
                                     } ${isConsecutivePrev ? "rounded-tl-[6px]" : ""}`
                               }`}
                             >
-                              <span className="whitespace-pre-wrap break-words">{m.text}</span>
+                              {/* Parsed embedded quote header if present */}
+                              {parsed.quotedText && (
+                                <div className="mb-1.5 pb-1 border-b border-white/20 text-[10.5px] opacity-80 flex items-center gap-1">
+                                  <span>💬 Replying to:</span>
+                                  <span className="truncate italic">"{parsed.quotedText}"</span>
+                                </div>
+                              )}
+                              <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] inline-block">{parsed.actualText}</span>
                             </div>
                           )}
 
@@ -961,7 +984,7 @@ export default function InboxPage() {
                               href={smartLink.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="mt-1.5 block rounded-2xl bg-[#1c1c24] border border-white/10 hover:border-purple-500/50 p-2.5 transition-all shadow-lg group/link"
+                              className="mt-1.5 block w-full rounded-2xl bg-[#1c1c24] border border-white/10 hover:border-purple-500/50 p-2.5 transition-all shadow-lg group/link"
                             >
                               <div className="flex items-center gap-2.5">
                                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center text-lg text-white shadow-md shrink-0">
@@ -990,7 +1013,7 @@ export default function InboxPage() {
 
                         {/* Micro Delivery Time / Seen Receipt under last message */}
                         {(!isConsecutiveNext || idx === messages.length - 1) && (
-                          <div className={`flex items-center gap-1 mt-1 text-[9px] px-1 text-zinc-500`}>
+                          <div className={`flex items-center gap-1 mt-1 text-[9.5px] px-1 text-zinc-500`}>
                             <span>{formatTime(m.createdTime)}</span>
                             {m.fromMe && (
                               <span className="text-zinc-400 font-bold" title="Delivered to Instagram Direct">
