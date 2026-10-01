@@ -7,12 +7,14 @@ import {
   type RealtimeInstagramStoryItem,
   type RealtimeInstagramHighlightItem,
   type SuggestedProfileItem,
+  type InstagramFollowItem,
 } from "@/lib/instagram-realtime";
 
 export type ContactProfileData = RealtimeInstagramProfile;
 export type ContactPostItem = RealtimeInstagramPost;
 export type ContactStoryItem = RealtimeInstagramStoryItem;
 export type ContactHighlightItem = RealtimeInstagramHighlightItem;
+export type ContactFollowItem = InstagramFollowItem;
 
 export const dynamic = "force-dynamic";
 

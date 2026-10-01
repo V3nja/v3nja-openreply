@@ -44,7 +44,22 @@ export interface SuggestedProfileItem {
   avatarUrl: string;
   isVerified?: boolean;
   category?: string;
-  mutualFollowers?: string[];
+  mutualFollowedBy?: string;
+  followersCount?: number;
+  isFollowing?: boolean;
+  reason?: string;
+  hasStory?: boolean;
+}
+
+export interface InstagramFollowItem {
+  id: string;
+  username: string;
+  name: string;
+  avatarUrl: string;
+  isVerified?: boolean;
+  isFollowing?: boolean;
+  mutualNote?: string;
+  category?: string;
   followersCount?: number;
 }
 
@@ -66,7 +81,10 @@ export interface RealtimeInstagramProfile {
   highlights?: RealtimeInstagramHighlightItem[];
   posts?: RealtimeInstagramPost[];
   reels?: RealtimeInstagramPost[];
+  taggedPosts?: RealtimeInstagramPost[];
   suggestedProfiles?: SuggestedProfileItem[];
+  followersList?: InstagramFollowItem[];
+  followingList?: InstagramFollowItem[];
 }
 
 export function getProxiedImageUrl(rawUrl?: string | null): string {
