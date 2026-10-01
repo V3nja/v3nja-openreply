@@ -3,15 +3,15 @@
 /**
  * Authentic iOS & Instagram Direct Messaging Suite (V3NJA WRLD)
  *
- * Full iOS / Instagram Direct design system:
- * - Real Instagram Twilight, iOS iMessage Blue, Cyberpunk, Sunset, and Emerald themes
- * - Authentic iOS SF Pro typography, precise bubble curvature, and micro-interactions
+ * Full iOS Liquid Glass & Instagram Direct design system:
+ * - Per-Chat dynamic Theme & Custom Wallpaper Engine (stored per conversation)
+ * - Custom Wallpaper photo upload & preset atmospheric backgrounds
+ * - iOS Liquid Glass Long-Press & Context Action Popover (exact match to iOS 19 / iMessage)
  * - Single-line tight-fitting pill bubbles for short messages (zero unwanted wrapping)
  * - Double-tap / double-click to Heart with bursting heart animation
  * - Instagram Direct Stories & Notes top bar
- * - Interactive Instagram floating reaction capsule & quick reactions
  * - Rich Smart Link preview cards for v3nja-official.web.app links
- * - Audio Voice Note player & recorder simulation
+ * - Audio Voice Note player & waveform recorder simulation
  * - Saved quick replies (Canned Responses) drawer
  * - Interactive Audio & Video Calling simulation modal
  * - Live Meta Graph API direct dispatch with instant receipts
@@ -30,7 +30,6 @@ const POLL_MS = 10_000;
 const CACHE_MAX_AGE_MS = 60_000;
 const convCacheKey = (accountId: string) => `inbox:convs:${accountId}`;
 const msgCacheKey = (conversationId: string) => `inbox:msgs:${conversationId}`;
-const THEME_STORAGE_KEY = "v3nja:inbox:theme";
 
 // Authentic Instagram & iOS Themes
 export interface ChatTheme {
@@ -38,8 +37,10 @@ export interface ChatTheme {
   name: string;
   badge: string;
   bubbleClass: string;
+  glowColor: string;
   accentColor: string;
   swatchGradient: string;
+  wallpaperBg: string;
   textSelection: string;
 }
 
@@ -48,79 +49,136 @@ export const CHAT_THEMES: ChatTheme[] = [
     id: "instagram-twilight",
     name: "Instagram Twilight",
     badge: "Official IG",
-    bubbleClass: "bg-gradient-to-r from-[#0084FF] via-[#7F38EC] to-[#E1306C] text-white shadow-md",
+    bubbleClass: "bg-gradient-to-r from-[#0084FF] via-[#7F38EC] to-[#E1306C] text-white shadow-lg shadow-purple-500/25",
+    glowColor: "rgba(127, 56, 236, 0.4)",
     accentColor: "#7F38EC",
     swatchGradient: "linear-gradient(135deg, #0084FF 0%, #7F38EC 50%, #E1306C 100%)",
+    wallpaperBg: "radial-gradient(circle at 50% 10%, rgba(127, 56, 236, 0.15) 0%, transparent 60%), radial-gradient(circle at 90% 90%, rgba(225, 48, 108, 0.12) 0%, transparent 50%), #07070a",
     textSelection: "selection:bg-pink-500 selection:text-white",
   },
   {
     id: "ios-imessage",
     name: "Apple iMessage",
     badge: "Cupertino Blue",
-    bubbleClass: "bg-[#007AFF] text-white shadow-md",
+    bubbleClass: "bg-[#007AFF] text-white shadow-lg shadow-blue-500/30",
+    glowColor: "rgba(0, 122, 255, 0.45)",
     accentColor: "#007AFF",
     swatchGradient: "linear-gradient(135deg, #007AFF 0%, #0056B3 100%)",
+    wallpaperBg: "radial-gradient(circle at 50% 15%, rgba(0, 122, 255, 0.15) 0%, transparent 60%), #000000",
     textSelection: "selection:bg-blue-600 selection:text-white",
   },
   {
     id: "ios-sms",
     name: "Apple SMS Green",
     badge: "Cupertino Green",
-    bubbleClass: "bg-[#34C759] text-white shadow-md",
+    bubbleClass: "bg-[#34C759] text-white shadow-lg shadow-emerald-500/25",
+    glowColor: "rgba(52, 199, 89, 0.4)",
     accentColor: "#34C759",
     swatchGradient: "linear-gradient(135deg, #34C759 0%, #28A745 100%)",
+    wallpaperBg: "radial-gradient(circle at 50% 10%, rgba(52, 199, 89, 0.14) 0%, transparent 60%), #000000",
     textSelection: "selection:bg-emerald-600 selection:text-white",
   },
   {
     id: "cyberpunk-cyan",
     name: "Cyberpunk Neon",
     badge: "Cyan Wave",
-    bubbleClass: "bg-gradient-to-r from-[#00F2FE] via-[#4FACFE] to-[#8E2DE2] text-white shadow-md",
+    bubbleClass: "bg-gradient-to-r from-[#00F2FE] via-[#4FACFE] to-[#8E2DE2] text-white shadow-lg shadow-cyan-500/25",
+    glowColor: "rgba(0, 242, 254, 0.4)",
     accentColor: "#00F2FE",
     swatchGradient: "linear-gradient(135deg, #00F2FE 0%, #8E2DE2 100%)",
+    wallpaperBg: "radial-gradient(circle at 20% 20%, rgba(0, 242, 254, 0.12) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(142, 45, 226, 0.12) 0%, transparent 50%), #050508",
     textSelection: "selection:bg-cyan-500 selection:text-black",
   },
   {
     id: "sunset-glow",
     name: "Sunset Peach",
     badge: "Warm Sunset",
-    bubbleClass: "bg-gradient-to-r from-[#FF5858] via-[#F857A6] to-[#FF5858] text-white shadow-md",
+    bubbleClass: "bg-gradient-to-r from-[#FF5858] via-[#F857A6] to-[#FF5858] text-white shadow-lg shadow-rose-500/25",
+    glowColor: "rgba(248, 87, 166, 0.4)",
     accentColor: "#F857A6",
     swatchGradient: "linear-gradient(135deg, #FF5858 0%, #F857A6 100%)",
+    wallpaperBg: "radial-gradient(circle at 50% 10%, rgba(255, 88, 88, 0.14) 0%, transparent 55%), radial-gradient(circle at 80% 90%, rgba(248, 87, 166, 0.12) 0%, transparent 50%), #080507",
     textSelection: "selection:bg-rose-500 selection:text-white",
   },
   {
     id: "emerald-mint",
     name: "Emerald Mint",
     badge: "Fresh Mint",
-    bubbleClass: "bg-gradient-to-r from-[#0BA360] via-[#10B981] to-[#3CBA92] text-white shadow-md",
+    bubbleClass: "bg-gradient-to-r from-[#0BA360] via-[#10B981] to-[#3CBA92] text-white shadow-lg shadow-emerald-500/25",
+    glowColor: "rgba(16, 185, 129, 0.4)",
     accentColor: "#10B981",
     swatchGradient: "linear-gradient(135deg, #0BA360 0%, #3CBA92 100%)",
+    wallpaperBg: "radial-gradient(circle at 50% 15%, rgba(16, 185, 129, 0.14) 0%, transparent 60%), #050806",
     textSelection: "selection:bg-emerald-500 selection:text-white",
   },
   {
     id: "midnight-noir",
     name: "Apple Noir Stealth",
     badge: "Matte Dark",
-    bubbleClass: "bg-gradient-to-b from-[#3A3A3C] to-[#2C2C2E] border border-white/10 text-white shadow-md",
+    bubbleClass: "bg-gradient-to-b from-[#3A3A3C] to-[#2C2C2E] border border-white/10 text-white shadow-lg",
+    glowColor: "rgba(255, 255, 255, 0.15)",
     accentColor: "#8E8E93",
     swatchGradient: "linear-gradient(135deg, #3A3A3C 0%, #1C1C1E 100%)",
+    wallpaperBg: "#09090b",
     textSelection: "selection:bg-zinc-600 selection:text-white",
   },
   {
     id: "berry-lavender",
     name: "Berry Lavender",
     badge: "Fuchsia",
-    bubbleClass: "bg-gradient-to-r from-[#8A2387] via-[#E94057] to-[#F27121] text-white shadow-md",
+    bubbleClass: "bg-gradient-to-r from-[#8A2387] via-[#E94057] to-[#F27121] text-white shadow-lg shadow-pink-500/25",
+    glowColor: "rgba(233, 64, 87, 0.4)",
     accentColor: "#E94057",
     swatchGradient: "linear-gradient(135deg, #8A2387 0%, #F27121 100%)",
+    wallpaperBg: "radial-gradient(circle at 30% 20%, rgba(138, 35, 135, 0.15) 0%, transparent 55%), radial-gradient(circle at 70% 80%, rgba(242, 113, 33, 0.12) 0%, transparent 50%), #080406",
     textSelection: "selection:bg-fuchsia-600 selection:text-white",
   },
 ];
 
-// Curated Instagram quick emojis & standard reactions
+// Atmospheric Wallpapers
+export interface WallpaperOption {
+  id: string;
+  name: string;
+  preview: string;
+  css: string;
+}
+
+export const WALLPAPER_OPTIONS: WallpaperOption[] = [
+  {
+    id: "theme-default",
+    name: "Theme Atmosphere",
+    preview: "linear-gradient(135deg, #1c1c24, #000000)",
+    css: "default",
+  },
+  {
+    id: "deep-space",
+    name: "Deep Space Aurora",
+    preview: "linear-gradient(135deg, #0f0c29, #302b63, #24243e)",
+    css: "radial-gradient(circle at 50% 0%, rgba(120, 119, 198, 0.25) 0%, transparent 60%), radial-gradient(circle at 100% 100%, rgba(76, 29, 149, 0.2) 0%, transparent 50%), #090714",
+  },
+  {
+    id: "cyber-matrix",
+    name: "Cyber Neon Glow",
+    preview: "linear-gradient(135deg, #000428, #004e92)",
+    css: "radial-gradient(circle at 50% 10%, rgba(0, 242, 254, 0.18) 0%, transparent 55%), radial-gradient(circle at 10% 90%, rgba(79, 172, 254, 0.15) 0%, transparent 50%), #020713",
+  },
+  {
+    id: "twilight-mesh",
+    name: "Twilight Mesh",
+    preview: "linear-gradient(135deg, #2b1055, #7597de)",
+    css: "radial-gradient(circle at 70% 20%, rgba(236, 72, 153, 0.18) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.18) 0%, transparent 50%), #06050b",
+  },
+  {
+    id: "noir-carbon",
+    name: "Pure Apple Dark",
+    preview: "#000000",
+    css: "#000000",
+  },
+];
+
+// Curated Instagram & iOS Popover Reactions (exact match to image-1.png)
+const REACTION_EMOJIS = ["❤️", "👍", "👎", "😂", "‼️", "❓", "🔥", "🎵"];
 const QUICK_EMOJIS = ["❤️", "🔥", "😂", "👏", "😮", "🎵", "🙏🏾", "🚀", "✨", "💯", "🎧", "💿", "🎤", "👀", "⚡", "👑"];
-const REACTION_EMOJIS = ["❤️", "😂", "😮", "😢", "🔥", "👏"];
 
 // Instagram Saved Responses (Canned Quick Replies)
 const SAVED_REPLIES = [
@@ -225,10 +283,15 @@ export default function InboxPage() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<{ id: string; text: string; username?: string | null } | null>(null);
-  
-  // Theme state
-  const [selectedThemeId, setSelectedThemeId] = useState<string>("instagram-twilight");
-  const [showThemePicker, setShowThemePicker] = useState(false);
+
+  // Per-Chat Theme & Wallpaper State
+  const [chatThemes, setChatThemes] = useState<Record<string, { themeId: string; wallpaperId: string; customWallpaperUrl?: string }>>({});
+  const [globalThemeId, setGlobalThemeId] = useState<string>("instagram-twilight");
+  const [showThemeModal, setShowThemeModal] = useState(false);
+
+  // iOS Long-Press / Context Menu Popover (Exact match to image-1.png)
+  const [activeContextMenuMessageId, setActiveContextMenuMessageId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Drawers & Modals
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -238,6 +301,12 @@ export default function InboxPage() {
   const [callDurationSec, setCallDurationSec] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
+
+  // iOS Settings Toggles (image-2.png / image-3.png)
+  const [sendReadReceipts, setSendReadReceipts] = useState(true);
+  const [showSmartPreviews, setShowSmartPreviews] = useState(true);
+  const [autoTranslate, setAutoTranslate] = useState(false);
+  const [mutedNotifications, setMutedNotifications] = useState(false);
 
   // Micro-interactions
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
@@ -249,25 +318,78 @@ export default function InboxPage() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const activeTheme = CHAT_THEMES.find((t) => t.id === selectedThemeId) ?? CHAT_THEMES[0];
   const active = conversations.find((c) => c.id === activeId) ?? null;
 
-  // Load saved theme on mount
+  // Resolve active chat theme & wallpaper
+  const activeChatCustom = activeId && chatThemes[activeId] ? chatThemes[activeId] : null;
+  const currentThemeId = activeChatCustom?.themeId || globalThemeId;
+  const activeTheme = CHAT_THEMES.find((t) => t.id === currentThemeId) ?? CHAT_THEMES[0];
+  
+  const currentWallpaperId = activeChatCustom?.wallpaperId || "theme-default";
+  const activeWallpaper = WALLPAPER_OPTIONS.find((w) => w.id === currentWallpaperId) ?? WALLPAPER_OPTIONS[0];
+  const customWallpaperUrl = activeChatCustom?.customWallpaperUrl;
+
+  // Load saved per-chat customizations on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved && CHAT_THEMES.some((t) => t.id === saved)) {
-      setSelectedThemeId(saved);
-    }
+    try {
+      const saved = localStorage.getItem("v3nja:inbox:chatThemes");
+      if (saved) setChatThemes(JSON.parse(saved));
+      const savedGlobal = localStorage.getItem("v3nja:inbox:globalTheme");
+      if (savedGlobal && CHAT_THEMES.some((t) => t.id === savedGlobal)) {
+        setGlobalThemeId(savedGlobal);
+      }
+    } catch {}
   }, []);
 
-  function handleSelectTheme(themeId: string) {
-    setSelectedThemeId(themeId);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(THEME_STORAGE_KEY, themeId);
+  function handleSetChatTheme(themeId: string) {
+    if (!activeId) {
+      setGlobalThemeId(themeId);
+      if (typeof window !== "undefined") localStorage.setItem("v3nja:inbox:globalTheme", themeId);
+      return;
     }
-    setShowThemePicker(false);
+    const next = {
+      ...chatThemes,
+      [activeId]: {
+        themeId,
+        wallpaperId: activeChatCustom?.wallpaperId || "theme-default",
+        customWallpaperUrl: activeChatCustom?.customWallpaperUrl,
+      },
+    };
+    setChatThemes(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("v3nja:inbox:chatThemes", JSON.stringify(next));
+    }
+  }
+
+  function handleSetChatWallpaper(wallpaperId: string, customUrl?: string) {
+    if (!activeId) return;
+    const next = {
+      ...chatThemes,
+      [activeId]: {
+        themeId: activeChatCustom?.themeId || globalThemeId,
+        wallpaperId,
+        customWallpaperUrl: customUrl !== undefined ? customUrl : activeChatCustom?.customWallpaperUrl,
+      },
+    };
+    setChatThemes(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("v3nja:inbox:chatThemes", JSON.stringify(next));
+    }
+  }
+
+  function handleWallpaperFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !activeId) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        handleSetChatWallpaper("custom", reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   // Voice note recording timer
@@ -431,6 +553,7 @@ export default function InboxPage() {
     setReplyingTo(null);
     setShowEmojiPicker(false);
     setShowSavedReplies(false);
+    setActiveContextMenuMessageId(null);
     const cached = readCache<ThreadMessage[]>(msgCacheKey(id), CACHE_MAX_AGE_MS);
     setMessages(cached.data ?? []);
     setThreadLoading(!cached.data);
@@ -488,12 +611,10 @@ export default function InboxPage() {
     }
   }
 
-  // Quick Like Heart (Instagram standard behavior when input is empty)
   function handleSendQuickHeart() {
     void handleSend("❤️");
   }
 
-  // Voice Note sending simulation
   function handleFinishVoiceRecord() {
     setIsRecordingVoice(false);
     const durationStr = `0:${recordTimerSec < 10 ? `0${recordTimerSec}` : recordTimerSec}`;
@@ -534,9 +655,9 @@ export default function InboxPage() {
         return { ...m, reactions: next };
       })
     );
+    setActiveContextMenuMessageId(null);
   }
 
-  // Double-tap heart animation
   function handleDoubleTapHeart(messageId: string) {
     setHeartAnimId(messageId);
     handleReact(messageId, "❤️");
@@ -546,11 +667,26 @@ export default function InboxPage() {
   function handleCopy(id: string, text: string) {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
+    setActiveContextMenuMessageId(null);
     setTimeout(() => setCopiedId(null), 1800);
   }
 
   function handleDeleteMessage(messageId: string) {
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    setActiveContextMenuMessageId(null);
+  }
+
+  // Touch Long-Press handlers for mobile
+  function handleTouchStart(messageId: string) {
+    longPressTimerRef.current = setTimeout(() => {
+      setActiveContextMenuMessageId(messageId);
+    }, 450);
+  }
+
+  function handleTouchEnd() {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
   }
 
   const filteredConversations = conversations.filter((c) => {
@@ -582,55 +718,24 @@ export default function InboxPage() {
             <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
               <span>Instagram Direct</span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 border border-white/15 text-white/90 backdrop-blur-md">
-                iOS Native UI
+                iOS 19 Liquid Glass
               </span>
             </h1>
-            <p className="text-xs text-zinc-400">Real-time Meta Direct sync, artist link delivery & fan conversations</p>
+            <p className="text-xs text-zinc-400">Direct Meta sync, per-chat wallpapers, Apple glass popovers & fan CRM</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Theme Selector Button */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowThemePicker(!showThemePicker)}
-              className="px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 text-xs font-semibold text-zinc-200 hover:text-white transition-all flex items-center gap-2 shadow-sm"
-            >
-              <span className="w-3 h-3 rounded-full shrink-0" style={{ background: activeTheme.swatchGradient }} />
-              <span className="hidden sm:inline font-bold">{activeTheme.name}</span>
-              <span className="text-[10px] text-zinc-400">🎨</span>
-            </button>
-
-            {/* Theme Picker Popover */}
-            {showThemePicker && (
-              <div className="absolute right-0 top-11 z-50 w-64 rounded-2xl bg-zinc-900/95 border border-white/15 p-2 shadow-2xl backdrop-blur-2xl">
-                <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400 border-b border-white/10 mb-1">
-                  Chat Themes & Bubble Color
-                </div>
-                <div className="space-y-1">
-                  {CHAT_THEMES.map((theme) => (
-                    <button
-                      key={theme.id}
-                      type="button"
-                      onClick={() => handleSelectTheme(theme.id)}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-left text-xs transition-all ${
-                        selectedThemeId === theme.id ? "bg-white/15 text-white font-bold" : "text-zinc-300 hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-4 h-4 rounded-full shadow-sm shrink-0" style={{ background: theme.swatchGradient }} />
-                        <span>{theme.name}</span>
-                      </div>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300 font-mono">
-                        {theme.badge}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Theme & Wallpaper Button */}
+          <button
+            type="button"
+            onClick={() => setShowThemeModal(true)}
+            className="px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 text-xs font-semibold text-zinc-200 hover:text-white transition-all flex items-center gap-2 shadow-sm"
+          >
+            <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: activeTheme.swatchGradient }} />
+            <span className="hidden sm:inline font-bold">{activeTheme.name}</span>
+            <span className="text-[10px] text-zinc-400">🎨 Wallpaper</span>
+          </button>
 
           {accounts.length > 1 && (
             <AccountSelect accounts={accounts} value={selectedAccountId} onChange={setSelectedAccountId} includeAll={false} />
@@ -772,13 +877,21 @@ export default function InboxPage() {
                 💬
               </div>
               <h3 className="text-base font-bold text-white mb-1">Your Direct Messages</h3>
-              <p className="text-xs text-zinc-400 max-w-sm">Select any conversation to chat live, deliver smart links, react, or trigger voice notes.</p>
+              <p className="text-xs text-zinc-400 max-w-sm">Select any conversation to chat live, customize wallpapers, react with liquid glass, or trigger voice notes.</p>
             </div>
           ) : (
-            <div className="flex flex-1 flex-col min-h-0 bg-[#000000]">
-              
+            <div
+              className="flex flex-1 flex-col min-h-0 relative transition-all"
+              style={{
+                background: customWallpaperUrl
+                  ? `linear-gradient(rgba(0,0,0,0.65), rgba(0,0,0,0.75)), url(${customWallpaperUrl}) center/cover no-repeat`
+                  : activeWallpaper.css !== "default"
+                  ? activeWallpaper.css
+                  : activeTheme.wallpaperBg,
+              }}
+            >
               {/* iOS Chat Header */}
-              <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/80 px-4 py-2.5 bg-[#0f0f13]/90 backdrop-blur-xl">
+              <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/80 px-4 py-2.5 bg-[#0f0f13]/85 backdrop-blur-2xl z-20">
                 <div className="flex items-center gap-3">
                   <button type="button" onClick={() => setActiveId(null)} className="rounded-lg p-1.5 text-xs font-bold text-zinc-400 hover:text-white sm:hidden bg-white/[0.05]">
                     ←
@@ -818,6 +931,14 @@ export default function InboxPage() {
                   >
                     📹
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowThemeModal(true)}
+                    className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 border border-white/10 flex items-center justify-center text-xs transition-all"
+                    title="Change Chat Theme & Wallpaper"
+                  >
+                    🎨
+                  </button>
                   <a
                     href={`https://www.instagram.com/${active.contact.username || ""}/`}
                     target="_blank"
@@ -830,7 +951,7 @@ export default function InboxPage() {
                   <button
                     onClick={() => setShowInfoSidebar(!showInfoSidebar)}
                     className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 border border-white/10 flex items-center justify-center text-xs font-bold transition-all"
-                    title="Toggle Fan Details"
+                    title="Toggle Fan Details & iOS Settings"
                   >
                     ℹ️
                   </button>
@@ -838,7 +959,7 @@ export default function InboxPage() {
               </div>
 
               {/* Messages Stream */}
-              <div ref={scrollRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-4 sm:p-5 bg-[#000000]">
+              <div ref={scrollRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-4 sm:p-5 relative">
                 {threadLoading && messages.length === 0 ? (
                   <div className="flex items-center justify-center h-40 text-xs text-zinc-500 animate-pulse">Loading conversation…</div>
                 ) : messages.length === 0 ? (
@@ -848,8 +969,9 @@ export default function InboxPage() {
                     const isHovered = hoveredMessageId === m.id;
                     const isCopied = copiedId === m.id;
                     const isHeartBursting = heartAnimId === m.id;
+                    const isMenuOpen = activeContextMenuMessageId === m.id;
                     const parsed = parseMessageContent(m.text);
-                    const smartLink = extractSmartLink(parsed.actualText);
+                    const smartLink = showSmartPreviews ? extractSmartLink(parsed.actualText) : null;
                     const prevMsg = messages[idx - 1];
                     const nextMsg = messages[idx + 1];
                     const isConsecutivePrev = prevMsg && prevMsg.fromMe === m.fromMe;
@@ -860,49 +982,110 @@ export default function InboxPage() {
                         key={m.id}
                         onMouseEnter={() => setHoveredMessageId(m.id)}
                         onMouseLeave={() => setHoveredMessageId(null)}
-                        className={`flex flex-col group relative ${m.fromMe ? "items-end" : "items-start"} mb-1`}
+                        onTouchStart={() => handleTouchStart(m.id)}
+                        onTouchEnd={handleTouchEnd}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setActiveContextMenuMessageId(m.id);
+                        }}
+                        className={`flex flex-col group relative ${m.fromMe ? "items-end" : "items-start"} mb-1 ${
+                          isMenuOpen ? "z-40" : "z-10"
+                        }`}
                       >
-                        {/* iOS / Instagram Floating Reaction Capsule */}
-                        <div
-                          className={`flex items-center gap-1 mb-1 px-2 py-0.5 rounded-full bg-[#1e1e24]/95 border border-white/15 shadow-2xl backdrop-blur-xl z-20 transition-all ${
-                            isHovered ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-1 pointer-events-none h-0 p-0 m-0 border-0 overflow-hidden"
-                          }`}
-                        >
-                          {REACTION_EMOJIS.map((emoji) => (
-                            <button
-                              key={emoji}
-                              type="button"
-                              onClick={() => handleReact(m.id, emoji)}
-                              className="text-sm hover:scale-130 active:scale-95 transition-transform px-0.5"
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                          <div className="w-[1px] h-3 bg-white/20 mx-1" />
-                          <button
-                            type="button"
-                            onClick={() => setReplyingTo({ id: m.id, text: parsed.actualText, username: m.fromUsername || active.contact.username })}
-                            className="text-[10px] font-semibold text-zinc-300 hover:text-white px-1"
-                          >
-                            Reply
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(m.id, parsed.actualText)}
-                            className="text-[10px] font-semibold text-zinc-300 hover:text-white px-1"
-                          >
-                            {isCopied ? "✓" : "Copy"}
-                          </button>
-                          {m.fromMe && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteMessage(m.id)}
-                              className="text-[10px] font-semibold text-rose-400 hover:text-rose-300 px-1"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
+                        {/* ================= iOS LIQUID GLASS POPOVER (EXACT MATCH TO IMAGE-1.png) ================= */}
+                        {isMenuOpen && (
+                          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                            {/* Backdrop click to dismiss */}
+                            <div className="absolute inset-0" onClick={() => setActiveContextMenuMessageId(null)} />
+
+                            <div className="relative z-10 flex flex-col items-center max-w-sm w-full space-y-3">
+                              {/* 1. Top Liquid Glass Reaction Pill */}
+                              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#1e1e24]/90 border border-white/20 shadow-2xl backdrop-blur-3xl animate-in zoom-in-95 duration-150">
+                                {REACTION_EMOJIS.map((emoji) => (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    onClick={() => handleReact(m.id, emoji)}
+                                    className="text-xl hover:scale-135 active:scale-95 transition-transform px-1 py-0.5"
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+
+                              {/* 2. Highlighted Message Preview with Theme Glow */}
+                              <div
+                                style={{ boxShadow: `0 0 35px ${activeTheme.glowColor}` }}
+                                className={`w-fit max-w-[85%] px-4 py-2.5 rounded-[22px] text-[14.5px] leading-relaxed ${
+                                  m.fromMe ? activeTheme.bubbleClass : "bg-[#262626] text-white border border-white/10"
+                                }`}
+                              >
+                                {parsed.actualText}
+                              </div>
+
+                              {/* 3. Bottom iOS Glass Context Action Sheet */}
+                              <div className="w-56 rounded-2xl bg-[#1c1c24]/95 border border-white/15 shadow-2xl backdrop-blur-3xl overflow-hidden divide-y divide-white/10 animate-in slide-in-from-top-2 duration-150 text-xs font-semibold">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setReplyingTo({ id: m.id, text: parsed.actualText, username: m.fromUsername || active.contact.username });
+                                    setActiveContextMenuMessageId(null);
+                                    if (textareaRef.current) textareaRef.current.focus();
+                                  }}
+                                  className="w-full px-4 py-2.5 text-left text-zinc-200 hover:bg-white/10 flex items-center justify-between"
+                                >
+                                  <span>Reply</span>
+                                  <span className="text-zinc-400">↩</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopy(m.id, parsed.actualText)}
+                                  className="w-full px-4 py-2.5 text-left text-zinc-200 hover:bg-white/10 flex items-center justify-between"
+                                >
+                                  <span>Copy Text</span>
+                                  <span className="text-zinc-400">📋</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDraft(parsed.actualText);
+                                    setActiveContextMenuMessageId(null);
+                                    if (textareaRef.current) textareaRef.current.focus();
+                                  }}
+                                  className="w-full px-4 py-2.5 text-left text-zinc-200 hover:bg-white/10 flex items-center justify-between"
+                                >
+                                  <span>Edit in Composer</span>
+                                  <span className="text-zinc-400">✏️</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`https://translate.google.com/?text=${encodeURIComponent(parsed.actualText)}`);
+                                    setActiveContextMenuMessageId(null);
+                                  }}
+                                  className="w-full px-4 py-2.5 text-left text-zinc-200 hover:bg-white/10 flex items-center justify-between"
+                                >
+                                  <span>Translate</span>
+                                  <span className="text-zinc-400">🌐</span>
+                                </button>
+
+                                {m.fromMe && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteMessage(m.id)}
+                                    className="w-full px-4 py-2.5 text-left text-rose-400 hover:bg-rose-500/10 flex items-center justify-between font-bold"
+                                  >
+                                    <span>Undo Send / Delete</span>
+                                    <span>🗑️</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Quoted Message Tag (if explicit replyTo) */}
                         {m.replyTo && (
@@ -927,7 +1110,7 @@ export default function InboxPage() {
                           {m.isVoice ? (
                             <div
                               className={`w-fit rounded-[20px] px-3.5 py-2.5 flex items-center gap-3 shadow-md ${
-                                m.fromMe ? activeTheme.bubbleClass : "bg-[#262626] text-white border border-white/[0.08]"
+                                m.fromMe ? activeTheme.bubbleClass : "bg-[#262626]/90 text-white border border-white/[0.08]"
                               }`}
                             >
                               <button
@@ -961,7 +1144,7 @@ export default function InboxPage() {
                                   ? `${activeTheme.bubbleClass} ${
                                       isConsecutiveNext ? "rounded-[20px] rounded-br-[6px]" : "rounded-[20px] rounded-br-[3px]"
                                     } ${isConsecutivePrev ? "rounded-tr-[6px]" : ""}`
-                                  : `bg-[#262626] text-[#F5F5F7] border border-white/[0.04] shadow-md ${
+                                  : `bg-[#262626]/90 backdrop-blur-xl text-[#F5F5F7] border border-white/[0.08] shadow-md ${
                                       isConsecutiveNext ? "rounded-[20px] rounded-bl-[6px]" : "rounded-[20px] rounded-bl-[3px]"
                                     } ${isConsecutivePrev ? "rounded-tl-[6px]" : ""}`
                               }`}
@@ -983,7 +1166,7 @@ export default function InboxPage() {
                               href={smartLink.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="mt-1.5 block w-full rounded-2xl bg-[#1c1c24] border border-white/10 hover:border-purple-500/50 p-2.5 transition-all shadow-lg group/link"
+                              className="mt-1.5 block w-full rounded-2xl bg-[#1c1c24]/90 backdrop-blur-xl border border-white/10 hover:border-purple-500/50 p-2.5 transition-all shadow-lg group/link"
                             >
                               <div className="flex items-center gap-2.5">
                                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center text-lg text-white shadow-md shrink-0">
@@ -1014,7 +1197,7 @@ export default function InboxPage() {
                         {(!isConsecutiveNext || idx === messages.length - 1) && (
                           <div className={`flex items-center gap-1 mt-1 text-[9.5px] px-1 text-zinc-500`}>
                             <span>{formatTime(m.createdTime)}</span>
-                            {m.fromMe && (
+                            {m.fromMe && sendReadReceipts && (
                               <span className="text-zinc-400 font-bold" title="Delivered to Instagram Direct">
                                 • Delivered ✓✓
                               </span>
@@ -1029,7 +1212,7 @@ export default function InboxPage() {
 
               {/* Replying Banner */}
               {replyingTo && (
-                <div className="px-4 py-2 bg-[#14141a] border-t border-white/[0.08] flex items-center justify-between text-xs">
+                <div className="px-4 py-2 bg-[#14141a]/95 backdrop-blur-xl border-t border-white/[0.08] flex items-center justify-between text-xs z-10">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-purple-400 font-bold">↳ Replying to @{replyingTo.username ?? "user"}:</span>
                     <span className="truncate text-zinc-400">{replyingTo.text}</span>
@@ -1042,7 +1225,7 @@ export default function InboxPage() {
 
               {/* Saved Canned Replies Drawer */}
               {showSavedReplies && (
-                <div className="px-3 py-2 bg-[#121218] border-t border-white/[0.08] space-y-1 max-h-44 overflow-y-auto">
+                <div className="px-3 py-2 bg-[#121218]/95 backdrop-blur-2xl border-t border-white/[0.08] space-y-1 max-h-44 overflow-y-auto z-10">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 px-1 mb-1">
                     ⚡ Instant Saved Replies (Canned Responses)
                   </div>
@@ -1067,7 +1250,7 @@ export default function InboxPage() {
 
               {/* Quick Emojis Drawer */}
               {showEmojiPicker && (
-                <div className="px-4 py-2 bg-[#121218] border-t border-white/[0.08] flex items-center gap-2 overflow-x-auto no-scrollbar">
+                <div className="px-4 py-2 bg-[#121218]/95 backdrop-blur-2xl border-t border-white/[0.08] flex items-center gap-2 overflow-x-auto no-scrollbar z-10">
                   <span className="text-[10px] uppercase font-bold text-zinc-400 shrink-0">Quick Emojis:</span>
                   {QUICK_EMOJIS.map((emoji) => (
                     <button
@@ -1084,7 +1267,7 @@ export default function InboxPage() {
 
               {/* Voice Recording Active Bar */}
               {isRecordingVoice && (
-                <div className="px-4 py-2.5 bg-rose-950/80 border-t border-rose-500/30 flex items-center justify-between text-xs backdrop-blur-md">
+                <div className="px-4 py-2.5 bg-rose-950/80 border-t border-rose-500/30 flex items-center justify-between text-xs backdrop-blur-md z-10">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
                     <span className="font-bold text-rose-300">Recording Voice Note… (0:{recordTimerSec < 10 ? `0${recordTimerSec}` : recordTimerSec})</span>
@@ -1109,10 +1292,10 @@ export default function InboxPage() {
               )}
 
               {/* iOS Pill Composer */}
-              <div className="shrink-0 p-3 bg-[#0a0a0f] border-t border-zinc-800/80 backdrop-blur-2xl">
+              <div className="shrink-0 p-3 bg-[#0a0a0f]/90 border-t border-zinc-800/80 backdrop-blur-2xl z-20">
                 {sendError && <p className="mb-2 text-xs text-rose-400 px-2 font-medium">{sendError}</p>}
 
-                <div className="flex items-center gap-1.5 bg-[#1c1c24] border border-white/[0.08] rounded-full px-2 py-1 focus-within:border-purple-500/50 transition-all">
+                <div className="flex items-center gap-1.5 bg-[#1c1c24]/90 border border-white/[0.08] rounded-full px-2 py-1 focus-within:border-purple-500/50 transition-all">
                   
                   {/* Saved Replies Action Button */}
                   <button
@@ -1193,13 +1376,224 @@ export default function InboxPage() {
           )}
         </div>
 
-        {/* ================= COLUMN 3: FAN CONTEXT CRM ================= */}
+        {/* ================= COLUMN 3: FAN CONTEXT CRM & iOS SETTINGS (image-2.png / image-3.png) ================= */}
         {active && showInfoSidebar && (
           <div className="hidden lg:flex min-h-0 flex-col border-l border-zinc-800 bg-[#0c0c12] overflow-y-auto">
+            {/* iOS Conversation Settings Section */}
+            <div className="p-4 border-b border-white/[0.08] space-y-3 bg-[#111117]/80">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 flex items-center justify-between">
+                <span>Chat Preferences</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono">iOS 19</span>
+              </div>
+
+              {/* iOS Toggle Cards (Matching image-2.png / image-3.png) */}
+              <div className="space-y-1.5 rounded-2xl bg-[#181820] border border-white/[0.06] p-2 text-xs">
+                <div className="flex items-center justify-between py-1 px-1">
+                  <span className="text-zinc-200">Send Read Receipts</span>
+                  <button
+                    type="button"
+                    onClick={() => setSendReadReceipts(!sendReadReceipts)}
+                    className={`w-9 h-5 rounded-full transition-colors relative ${
+                      sendReadReceipts ? "bg-emerald-500" : "bg-zinc-700"
+                    }`}
+                  >
+                    <span
+                      className={`block w-4 h-4 rounded-full bg-white transition-transform ${
+                        sendReadReceipts ? "translate-x-4.5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between py-1 px-1 border-t border-white/5">
+                  <span className="text-zinc-200">Smart Link Cards</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowSmartPreviews(!showSmartPreviews)}
+                    className={`w-9 h-5 rounded-full transition-colors relative ${
+                      showSmartPreviews ? "bg-emerald-500" : "bg-zinc-700"
+                    }`}
+                  >
+                    <span
+                      className={`block w-4 h-4 rounded-full bg-white transition-transform ${
+                        showSmartPreviews ? "translate-x-4.5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between py-1 px-1 border-t border-white/5">
+                  <span className="text-zinc-200">Auto-Translate</span>
+                  <button
+                    type="button"
+                    onClick={() => setAutoTranslate(!autoTranslate)}
+                    className={`w-9 h-5 rounded-full transition-colors relative ${
+                      autoTranslate ? "bg-emerald-500" : "bg-zinc-700"
+                    }`}
+                  >
+                    <span
+                      className={`block w-4 h-4 rounded-full bg-white transition-transform ${
+                        autoTranslate ? "translate-x-4.5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between py-1 px-1 border-t border-white/5">
+                  <span className="text-zinc-200">Mute Notifications</span>
+                  <button
+                    type="button"
+                    onClick={() => setMutedNotifications(!mutedNotifications)}
+                    className={`w-9 h-5 rounded-full transition-colors relative ${
+                      mutedNotifications ? "bg-emerald-500" : "bg-zinc-700"
+                    }`}
+                  >
+                    <span
+                      className={`block w-4 h-4 rounded-full bg-white transition-transform ${
+                        mutedNotifications ? "translate-x-4.5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Wallpaper & Theme Quick Trigger */}
+              <button
+                type="button"
+                onClick={() => setShowThemeModal(true)}
+                className="w-full py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-semibold text-zinc-200 transition-all flex items-center justify-center gap-2"
+              >
+                <span>🎨 Customize Chat Atmosphere</span>
+              </button>
+            </div>
+
+            {/* Fan CRM Data */}
             <InboxFanContext data={fanContext} loading={fanLoading} />
           </div>
         )}
       </div>
+
+      {/* ================= MODAL: THEME & CUSTOM WALLPAPER CUSTOMIZER ================= */}
+      {showThemeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-2xl p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-zinc-900 border border-white/15 p-6 shadow-2xl flex flex-col max-h-[88vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-white">Chat Themes & Wallpapers</h3>
+                <p className="text-xs text-zinc-400">
+                  {active ? `Customizing atmosphere for @${active.contact.username}` : "Global Chat Styling"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowThemeModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 font-bold text-sm flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 1. Theme Presets Grid */}
+            <div className="mb-5">
+              <label className="text-[11px] uppercase font-bold tracking-wider text-zinc-400 block mb-2.5">
+                Bubble Color & Glow Theme
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {CHAT_THEMES.map((theme) => (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => handleSetChatTheme(theme.id)}
+                    className={`p-2.5 rounded-2xl border text-left transition-all ${
+                      currentThemeId === theme.id
+                        ? "border-purple-500 bg-purple-500/15 shadow-md shadow-purple-500/20"
+                        : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <span className="block w-full h-7 rounded-xl mb-2 shadow-sm" style={{ background: theme.swatchGradient }} />
+                    <span className="text-[11px] font-bold text-white block truncate">{theme.name}</span>
+                    <span className="text-[9px] text-zinc-400 block">{theme.badge}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Wallpaper Presets Grid */}
+            <div className="mb-5">
+              <label className="text-[11px] uppercase font-bold tracking-wider text-zinc-400 block mb-2.5">
+                Atmospheric Background Wallpaper
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {WALLPAPER_OPTIONS.map((wall) => (
+                  <button
+                    key={wall.id}
+                    type="button"
+                    onClick={() => handleSetChatWallpaper(wall.id)}
+                    className={`p-2.5 rounded-2xl border text-left transition-all ${
+                      currentWallpaperId === wall.id && !customWallpaperUrl
+                        ? "border-purple-500 bg-purple-500/15 shadow-md"
+                        : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <span className="block w-full h-10 rounded-xl mb-1.5 shadow-inner border border-white/10" style={{ background: wall.preview }} />
+                    <span className="text-[11px] font-bold text-white block truncate">{wall.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Custom Photo / Image Wallpaper Upload */}
+            <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <span className="text-xs font-bold text-white block">Upload Custom Photo / Wallpaper</span>
+                  <span className="text-[10px] text-zinc-400">Set any custom image as the background for this chat</span>
+                </div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  onChange={handleWallpaperFileUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all shrink-0"
+                >
+                  Choose File 🖼️
+                </button>
+              </div>
+
+              {customWallpaperUrl && (
+                <div className="mt-3 flex items-center justify-between p-2 rounded-xl bg-black/40 border border-white/10">
+                  <div className="flex items-center gap-2">
+                    <img src={customWallpaperUrl} alt="Custom Wallpaper" className="w-8 h-8 rounded-lg object-cover border border-white/20" />
+                    <span className="text-xs text-zinc-300 font-medium">Custom Wallpaper Active</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSetChatWallpaper("theme-default", "")}
+                    className="text-xs text-rose-400 hover:text-rose-300 font-bold px-2 py-1"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowThemeModal(false)}
+                className="px-5 py-2 rounded-xl bg-white text-black font-bold text-xs hover:bg-zinc-200 transition-all shadow-md"
+              >
+                Apply & Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ================= AUDIO / VIDEO CALL SIMULATION MODAL ================= */}
       {activeCallModal && active && (
