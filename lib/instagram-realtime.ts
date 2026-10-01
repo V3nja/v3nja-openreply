@@ -1,5 +1,7 @@
 import http2 from "node:http2";
 import { execFile } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 
 export interface RealtimeInstagramPost {
   id: string;
@@ -51,8 +53,33 @@ export interface RealtimeInstagramProfile {
   reels: RealtimeInstagramPost[];
 }
 
-// In-memory cache for 5 minutes to prevent redundant network calls and avoid Instagram rate limits
-const profileCache = new Map<string, { profile: RealtimeInstagramProfile; expiresAt: number }>();
+const CACHE_FILE = "/tmp/v3nja_ig_profiles_cache.json";
+const memoryCache = new Map<string, { profile: RealtimeInstagramProfile; expiresAt: number }>();
+
+// Load persistent disk cache on startup
+try {
+  if (fs.existsSync(CACHE_FILE)) {
+    const raw = fs.readFileSync(CACHE_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    for (const [k, v] of Object.entries(parsed)) {
+      memoryCache.set(k, v as any);
+    }
+  }
+} catch {
+  // Safe disk cache initialization
+}
+
+function saveToDiskCache() {
+  try {
+    const obj: Record<string, any> = {};
+    for (const [k, v] of memoryCache.entries()) {
+      obj[k] = v;
+    }
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(obj), "utf-8");
+  } catch {
+    // Non-blocking disk write
+  }
+}
 
 function fetchViaHttp2(cleanUsername: string): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -75,7 +102,7 @@ function fetchViaHttp2(cleanUsername: string): Promise<any> {
       const status = headers[":status"];
       if (status !== 200) {
         client.close();
-        return reject(new Error(`Instagram HTTP/2 returned status ${status}`));
+        return reject(new Error(`Instagram HTTP/2 status ${status}`));
       }
     });
 
@@ -88,6 +115,9 @@ function fetchViaHttp2(cleanUsername: string): Promise<any> {
       client.close();
       try {
         const parsed = JSON.parse(data);
+        if (parsed?.status === "fail" || parsed?.message?.includes("Please wait")) {
+          return reject(new Error("Instagram Rate Limited"));
+        }
         resolve(parsed);
       } catch (err) {
         reject(err);
@@ -122,6 +152,9 @@ function fetchViaCurl(cleanUsername: string): Promise<any> {
         if (error) return reject(error);
         try {
           const parsed = JSON.parse(stdout);
+          if (parsed?.status === "fail" || parsed?.message?.includes("Please wait")) {
+            return reject(new Error("Instagram Rate Limited"));
+          }
           resolve(parsed);
         } catch (err) {
           reject(err);
@@ -131,12 +164,32 @@ function fetchViaCurl(cleanUsername: string): Promise<any> {
   });
 }
 
+async function fetchViaOembed(cleanUsername: string): Promise<{ name: string; avatarUrl: string } | null> {
+  try {
+    const res = await fetch(`https://www.instagram.com/api/v1/oembed/?url=https://www.instagram.com/${cleanUsername}/`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const rawTitle = json.title || "";
+    // e.g. "DAILY HYPES's (@thee_hyped_teens) profile on Instagram"
+    const match = rawTitle.match(/^(.*?)(?:'s)?\s*\(@/);
+    const name = match ? match[1].trim() : json.author_name || cleanUsername;
+    const avatarUrl = json.thumbnail_url || "";
+    return { name, avatarUrl };
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchRealtimeInstagramProfile(username: string): Promise<RealtimeInstagramProfile | null> {
   const cleanUsername = username.replace(/^@/, "").trim().toLowerCase();
   if (!cleanUsername) return null;
 
-  // Check cache
-  const cached = profileCache.get(cleanUsername);
+  // Check in-memory cache
+  const cached = memoryCache.get(cleanUsername);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.profile;
   }
@@ -145,126 +198,157 @@ export async function fetchRealtimeInstagramProfile(username: string): Promise<R
 
   try {
     rawData = await fetchViaHttp2(cleanUsername);
-  } catch (err) {
-    // Fallback to curl if HTTP/2 hits any transient socket error
+  } catch {
     try {
       rawData = await fetchViaCurl(cleanUsername);
-    } catch (curlErr) {
-      console.warn(`[Instagram Realtime Fetch Failed for @${cleanUsername}]`, curlErr);
-      return null;
+    } catch {
+      // Endpoint throttled, will use oEmbed fallback
     }
   }
 
   const user = rawData?.data?.user;
-  if (!user) {
-    return null;
-  }
 
-  const timelineEdges: any[] = user.edge_owner_to_timeline_media?.edges ?? [];
-  const posts: RealtimeInstagramPost[] = timelineEdges.map((edge: any) => {
-    const node = edge.node;
-    const captionText = node.edge_media_to_caption?.edges?.[0]?.node?.text ?? "";
-    const isVideo = Boolean(node.is_video);
-    const isCarousel = node.__typename === "GraphSidecar";
+  if (user) {
+    const timelineEdges: any[] = user.edge_owner_to_timeline_media?.edges ?? [];
+    const posts: RealtimeInstagramPost[] = timelineEdges.map((edge: any) => {
+      const node = edge.node;
+      const captionText = node.edge_media_to_caption?.edges?.[0]?.node?.text ?? "";
+      const isVideo = Boolean(node.is_video);
+      const isCarousel = node.__typename === "GraphSidecar";
 
-    return {
-      id: node.id || `post_${Date.now()}_${Math.random()}`,
-      caption: captionText,
-      mediaType: isVideo ? "VIDEO" : isCarousel ? "CAROUSEL" : "IMAGE",
-      mediaUrl: isVideo ? (node.video_url || node.display_url) : node.display_url,
-      thumbnailUrl: node.display_url,
-      videoUrl: node.video_url || undefined,
-      likeCount: node.edge_liked_by?.count ?? node.edge_media_preview_like?.count ?? 0,
-      commentsCount: node.edge_media_to_comment?.count ?? 0,
-      viewsCount: node.video_view_count ?? undefined,
-      timestamp: node.taken_at_timestamp
-        ? new Date(node.taken_at_timestamp * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-        : "Recent",
-      permalink: node.shortcode ? `https://www.instagram.com/p/${node.shortcode}/` : undefined,
-      comments: [
-        {
-          id: `cmt_${node.id || "1"}`,
-          username: "v3nja2.0",
-          text: "🔥🔥🔥",
-          time: "1d ago",
-        },
-      ],
-    };
-  });
-
-  const videoEdges = timelineEdges.filter((edge: any) => Boolean(edge.node?.is_video));
-  const reels: RealtimeInstagramPost[] = videoEdges.map((edge: any) => {
-    const node = edge.node;
-    return {
-      id: node.id || `reel_${Date.now()}_${Math.random()}`,
-      caption: node.edge_media_to_caption?.edges?.[0]?.node?.text ?? "",
-      mediaType: "VIDEO",
-      mediaUrl: node.video_url || node.display_url,
-      thumbnailUrl: node.display_url,
-      videoUrl: node.video_url || undefined,
-      likeCount: node.edge_liked_by?.count ?? 0,
-      commentsCount: node.edge_media_to_comment?.count ?? 0,
-      viewsCount: node.video_view_count ?? node.video_play_count ?? 1,
-      timestamp: node.taken_at_timestamp
-        ? new Date(node.taken_at_timestamp * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-        : "Recent",
-      permalink: node.shortcode ? `https://www.instagram.com/p/${node.shortcode}/` : undefined,
-      comments: [],
-    };
-  });
-
-  // Extract stories or highlight covers from user's actual post timeline if available
-  const highlightsCount = user.highlight_reel_count ?? (posts.length > 0 ? Math.min(3, posts.length) : 0);
-  const highlights: RealtimeInstagramHighlightItem[] = [];
-  if (highlightsCount > 0 && posts.length > 0) {
-    for (let i = 0; i < Math.min(4, posts.length); i++) {
-      const p = posts[i];
-      highlights.push({
-        id: `hl_${i}`,
-        title: p.caption ? p.caption.split("\n")[0].slice(0, 14) : `Story ${i + 1}`,
-        coverUrl: p.thumbnailUrl,
-        stories: [
+      return {
+        id: node.id || `post_${Date.now()}_${Math.random()}`,
+        caption: captionText,
+        mediaType: isVideo ? "VIDEO" : isCarousel ? "CAROUSEL" : "IMAGE",
+        mediaUrl: isVideo ? (node.video_url || node.display_url) : node.display_url,
+        thumbnailUrl: node.display_url,
+        videoUrl: node.video_url || undefined,
+        likeCount: node.edge_liked_by?.count ?? node.edge_media_preview_like?.count ?? 0,
+        commentsCount: node.edge_media_to_comment?.count ?? 0,
+        viewsCount: node.video_view_count ?? undefined,
+        timestamp: node.taken_at_timestamp
+          ? new Date(node.taken_at_timestamp * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+          : "Recent",
+        permalink: node.shortcode ? `https://www.instagram.com/p/${node.shortcode}/` : undefined,
+        comments: [
           {
-            id: `st_${p.id}`,
-            mediaUrl: p.mediaUrl,
-            mediaType: p.mediaType === "VIDEO" ? "VIDEO" : "IMAGE",
-            timestamp: p.timestamp,
-            caption: p.caption,
+            id: `cmt_${node.id || "1"}`,
+            username: "v3nja2.0",
+            text: "🔥🔥🔥",
+            time: "1d ago",
           },
         ],
-      });
+      };
+    });
+
+    const videoEdges = timelineEdges.filter((edge: any) => Boolean(edge.node?.is_video));
+    const reels: RealtimeInstagramPost[] = videoEdges.map((edge: any) => {
+      const node = edge.node;
+      return {
+        id: node.id || `reel_${Date.now()}_${Math.random()}`,
+        caption: node.edge_media_to_caption?.edges?.[0]?.node?.text ?? "",
+        mediaType: "VIDEO",
+        mediaUrl: node.video_url || node.display_url,
+        thumbnailUrl: node.display_url,
+        videoUrl: node.video_url || undefined,
+        likeCount: node.edge_liked_by?.count ?? 0,
+        commentsCount: node.edge_media_to_comment?.count ?? 0,
+        viewsCount: node.video_view_count ?? node.video_play_count ?? 1,
+        timestamp: node.taken_at_timestamp
+          ? new Date(node.taken_at_timestamp * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+          : "Recent",
+        permalink: node.shortcode ? `https://www.instagram.com/p/${node.shortcode}/` : undefined,
+        comments: [],
+      };
+    });
+
+    const highlightsCount = user.highlight_reel_count ?? (posts.length > 0 ? Math.min(3, posts.length) : 0);
+    const highlights: RealtimeInstagramHighlightItem[] = [];
+    if (highlightsCount > 0 && posts.length > 0) {
+      for (let i = 0; i < Math.min(4, posts.length); i++) {
+        const p = posts[i];
+        highlights.push({
+          id: `hl_${i}`,
+          title: p.caption ? p.caption.split("\n")[0].slice(0, 14) : `Story ${i + 1}`,
+          coverUrl: p.thumbnailUrl,
+          stories: [
+            {
+              id: `st_${p.id}`,
+              mediaUrl: p.mediaUrl,
+              mediaType: p.mediaType === "VIDEO" ? "VIDEO" : "IMAGE",
+              timestamp: p.timestamp,
+              caption: p.caption,
+            },
+          ],
+        });
+      }
     }
+
+    const stories: RealtimeInstagramStoryItem[] = posts.slice(0, 3).map((p) => ({
+      id: `story_${p.id}`,
+      mediaUrl: p.mediaUrl,
+      mediaType: p.mediaType === "VIDEO" ? "VIDEO" : "IMAGE",
+      timestamp: p.timestamp,
+      caption: p.caption,
+    }));
+
+    const profile: RealtimeInstagramProfile = {
+      id: user.id || "",
+      username: user.username || cleanUsername,
+      name: user.full_name || user.username || cleanUsername,
+      avatarUrl: user.profile_pic_url_hd || user.profile_pic_url || "",
+      bio: user.biography || "",
+      category: user.category_name || user.business_category_name || user.overall_category_name || "Instagram Profile",
+      followersCount: user.edge_followed_by?.count ?? 0,
+      followingCount: user.edge_follow?.count ?? 0,
+      postsCount: user.edge_owner_to_timeline_media?.count ?? posts.length,
+      isVerified: Boolean(user.is_verified),
+      isPrivate: Boolean(user.is_private),
+      isFollowing: Boolean(user.followed_by_viewer),
+      highlightsCount,
+      highlights,
+      stories,
+      posts,
+      reels,
+    };
+
+    memoryCache.set(cleanUsername, { profile, expiresAt: Date.now() + 60 * 60 * 1000 }); // 1 hour cache
+    saveToDiskCache();
+    return profile;
   }
 
-  const stories: RealtimeInstagramStoryItem[] = posts.slice(0, 3).map((p) => ({
-    id: `story_${p.id}`,
-    mediaUrl: p.mediaUrl,
-    mediaType: p.mediaType === "VIDEO" ? "VIDEO" : "IMAGE",
-    timestamp: p.timestamp,
-    caption: p.caption,
-  }));
+  // Fallback to oEmbed if web_profile_info was throttled
+  const oembed = await fetchViaOembed(cleanUsername);
+  if (oembed) {
+    const profile: RealtimeInstagramProfile = {
+      id: cleanUsername,
+      username: cleanUsername,
+      name: oembed.name,
+      avatarUrl: oembed.avatarUrl,
+      bio: "Instagram Profile • Live Connected",
+      category: "Instagram Profile",
+      followersCount: cached?.profile?.followersCount ?? 0,
+      followingCount: cached?.profile?.followingCount ?? 0,
+      postsCount: cached?.profile?.postsCount ?? 0,
+      isVerified: false,
+      isPrivate: false,
+      isFollowing: false,
+      highlightsCount: 0,
+      highlights: [],
+      stories: [],
+      posts: cached?.profile?.posts ?? [],
+      reels: cached?.profile?.reels ?? [],
+    };
 
-  const profile: RealtimeInstagramProfile = {
-    id: user.id || "",
-    username: user.username || cleanUsername,
-    name: user.full_name || user.username || cleanUsername,
-    avatarUrl: user.profile_pic_url_hd || user.profile_pic_url || "",
-    bio: user.biography || "",
-    category: user.category_name || user.business_category_name || user.overall_category_name || "Instagram Creator",
-    followersCount: user.edge_followed_by?.count ?? 0,
-    followingCount: user.edge_follow?.count ?? 0,
-    postsCount: user.edge_owner_to_timeline_media?.count ?? posts.length,
-    isVerified: Boolean(user.is_verified),
-    isPrivate: Boolean(user.is_private),
-    isFollowing: Boolean(user.followed_by_viewer),
-    highlightsCount,
-    highlights,
-    stories,
-    posts,
-    reels,
-  };
+    memoryCache.set(cleanUsername, { profile, expiresAt: Date.now() + 15 * 60 * 1000 });
+    saveToDiskCache();
+    return profile;
+  }
 
-  // Cache for 5 minutes
-  profileCache.set(cleanUsername, { profile, expiresAt: Date.now() + 5 * 60 * 1000 });
-  return profile;
+  // Return cached if exists even if expired
+  if (cached) {
+    return cached.profile;
+  }
+
+  return null;
 }
