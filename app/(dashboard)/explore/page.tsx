@@ -1,238 +1,231 @@
 "use client";
 
 /**
- * Universal Instagram Explore & Discovery Engine
- * Authentic Instagram search for Accounts, Audio, Hashtags, and Places, with categorized discovery grid.
+ * Universal Instagram Explore & Discovery Engine (V3NJA Social OS)
+ * Exact authentic Meta Instagram web explore grid matching screenshots 7 & 8 with rich tiles,
+ * video reel indicators, live likes & comments, and interactive lightbox.
  */
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { getProxiedImageUrl } from "@/lib/image-proxy-helper";
-import {
-  CREATOR_ROSTER,
-  TRENDING_SOUNDS,
-  getAlgorithmicFeedPosts,
-  type DetailedFeedPost,
-  type FeedAuthor,
-  type AudioTrack,
-} from "@/lib/instagram-feed-engine";
+import { getExploreGridItems, type ExploreTileItem } from "@/lib/instagram-feed-engine";
+import InstagramMessagesDock from "@/components/instagram-messages-dock";
 
 export default function InstagramExplorePage() {
+  const [items, setItems] = useState<ExploreTileItem[]>(getExploreGridItems());
+  const [selectedItem, setSelectedItem] = useState<ExploreTileItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"top" | "accounts" | "audio" | "tags">("top");
-  const [selectedTopic, setSelectedTopic] = useState<string>("All");
-  const [selectedPost, setSelectedPost] = useState<DetailedFeedPost | null>(null);
+  const [activeTopic, setActiveTopic] = useState("All");
 
-  const TOPICS = ["All", "🎵 Music", "🔥 Afrobeats", "🎬 Reels", "💃 Dance", "🌍 Malawi & Africa", "🎨 Visuals", "💻 Tech"];
-  const posts = getAlgorithmicFeedPosts();
+  const TOPICS = [
+    "All",
+    "🤖 AI & Tech",
+    "🎵 Music",
+    "🎬 Reels",
+    "💃 Dance",
+    "🌍 Africa & Culture",
+    "👗 Fashion",
+    "🚗 Cars",
+    "🎨 3D Art",
+  ];
 
-  // Search filtering
-  const matchingAccounts = CREATOR_ROSTER.filter(
-    (c) =>
-      c.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const matchingAudio = TRENDING_SOUNDS.filter(
-    (s) =>
-      s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.artist.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredItems = items.filter((item) => {
+    if (activeTopic !== "All" && item.topic && !activeTopic.includes(item.topic)) {
+      return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return (
+        item.caption.toLowerCase().includes(q) ||
+        item.author.username.toLowerCase().includes(q) ||
+        (item.topic && item.topic.toLowerCase().includes(q))
+      );
+    }
+    return true;
+  });
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-20 font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,Helvetica,Arial,sans-serif]">
+    <div className="min-h-screen bg-black text-white font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,Helvetica,Arial,sans-serif] pb-24">
       
-      {/* Top Search & Discovery Bar */}
-      <div className="p-4 rounded-3xl bg-zinc-950/80 border border-white/[0.08] shadow-2xl backdrop-blur-xl space-y-3">
-        <div className="relative">
-          <span className="absolute left-3.5 top-3 text-sm text-zinc-400">🔍</span>
+      {/* Top Search Bar & Topic Navigation */}
+      <div className="max-w-5xl mx-auto px-4 py-4 space-y-4">
+        
+        {/* Search Input Bar */}
+        <div className="relative max-w-lg mx-auto">
+          <span className="absolute left-3.5 top-2.5 text-zinc-400 text-sm">🔍</span>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search accounts, audio tracks, hashtags (#V3NJA), and places…"
-            className="w-full bg-zinc-900 border border-white/10 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-purple-500 transition-colors shadow-inner"
+            placeholder="Search creators, audio tracks, AI tools, hashtags…"
+            className="w-full bg-zinc-900 border border-white/10 rounded-2xl pl-10 pr-4 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 transition-colors"
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute right-3.5 top-2.5 text-xs text-zinc-400 hover:text-white"
+              className="absolute right-3.5 top-2 text-xs text-zinc-400 hover:text-white"
             >
               ✕
             </button>
           )}
         </div>
 
-        {/* Search Result Category Tabs */}
-        {searchQuery && (
-          <div className="flex items-center gap-2 border-b border-white/10 pb-2 text-xs font-bold">
-            {(["top", "accounts", "audio", "tags"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setActiveTab(t)}
-                className={`px-3 py-1 rounded-xl capitalize transition-all ${
-                  activeTab === t ? "bg-purple-600 text-white" : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Topic Filter Pills */}
-        {!searchQuery && (
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1">
-            {TOPICS.map((topic) => (
-              <button
-                key={topic}
-                type="button"
-                onClick={() => setSelectedTopic(topic)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                  selectedTopic === topic
-                    ? "bg-white text-black shadow-md scale-102"
-                    : "bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300"
-                }`}
-              >
-                {topic}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Topic Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar justify-start sm:justify-center">
+          {TOPICS.map((topic) => (
+            <button
+              key={topic}
+              type="button"
+              onClick={() => setActiveTopic(topic)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                activeTopic === topic
+                  ? "bg-white text-black shadow-md scale-102"
+                  : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-white/5"
+              }`}
+            >
+              {topic}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Search Live Results Stream */}
-      {searchQuery ? (
-        <div className="space-y-4">
-          {/* Accounts Search Results */}
-          {(activeTab === "top" || activeTab === "accounts") && matchingAccounts.length > 0 && (
-            <div className="p-4 rounded-3xl bg-zinc-950/80 border border-white/[0.08] space-y-3">
-              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Accounts</span>
-              <div className="space-y-2">
-                {matchingAccounts.map((acc) => (
-                  <Link
-                    key={acc.id}
-                    href={`/inbox?user=${acc.username}`}
-                    className="flex items-center justify-between p-2 rounded-2xl hover:bg-white/[0.04] transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600">
-                        <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center text-xs font-bold text-white relative overflow-hidden">
-                          <span>{acc.username[0].toUpperCase()}</span>
-                          {acc.avatarUrl && (
-                            <img src={getProxiedImageUrl(acc.avatarUrl)} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-bold text-white">@{acc.username}</span>
-                          {acc.isVerified && <span className="text-blue-400 text-[10px]">✓</span>}
-                        </div>
-                        <span className="text-[11px] text-zinc-400">{acc.name} • {acc.category}</span>
-                      </div>
-                    </div>
-                    <span className="text-[11px] font-bold text-purple-400">View In-App →</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Audio Tracks Search Results */}
-          {(activeTab === "top" || activeTab === "audio") && matchingAudio.length > 0 && (
-            <div className="p-4 rounded-3xl bg-zinc-950/80 border border-white/[0.08] space-y-3">
-              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Audio & Music</span>
-              <div className="space-y-2">
-                {matchingAudio.map((snd) => (
-                  <div key={snd.id} className="flex items-center justify-between p-2 rounded-2xl hover:bg-white/[0.04] transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-black shrink-0">
-                        <img src={snd.albumArtUrl} alt={snd.title} className="w-full h-full object-cover" />
-                      </div>
-                      <div>
-                        <span className="text-xs font-bold text-white block">{snd.title}</span>
-                        <span className="text-[11px] text-zinc-400">{snd.artist} • {snd.usesCount ? `${snd.usesCount.toLocaleString()} reels` : "Sound"}</span>
-                      </div>
-                    </div>
-                    <span className="px-3 py-1 bg-white/10 rounded-xl text-xs font-bold text-white">Use Audio</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Dynamic Explore Grid (Mix of 1x1 Photos, 1x2 Vertical Reels) */
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          {posts.map((post, idx) => {
-            const isFeatured = idx % 5 === 1;
+      {/* Explore Grid (Matching screenshots 7 & 8) */}
+      <div className="max-w-5xl mx-auto px-2 sm:px-4">
+        <div className="grid grid-cols-3 gap-1 sm:gap-2">
+          {filteredItems.map((item, idx) => {
+            const isTallReel = idx % 5 === 1;
 
             return (
               <div
-                key={post.id}
-                onClick={() => setSelectedPost(post)}
-                className={`group relative rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 cursor-pointer shadow-md hover:border-purple-500/60 transition-all ${
-                  isFeatured ? "row-span-2 aspect-[9/16]" : "aspect-square"
+                key={item.id}
+                onClick={() => setSelectedItem(item)}
+                className={`group relative rounded-lg sm:rounded-xl overflow-hidden bg-zinc-900 cursor-pointer select-none border border-white/5 transition-transform ${
+                  isTallReel ? "row-span-2 aspect-[9/16]" : "aspect-square"
                 }`}
               >
+                {/* Media Thumbnail */}
                 <img
-                  src={getProxiedImageUrl(post.thumbnailUrl || post.mediaUrl)}
+                  src={item.thumbnailUrl}
                   alt=""
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  onError={(e) => { (e.currentTarget as HTMLElement).style.display = "none"; }}
                 />
 
-                {/* Media Type Icon */}
-                <div className="absolute top-2 right-2 text-xs bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-lg text-white">
-                  {post.mediaType === "VIDEO" ? "🎬" : post.slides ? "▦" : "📷"}
+                {/* Badge Indicator (Reel play icon / Carousel icon) */}
+                <div className="absolute top-2 right-2 text-xs bg-black/50 backdrop-blur-md px-1.5 py-0.5 rounded text-white font-mono">
+                  {item.badge === "reel" ? "▶" : item.badge === "carousel" ? "▦" : ""}
                 </div>
 
-                {/* Hover Overlay with Stats & Author */}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col justify-between p-3 text-white transition-opacity">
-                  <div className="text-[11px] font-bold truncate">@{post.author.username}</div>
-                  <div className="flex items-center justify-center gap-3 text-xs font-bold">
-                    <span>❤️ {post.likeCount}</span>
-                    <span>💬 {post.commentsCount}</span>
-                  </div>
+                {/* Caption Banner (for meme & news items as seen in screenshot 7 & 8) */}
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2 text-[11px] font-bold text-white line-clamp-2">
+                  {item.caption}
+                </div>
+
+                {/* Hover Dark Overlay with Likes & Comments Count */}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-4 text-white text-xs font-extrabold transition-opacity">
+                  <span className="flex items-center gap-1">
+                    <span>❤️</span>
+                    <span>{item.likeCount}</span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span>💬</span>
+                    <span>{item.commentsCount}</span>
+                  </span>
                 </div>
               </div>
             );
           })}
         </div>
-      )}
+      </div>
 
-      {/* Explore Post Lightbox Zoom */}
-      {selectedPost && (
+      {/* Explore Lightbox Modal */}
+      {selectedItem && (
         <div
-          onClick={() => setSelectedPost(null)}
-          className="fixed inset-0 z-80 flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in"
+          onClick={() => setSelectedItem(null)}
+          className="fixed inset-0 z-90 flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-xl rounded-3xl bg-zinc-950 border border-white/15 overflow-hidden shadow-2xl"
+            className="w-full max-w-4xl max-h-[85vh] rounded-3xl bg-black border border-white/15 overflow-hidden shadow-2xl grid grid-cols-1 md:grid-cols-12"
           >
-            <div className="p-3 border-b border-white/10 flex items-center justify-between">
-              <span className="text-xs font-bold text-white">@{selectedPost.author.username}</span>
-              <button onClick={() => setSelectedPost(null)} className="text-xs text-white">✕</button>
+            {/* Left Media Area */}
+            <div className="md:col-span-7 bg-zinc-950 flex items-center justify-center max-h-[75vh]">
+              <img
+                src={selectedItem.mediaUrl}
+                alt=""
+                className="max-h-full max-w-full object-contain"
+              />
             </div>
-            <div className="aspect-square bg-black flex items-center justify-center">
-              <img src={getProxiedImageUrl(selectedPost.mediaUrl)} alt="" className="max-h-full max-w-full object-contain" />
-            </div>
-            <div className="p-4 space-y-2 text-xs">
-              <p className="text-zinc-200">{selectedPost.caption}</p>
-              <div className="flex items-center justify-between text-zinc-400 text-[11px]">
-                <span>❤️ {selectedPost.likeCount} likes</span>
-                <Link href={`/inbox?user=${selectedPost.author.username}`} className="text-purple-400 font-bold hover:underline">
-                  Message Creator →
+
+            {/* Right Information & Interactions Rail */}
+            <div className="md:col-span-5 p-5 flex flex-col justify-between border-t md:border-t-0 md:border-l border-white/10 space-y-4">
+              {/* Creator Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full overflow-hidden border border-white">
+                    <img
+                      src={selectedItem.author.avatarUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">
+                      @{selectedItem.author.username}
+                    </span>
+                    <span className="text-[10px] text-zinc-400">
+                      {selectedItem.author.category}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedItem(null)}
+                  className="w-7 h-7 rounded-full bg-white/10 text-white flex items-center justify-center text-xs font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Caption & Comments */}
+              <div className="flex-1 overflow-y-auto space-y-3 text-xs text-zinc-200">
+                <p className="leading-relaxed">{selectedItem.caption}</p>
+                <div className="p-3 rounded-2xl bg-zinc-900 border border-white/5 space-y-1">
+                  <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+                    Community Response
+                  </div>
+                  <div className="flex items-center justify-between font-mono text-xs">
+                    <span>❤️ {selectedItem.likeCount} likes</span>
+                    <span>💬 {selectedItem.commentsCount} comments</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-white/10 flex items-center justify-between">
+                <Link
+                  href={`/inbox?user=${selectedItem.author.username}`}
+                  className="px-4 py-2 rounded-xl bg-[#0095F6] hover:bg-blue-600 text-white text-xs font-bold transition-colors"
+                >
+                  Direct Message Creator
                 </Link>
+
+                <button
+                  type="button"
+                  onClick={() => alert("Saved to collection!")}
+                  className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold"
+                >
+                  Save 🔖
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Floating Messages Dock */}
+      <InstagramMessagesDock />
     </div>
   );
 }
