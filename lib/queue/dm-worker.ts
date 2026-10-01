@@ -788,10 +788,31 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
 export async function processMessage(job: { data: ProcessMessageJob; attemptsMade?: number }): Promise<void> {
   const { instagramAccountId, messageId, messageText, senderId } = job.data;
 
+  // 1. Sanitize text
+  const cleanMsg = (messageText || "").trim().toLowerCase();
+  if (!cleanMsg) return;
+
+  // 2. Comprehensive Conversational Chat Filter:
+  // If the message is a regular conversational phrase, greeting, response, or question,
+  // NEVER fire an automated bot response!
+  const conversationalPhrases = [
+    "hi", "hie", "hey", "heyy", "heyyy", "hello", "yo", "sup", "whatsup",
+    "whats up", "what's up", "what's this", "whats this", "what is this",
+    "thanks", "thank you", "thanks i enjoyed", "enjoyed", "alright", "okay", "ok",
+    "cool", "nice", "love this", "good morning", "good evening", "gm", "gn",
+    "how are you", "how are u", "how r u", "who is this", "who are you",
+    "yes", "yeah", "yep", "no", "nah", "nope", "great", "awesome", "sure"
+  ];
+  if (conversationalPhrases.includes(cleanMsg)) {
+    return; // Normal 1-on-1 chat - Stay SILENT!
+  }
+
+  // 3. Only query campaigns with explicit non-empty keywords
   const automations = await prisma.automation.findMany({
     where: {
       dmTriggerEnabled: true,
       isActive: true,
+      matchAnyWord: false, // NEVER match any-word comment campaigns on private DMs!
       instagramAccount: {
         OR: [
           { instagramId: instagramAccountId },
@@ -813,13 +834,18 @@ export async function processMessage(job: { data: ProcessMessageJob; attemptsMad
   const dedupeId = `dm:${messageId}`;
 
   for (const automation of automations) {
+    // If the campaign has no keywords or is empty, DO NOT trigger on private DMs!
+    if (!automation.keywords || automation.keywords.length === 0) {
+      continue;
+    }
+
     const decision = evaluateAutomationRule(
       {
         postId: null,
-        matchAnyPost: true,
+        matchAnyPost: false,
         pendingNextReel: false,
         keywords: automation.keywords,
-        matchAnyWord: automation.matchAnyWord,
+        matchAnyWord: false,
         wholeWordMatch: automation.wholeWordMatch,
       },
       { text: messageText }

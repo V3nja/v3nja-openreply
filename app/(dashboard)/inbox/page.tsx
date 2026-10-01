@@ -45,6 +45,7 @@ export default function InboxPage() {
   const [threadLoading, setThreadLoading] = useState(false);
   const [fanContext, setFanContext] = useState<InboxFanContextData | null>(null);
   const [fanLoading, setFanLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"primary" | "unread" | "general" | "requests" | "all">("primary");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -53,6 +54,17 @@ export default function InboxPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
+
+  const filteredConversations = conversations.filter((c) => {
+    if (activeTab === "all") return true;
+    if (activeTab === "unread") return c.unread;
+    if (activeTab === "primary") return c.folder === "primary" || !c.folder;
+    if (activeTab === "general") return c.folder === "general";
+    if (activeTab === "requests") return c.folder === "requests";
+    return true;
+  });
+
+  const unreadCount = conversations.filter((c) => c.unread).length;
 
   useEffect(() => {
     fetch("/api/instagram/accounts")
@@ -270,21 +282,81 @@ export default function InboxPage() {
       </div>
 
       <div className="grid h-[calc(100dvh-12rem)] grid-cols-1 overflow-hidden rounded-2xl border border-white/10 bg-[#0d0d12] shadow-2xl sm:grid-cols-[280px_1fr] lg:grid-cols-[280px_1fr_290px]">
-        {/* Column 1: Conversations list */}
-        <div className={`min-h-0 flex-col border-b border-white/10 sm:flex sm:border-b-0 sm:border-r bg-zinc-950/40 ${active ? "hidden sm:flex" : "flex"}`}>
-          <div className="shrink-0 border-b border-white/10 px-4 py-3.5 text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center justify-between">
-            <span>Conversations</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-300 font-mono">{conversations.length}</span>
+        {/* Column 1: Conversations list with Instagram Folder Tabs */}
+        <div className={`min-h-0 flex-col border-b border-white/10 sm:flex sm:border-b-0 sm:border-r bg-zinc-950/50 ${active ? "hidden sm:flex" : "flex"}`}>
+          <div className="shrink-0 border-b border-white/10 px-3.5 py-3 bg-zinc-950/80">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">Direct Messages</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.08] text-zinc-300 font-mono font-semibold">
+                {conversations.length}
+              </span>
+            </div>
+
+            {/* Instagram Category Tabs */}
+            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-zinc-900 border border-white/[0.06] text-[11px] font-medium">
+              <button
+                type="button"
+                onClick={() => setActiveTab("primary")}
+                className={`flex-1 py-1 rounded-md text-center transition-all ${
+                  activeTab === "primary"
+                    ? "bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-400 font-bold border border-orange-500/30"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                Primary
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("unread")}
+                className={`flex-1 py-1 rounded-md text-center transition-all relative ${
+                  activeTab === "unread"
+                    ? "bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-400 font-bold border border-orange-500/30"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                Unread
+                {unreadCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full text-[9px] bg-orange-500 text-white font-mono font-bold">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("general")}
+                className={`flex-1 py-1 rounded-md text-center transition-all ${
+                  activeTab === "general"
+                    ? "bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-400 font-bold border border-orange-500/30"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                General
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("requests")}
+                className={`flex-1 py-1 rounded-md text-center transition-all ${
+                  activeTab === "requests"
+                    ? "bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-400 font-bold border border-orange-500/30"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                Requests
+              </button>
+            </div>
           </div>
+
           <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-white/[0.04]">
             {convLoading ? (
               <p className="px-4 py-6 text-xs text-zinc-500">Loading conversations…</p>
             ) : convError ? (
               <p className="px-4 py-6 text-xs text-rose-400">{convError}</p>
-            ) : conversations.length === 0 ? (
-              <p className="px-4 py-6 text-xs text-zinc-500">No active conversations yet.</p>
+            ) : filteredConversations.length === 0 ? (
+              <div className="px-4 py-8 text-center text-xs text-zinc-500">
+                No conversations in <span className="capitalize font-semibold text-zinc-400">{activeTab}</span>.
+              </div>
             ) : (
-              conversations.map((c) => (
+              filteredConversations.map((c) => (
                 <button
                   key={c.id}
                   type="button"
@@ -294,11 +366,16 @@ export default function InboxPage() {
                   }`}
                 >
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-xs font-bold text-white">@{c.contact.username ?? "unknown"}</span>
-                    <span className="shrink-0 text-[10px] text-zinc-500">{formatTime(c.updatedTime)}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {c.unread && <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0"></span>}
+                      <span className={`truncate text-xs font-bold ${c.unread ? "text-white" : "text-zinc-300"}`}>
+                        @{c.contact.username ?? "unknown"}
+                      </span>
+                    </div>
+                    <span className="shrink-0 text-[10px] text-zinc-500 font-mono">{formatTime(c.updatedTime)}</span>
                   </div>
                   {c.lastMessage && (
-                    <p className="mt-1 truncate text-xs text-zinc-400">
+                    <p className={`mt-1 truncate text-xs ${c.unread ? "text-zinc-200 font-medium" : "text-zinc-400"}`}>
                       {c.lastMessage.fromMe ? <span className="text-orange-400/90 font-medium">You: </span> : ""}
                       {c.lastMessage.text || "(no text)"}
                     </p>

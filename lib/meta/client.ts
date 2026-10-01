@@ -568,7 +568,7 @@ export async function getConversations(
   url.searchParams.set("platform", "instagram");
   url.searchParams.set(
     "fields",
-    "participants,updated_time,messages.limit(1){message,from,created_time}"
+    "participants,updated_time,unread_count,messages.limit(1){message,from,created_time}"
   );
   url.searchParams.set("limit", "50");
   url.searchParams.set("access_token", accessToken);
