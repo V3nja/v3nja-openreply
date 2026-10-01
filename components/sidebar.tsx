@@ -8,9 +8,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: "📊" },
   { label: "Instagram Home Feed", href: "/feed", icon: "🏠" },
-  { label: "Instagram Inbox", href: "/inbox", icon: "💬" },
+  { label: "Explore & Discovery", href: "/explore", icon: "🔍" },
+  { label: "Reels Stream", href: "/reels", icon: "🎬" },
+  { label: "Instagram Direct Inbox", href: "/inbox", icon: "💬" },
+  { label: "Dashboard", href: "/dashboard", icon: "📊" },
   { label: "Overview & Growth", href: "/overview", icon: "📈" },
   { label: "Analytics", href: "/analytics", icon: "📉" },
   { label: "Fans & Audience", href: "/fans", icon: "👥" },
