@@ -540,12 +540,25 @@ export interface InstagramParticipant {
   username?: string;
 }
 
+export interface InstagramAttachment {
+  id?: string;
+  mime_type?: string;
+  name?: string;
+  size?: number;
+  file_url?: string;
+  image_data?: { url?: string; preview_url?: string; max_width?: number; max_height?: number };
+  video_data?: { url?: string; preview_url?: string };
+  audio_data?: { url?: string };
+}
+
 export interface InstagramMessage {
   id: string;
   created_time?: string;
   message?: string;
   from?: InstagramParticipant;
   to?: { data: InstagramParticipant[] };
+  attachments?: { data: InstagramAttachment[] };
+  shares?: { data: Array<{ id?: string; link?: string; name?: string }> };
 }
 
 export interface InstagramConversation {
@@ -587,7 +600,7 @@ export async function getConversationMessages(
   conversationId: string
 ): Promise<InstagramMessage[]> {
   const url = new URL(`${instagramGraphBase()}/${conversationId}`);
-  url.searchParams.set("fields", "messages{id,created_time,from,to,message}");
+  url.searchParams.set("fields", "messages{id,created_time,from,to,message,attachments{id,mime_type,name,size,file_url,image_data,video_data,audio_data},shares}");
   url.searchParams.set("access_token", accessToken);
 
   const response = await fetch(url.toString());

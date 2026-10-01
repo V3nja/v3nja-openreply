@@ -539,6 +539,11 @@ export default function InboxPage() {
   // Real Web Audio Recording Hook
   async function startRealVoiceRecording() {
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Microphone recording is not supported on this browser or connection (HTTPS required).");
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStreamRef.current = stream;
 
@@ -564,7 +569,9 @@ export default function InboxPage() {
       };
       updateVolume();
 
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm")
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
         ? "audio/webm"
         : MediaRecorder.isTypeSupported("audio/mp4")
         ? "audio/mp4"
@@ -574,7 +581,7 @@ export default function InboxPage() {
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
@@ -583,11 +590,14 @@ export default function InboxPage() {
       setIsRecordingVoice(true);
       setRecordTimerSec(0);
       setShowPlusDrawer(false);
-    } catch (err) {
+    } catch (err: any) {
       console.warn("[Mic Permission Error]", err);
-      setIsRecordingVoice(true);
-      setRecordTimerSec(0);
-      setShowPlusDrawer(false);
+      alert(
+        err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError"
+          ? "Microphone access denied. Please grant microphone permissions in your browser to record voice notes."
+          : "Unable to access microphone: " + (err?.message || "Unknown error")
+      );
+      setIsRecordingVoice(false);
     }
   }
 
@@ -596,12 +606,14 @@ export default function InboxPage() {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     if (audioContextRef.current) audioContextRef.current.close().catch(() => {});
 
-    const durationStr = `0:${recordTimerSec < 10 ? `0${recordTimerSec}` : recordTimerSec}`;
-    const formattedDuration = durationStr === "0:00" ? "0:05" : durationStr;
+    const elapsed = recordTimerSec;
+    const durationStr = `0:${elapsed < 10 ? `0${elapsed}` : elapsed}`;
+    const formattedDuration = durationStr === "0:00" ? "0:02" : durationStr;
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const mime = mediaRecorderRef.current?.mimeType || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: mime });
         const audioUrl = URL.createObjectURL(audioBlob);
 
         const optimisticVoice: ExtendedMessage = {
@@ -618,18 +630,6 @@ export default function InboxPage() {
         setMessages((prev) => [...prev, optimisticVoice]);
       };
       mediaRecorderRef.current.stop();
-    } else {
-      const optimisticVoice: ExtendedMessage = {
-        id: `voice-${Date.now()}`,
-        text: "🎤 Voice Message",
-        fromMe: true,
-        fromUsername: null,
-        createdTime: new Date().toISOString(),
-        isVoice: true,
-        voiceDuration: formattedDuration,
-        platform: "instagram",
-      };
-      setMessages((prev) => [...prev, optimisticVoice]);
     }
 
     if (micStreamRef.current) {
@@ -665,40 +665,36 @@ export default function InboxPage() {
       activeAudioElementRef.current = null;
     }
 
-    if (audioUrl) {
-      const audio = new Audio(audioUrl);
-      activeAudioElementRef.current = audio;
-      setPlayingVoiceId(msgId);
-
-      audio.ontimeupdate = () => {
-        if (audio.duration > 0) {
-          const progress = Math.round((audio.currentTime / audio.duration) * 100);
-          setVoicePlaybackProgress((prev) => ({ ...prev, [msgId]: progress }));
-        }
-      };
-
-      audio.onended = () => {
-        setPlayingVoiceId(null);
-        setVoicePlaybackProgress((prev) => ({ ...prev, [msgId]: 0 }));
-      };
-
-      audio.play().catch(() => {
-        setPlayingVoiceId(null);
-      });
-    } else {
-      setPlayingVoiceId(msgId);
-      let p = 0;
-      const interval = setInterval(() => {
-        p += 5;
-        if (p > 100) {
-          clearInterval(interval);
-          setPlayingVoiceId(null);
-          setVoicePlaybackProgress((prev) => ({ ...prev, [msgId]: 0 }));
-        } else {
-          setVoicePlaybackProgress((prev) => ({ ...prev, [msgId]: p }));
-        }
-      }, 150);
+    if (!audioUrl) {
+      alert("No audio file available for this message.");
+      return;
     }
+
+    const audio = new Audio(audioUrl);
+    activeAudioElementRef.current = audio;
+    setPlayingVoiceId(msgId);
+
+    audio.ontimeupdate = () => {
+      if (audio.duration > 0) {
+        const progress = Math.round((audio.currentTime / audio.duration) * 100);
+        setVoicePlaybackProgress((prev) => ({ ...prev, [msgId]: progress }));
+      }
+    };
+
+    audio.onended = () => {
+      setPlayingVoiceId(null);
+      setVoicePlaybackProgress((prev) => ({ ...prev, [msgId]: 0 }));
+    };
+
+    audio.onerror = () => {
+      setPlayingVoiceId(null);
+      alert("Error playing audio note.");
+    };
+
+    audio.play().catch((err) => {
+      console.warn("Audio play prevented:", err);
+      setPlayingVoiceId(null);
+    });
   }
 
   useEffect(() => {
@@ -1231,8 +1227,17 @@ export default function InboxPage() {
                     <div className={`w-12 h-12 rounded-full p-[2px] transition-transform group-hover:scale-105 ${
                       c.unread ? "bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]" : "bg-zinc-700/60"
                     }`}>
-                      <div className="w-full h-full rounded-full bg-[#181820] border-2 border-black flex items-center justify-center text-xs font-black text-white">
-                        {(c.contact.username || "U")[0].toUpperCase()}
+                      <div className="w-full h-full rounded-full bg-[#181820] border-2 border-black flex items-center justify-center text-xs font-black text-white overflow-hidden">
+                        {c.contact.profilePic ? (
+                          <img
+                            src={c.contact.profilePic}
+                            alt={c.contact.username || "User"}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        ) : (
+                          (c.contact.username || "U")[0].toUpperCase()
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1313,8 +1318,17 @@ export default function InboxPage() {
                   >
                     <div className="flex items-start gap-3">
                       <div className="relative shrink-0">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center text-xs font-black text-white shadow-md">
-                          {initial}
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center text-xs font-black text-white shadow-md overflow-hidden">
+                          {c.contact.profilePic ? (
+                            <img
+                              src={c.contact.profilePic}
+                              alt={c.contact.username || "User"}
+                              referrerPolicy="no-referrer"
+                              className="w-full h-full object-cover rounded-full"
+                            />
+                          ) : (
+                            initial
+                          )}
                         </div>
                         {c.unread && (
                           <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-blue-500 ring-2 ring-black" />
@@ -1377,8 +1391,17 @@ export default function InboxPage() {
                     ←
                   </button>
                   <div className="relative">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center text-xs font-black text-white border border-white/15 shadow-md group-hover:scale-105 transition-transform">
-                      {(active.contact.username || "U")[0].toUpperCase()}
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center text-xs font-black text-white border border-white/15 shadow-md group-hover:scale-105 transition-transform overflow-hidden">
+                      {contactProfileData?.avatarUrl || active.contact.profilePic ? (
+                        <img
+                          src={contactProfileData?.avatarUrl || active.contact.profilePic || ""}
+                          alt={active.contact.username || "User"}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover rounded-full"
+                        />
+                      ) : (
+                        (active.contact.username || "U")[0].toUpperCase()
+                      )}
                     </div>
                     <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-black" />
                   </div>
@@ -2101,12 +2124,19 @@ export default function InboxPage() {
                   }}
                   className="relative cursor-pointer group"
                 >
-                  <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] shadow-lg group-hover:scale-105 transition-transform">
-                    <img
-                      src={contactProfileData?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80"}
-                      alt={active.contact.username || "User"}
-                      className="w-full h-full rounded-full object-cover border-2 border-zinc-950"
-                    />
+                  <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] shadow-lg group-hover:scale-105 transition-transform overflow-hidden">
+                    {contactProfileData?.avatarUrl ? (
+                      <img
+                        src={contactProfileData.avatarUrl}
+                        alt={active.contact.username || "User"}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full rounded-full object-cover border-2 border-zinc-950"
+                      />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-zinc-900 border-2 border-zinc-950 flex items-center justify-center text-lg font-black text-white">
+                        {(active.contact.username || "U")[0].toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   <span className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
                 </div>
@@ -2120,11 +2150,11 @@ export default function InboxPage() {
                   </div>
 
                   <p className="text-xs text-zinc-300 font-medium mt-0.5">
-                    {contactProfileData?.name || active.contact.username} • <span className="text-zinc-400">{contactProfileData?.category || "Creator"}</span>
+                    {contactProfileData?.name || active.contact.username} • <span className="text-zinc-400">{contactProfileData?.category || "Instagram Profile"}</span>
                   </p>
 
-                  <p className="text-xs text-zinc-300 mt-1 max-w-md">
-                    {contactProfileData?.bio || "Active contact on Instagram Direct • Interacted via V3NJA WRLD campaigns."}
+                  <p className="text-xs text-zinc-300 mt-1 max-w-md whitespace-pre-line leading-relaxed">
+                    {contactProfileData?.bio || (contactProfileLoading ? "Loading live profile…" : "No bio available.")}
                   </p>
                 </div>
               </div>
@@ -2157,19 +2187,19 @@ export default function InboxPage() {
             <div className="grid grid-cols-3 gap-2 px-6 py-3 border-b border-white/[0.06] bg-black/40 text-center text-xs">
               <div>
                 <div className="text-sm font-black text-white">
-                  {contactProfileData?.postsCount || (contactProfileData?.posts?.length ?? 6)}
+                  {contactProfileLoading ? "…" : (contactProfileData?.postsCount ?? 0)}
                 </div>
                 <div className="text-[10px] text-zinc-400 uppercase tracking-wider">Posts</div>
               </div>
               <div>
                 <div className="text-sm font-black text-purple-400">
-                  {contactProfileData?.followersCount ? contactProfileData.followersCount.toLocaleString() : "1,420"}
+                  {contactProfileLoading ? "…" : (contactProfileData?.followersCount !== undefined ? contactProfileData.followersCount.toLocaleString() : "0")}
                 </div>
                 <div className="text-[10px] text-zinc-400 uppercase tracking-wider">Followers</div>
               </div>
               <div>
                 <div className="text-sm font-black text-pink-400">
-                  {contactProfileData?.followingCount ? contactProfileData.followingCount.toLocaleString() : "385"}
+                  {contactProfileLoading ? "…" : (contactProfileData?.followingCount !== undefined ? contactProfileData.followingCount.toLocaleString() : "0")}
                 </div>
                 <div className="text-[10px] text-zinc-400 uppercase tracking-wider">Following</div>
               </div>
@@ -2193,10 +2223,10 @@ export default function InboxPage() {
                     }}
                     className="flex flex-col items-center shrink-0 cursor-pointer group"
                   >
-                    <div className="w-14 h-14 rounded-full p-[2px] bg-zinc-800 group-hover:bg-gradient-to-tr from-pink-500 to-purple-600 transition-all">
-                      <img src={hl.coverUrl} alt={hl.title} className="w-full h-full rounded-full object-cover border-2 border-black" />
+                    <div className="w-14 h-14 rounded-full p-[2px] bg-zinc-800 group-hover:bg-gradient-to-tr from-pink-500 to-purple-600 transition-all overflow-hidden">
+                      <img src={hl.coverUrl} alt={hl.title} referrerPolicy="no-referrer" className="w-full h-full rounded-full object-cover border-2 border-black" />
                     </div>
-                    <span className="text-[10px] text-zinc-400 mt-1">{hl.title}</span>
+                    <span className="text-[10px] text-zinc-400 mt-1 max-w-[56px] truncate">{hl.title}</span>
                   </div>
                 ))}
               </div>
@@ -2212,7 +2242,7 @@ export default function InboxPage() {
                 }`}
               >
                 <span>▦</span>
-                <span>Posts ({contactProfileData?.posts?.length || 0})</span>
+                <span>Posts ({contactProfileLoading ? "…" : (contactProfileData?.posts?.length || 0)})</span>
               </button>
               <button
                 type="button"
@@ -2222,7 +2252,7 @@ export default function InboxPage() {
                 }`}
               >
                 <span>🎬</span>
-                <span>Reels & Video ({contactProfileData?.reels?.length || 0})</span>
+                <span>Reels & Video ({contactProfileLoading ? "…" : (contactProfileData?.reels?.length || 0)})</span>
               </button>
               <button
                 type="button"
@@ -2238,53 +2268,88 @@ export default function InboxPage() {
 
             {/* Media Content Body */}
             <div className="flex-1 overflow-y-auto p-4 min-h-[300px]">
-              {profileExplorerTab === "posts" ? (
-                /* 3-Column Posts Grid */
-                <div className="grid grid-cols-3 gap-3">
-                  {(contactProfileData?.posts || []).map((post) => (
-                    <div
-                      key={post.id}
-                      onClick={() => setSelectedLightboxPost(post)}
-                      className="group/item relative aspect-square rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 cursor-pointer shadow-md hover:border-purple-500/60 transition-all"
-                    >
-                      <img src={post.mediaUrl} alt="Post" className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300" />
-                      
-                      {post.mediaType === "VIDEO" && (
-                        <span className="absolute top-2 right-2 text-xs bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-lg text-white">
-                          ▶
-                        </span>
-                      )}
-
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/item:opacity-100 flex items-center justify-center gap-4 text-white text-xs font-bold transition-opacity">
-                        <span className="flex items-center gap-1">❤️ {post.likeCount}</span>
-                        <span className="flex items-center gap-1">💬 {post.commentsCount}</span>
-                      </div>
-                    </div>
-                  ))}
+              {contactProfileLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mb-3" />
+                  <p className="text-xs text-zinc-400 font-medium">Fetching real-time Instagram posts & media…</p>
                 </div>
+              ) : profileExplorerTab === "posts" ? (
+                /* 3-Column Posts Grid */
+                contactProfileData?.isPrivate ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center text-xs text-zinc-400">
+                    <span className="text-2xl mb-2">🔒</span>
+                    <p className="font-bold text-white mb-1">This Account is Private</p>
+                    <p className="text-zinc-500 max-w-xs">Follow this account on Instagram to see their photos and videos.</p>
+                  </div>
+                ) : (contactProfileData?.posts || []).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center text-xs text-zinc-500">
+                    <span className="text-2xl mb-2">📷</span>
+                    <p className="font-bold text-zinc-400">No Posts Yet</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {(contactProfileData?.posts || []).map((post) => (
+                      <div
+                        key={post.id}
+                        onClick={() => setSelectedLightboxPost(post)}
+                        className="group/item relative aspect-square rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 cursor-pointer shadow-md hover:border-purple-500/60 transition-all"
+                      >
+                        <img
+                          src={post.thumbnailUrl || post.mediaUrl}
+                          alt="Post"
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300"
+                        />
+                        
+                        {post.mediaType === "VIDEO" && (
+                          <span className="absolute top-2 right-2 text-xs bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-lg text-white">
+                            ▶
+                          </span>
+                        )}
+
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/item:opacity-100 flex items-center justify-center gap-4 text-white text-xs font-bold transition-opacity">
+                          <span className="flex items-center gap-1">❤️ {post.likeCount}</span>
+                          <span className="flex items-center gap-1">💬 {post.commentsCount}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
               ) : profileExplorerTab === "reels" ? (
                 /* 9:16 Vertical Reels Grid */
-                <div className="grid grid-cols-3 gap-3">
-                  {(contactProfileData?.reels || []).map((reel) => (
-                    <div
-                      key={reel.id}
-                      onClick={() => setSelectedLightboxPost(reel)}
-                      className="group/item relative aspect-[9/16] rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 cursor-pointer shadow-md hover:border-purple-500/60 transition-all"
-                    >
-                      <img src={reel.mediaUrl} alt="Reel" className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300" />
-                      
-                      <div className="absolute bottom-2 left-2 text-[10px] font-bold bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-lg text-white flex items-center gap-1">
-                        <span>▶</span>
-                        <span>{reel.viewsCount ? `${(reel.viewsCount / 1000).toFixed(1)}K` : "10K"}</span>
-                      </div>
+                (contactProfileData?.reels || []).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center text-xs text-zinc-500">
+                    <span className="text-2xl mb-2">🎬</span>
+                    <p className="font-bold text-zinc-400">No Reels Found</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {(contactProfileData?.reels || []).map((reel) => (
+                      <div
+                        key={reel.id}
+                        onClick={() => setSelectedLightboxPost(reel)}
+                        className="group/item relative aspect-[9/16] rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 cursor-pointer shadow-md hover:border-purple-500/60 transition-all"
+                      >
+                        <img
+                          src={reel.thumbnailUrl || reel.mediaUrl}
+                          alt="Reel"
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300"
+                        />
+                        
+                        <div className="absolute bottom-2 left-2 text-[10px] font-bold bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-lg text-white flex items-center gap-1">
+                          <span>▶</span>
+                          <span>{reel.viewsCount ? (reel.viewsCount >= 1000 ? `${(reel.viewsCount / 1000).toFixed(1)}K` : `${reel.viewsCount}`) : "Play"}</span>
+                        </div>
 
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/item:opacity-100 flex items-center justify-center gap-3 text-white text-xs font-bold transition-opacity">
-                        <span>❤️ {reel.likeCount}</span>
-                        <span>💬 {reel.commentsCount}</span>
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/item:opacity-100 flex items-center justify-center gap-3 text-white text-xs font-bold transition-opacity">
+                          <span>❤️ {reel.likeCount}</span>
+                          <span>💬 {reel.commentsCount}</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )
               ) : (
                 /* CRM & Exchanged Chat Media View */
                 <div className="space-y-4 max-w-lg mx-auto">
@@ -2471,10 +2536,26 @@ export default function InboxPage() {
             {/* Left: High-Res Media */}
             <div
               onDoubleClick={() => handleTogglePostLike(selectedLightboxPost.id)}
-              className="relative bg-black flex items-center justify-center aspect-square select-none group"
+              className="relative bg-black flex items-center justify-center aspect-square select-none group overflow-hidden"
             >
-              <img src={selectedLightboxPost.mediaUrl} alt="Media" className="max-h-full max-w-full object-contain" />
-              <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-xl text-[10px] text-zinc-300">
+              {selectedLightboxPost.mediaType === "VIDEO" ? (
+                <video
+                  src={selectedLightboxPost.videoUrl || selectedLightboxPost.mediaUrl}
+                  poster={selectedLightboxPost.thumbnailUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="max-h-full max-w-full object-contain"
+                />
+              ) : (
+                <img
+                  src={selectedLightboxPost.mediaUrl}
+                  alt="Media"
+                  referrerPolicy="no-referrer"
+                  className="max-h-full max-w-full object-contain"
+                />
+              )}
+              <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-xl text-[10px] text-zinc-300 pointer-events-none">
                 Double-tap photo to like ❤️
               </div>
             </div>
@@ -2484,8 +2565,17 @@ export default function InboxPage() {
               {/* Post Header */}
               <div className="p-3.5 border-b border-white/10 flex items-center justify-between bg-black/40">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white">
-                    {(active.contact.username || "U")[0].toUpperCase()}
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white overflow-hidden">
+                    {contactProfileData?.avatarUrl ? (
+                      <img
+                        src={contactProfileData.avatarUrl}
+                        alt={active.contact.username || "User"}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                    ) : (
+                      (active.contact.username || "U")[0].toUpperCase()
+                    )}
                   </div>
                   <div>
                     <span className="text-xs font-bold text-white block">@{active.contact.username}</span>

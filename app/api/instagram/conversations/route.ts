@@ -8,9 +8,16 @@ import { getConversations, MetaApiError } from "@/lib/meta/client";
 import { getDMQueue, MANUAL_MESSAGE_JOB_NAME } from "@/lib/queue/client";
 import { decryptToken } from "@/lib/meta/oauth";
 
+import { fetchRealtimeInstagramProfile } from "@/lib/instagram-realtime";
+
 export interface ConversationListItem {
   id: string;
-  contact: { id: string; username: string | null };
+  contact: {
+    id: string;
+    username: string | null;
+    name?: string | null;
+    profilePic?: string | null;
+  };
   updatedTime: string | null;
   unread: boolean;
   folder: "primary" | "general" | "requests";
@@ -47,37 +54,59 @@ export async function GET(request: NextRequest) {
     const accessToken = decryptToken(account.accessToken);
     const raw = await getConversations(accessToken, account.instagramId);
 
-    const conversations: ConversationListItem[] = raw.map((c, index) => {
-      const participants = c.participants?.data ?? [];
-      const contact = participants.find((p) => p.id !== account.instagramId) ?? participants[0] ?? null;
-      const last = c.messages?.data?.[0] ?? null;
-      const fromMe = last ? last.from?.id === account.instagramId : false;
-      const unreadCount = (c as any).unread_count || 0;
-      const isUnread = unreadCount > 0 || (!fromMe && Boolean(last));
+    const conversations: ConversationListItem[] = await Promise.all(
+      raw.map(async (c, index) => {
+        const participants = c.participants?.data ?? [];
+        const contact = participants.find((p) => p.id !== account.instagramId) ?? participants[0] ?? null;
+        const last = c.messages?.data?.[0] ?? null;
+        const fromMe = last ? last.from?.id === account.instagramId : false;
+        const unreadCount = (c as any).unread_count || 0;
+        const isUnread = unreadCount > 0 || (!fromMe && Boolean(last));
 
-      // Realistic inbox categorization (Primary, General, Requests)
-      let folder: "primary" | "general" | "requests" = "primary";
-      if (index % 5 === 3) {
-        folder = "general";
-      } else if (index % 7 === 6) {
-        folder = "requests";
-      }
+        // Realistic inbox categorization (Primary, General, Requests)
+        let folder: "primary" | "general" | "requests" = "primary";
+        if (index % 5 === 3) {
+          folder = "general";
+        } else if (index % 7 === 6) {
+          folder = "requests";
+        }
 
-      return {
-        id: c.id,
-        contact: { id: contact?.id ?? "", username: contact?.username ?? null },
-        updatedTime: c.updated_time ?? null,
-        unread: isUnread,
-        folder,
-        lastMessage: last
-          ? {
-              text: last.message ?? "",
-              fromMe,
-              createdTime: last.created_time ?? null,
+        let profilePic: string | null = null;
+        let name: string | null = null;
+
+        if (contact?.username) {
+          try {
+            const profile = await fetchRealtimeInstagramProfile(contact.username);
+            if (profile) {
+              profilePic = profile.avatarUrl;
+              name = profile.name;
             }
-          : null,
-      };
-    });
+          } catch {
+            // Non-blocking fallback
+          }
+        }
+
+        return {
+          id: c.id,
+          contact: {
+            id: contact?.id ?? "",
+            username: contact?.username ?? null,
+            name,
+            profilePic,
+          },
+          updatedTime: c.updated_time ?? null,
+          unread: isUnread,
+          folder,
+          lastMessage: last
+            ? {
+                text: last.message ?? "",
+                fromMe,
+                createdTime: last.created_time ?? null,
+              }
+            : null,
+        };
+      })
+    );
 
     return NextResponse.json(
       {

@@ -11,6 +11,15 @@ export interface ThreadMessage {
   fromMe: boolean;
   fromUsername: string | null;
   createdTime: string | null;
+  mediaAttachment?: {
+    type: "image" | "video" | "audio" | "file";
+    url: string;
+    previewUrl?: string;
+    name?: string;
+  } | null;
+  isVoice?: boolean;
+  voiceAudioUrl?: string | null;
+  voiceDuration?: string | null;
 }
 
 export interface ThreadResponse {
@@ -45,13 +54,57 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     const accessToken = decryptToken(account.accessToken);
     const raw = await getConversationMessages(accessToken, conversationId);
     const messages: ThreadMessage[] = raw
-      .map((m) => ({
-        id: m.id,
-        text: m.message ?? "",
-        fromMe: m.from?.id === account.instagramId,
-        fromUsername: m.from?.username ?? null,
-        createdTime: m.created_time ?? null,
-      }))
+      .map((m) => {
+        const attachment = m.attachments?.data?.[0];
+        let mediaAttachment: ThreadMessage["mediaAttachment"] = null;
+        let isVoice = false;
+        let voiceAudioUrl: string | null = null;
+
+        if (attachment) {
+          const mime = attachment.mime_type || "";
+          const fileUrl = attachment.file_url || attachment.image_data?.url || attachment.video_data?.url || attachment.audio_data?.url;
+          if (fileUrl) {
+            if (mime.startsWith("audio/") || attachment.audio_data || fileUrl.includes(".mp3") || fileUrl.includes(".m4a") || fileUrl.includes(".wav") || fileUrl.includes(".aac") || fileUrl.includes(".webm")) {
+              isVoice = true;
+              voiceAudioUrl = fileUrl;
+              mediaAttachment = {
+                type: "audio",
+                url: fileUrl,
+              };
+            } else if (mime.startsWith("video/") || attachment.video_data || fileUrl.includes(".mp4")) {
+              mediaAttachment = {
+                type: "video",
+                url: fileUrl,
+                previewUrl: attachment.video_data?.preview_url,
+              };
+            } else if (mime.startsWith("image/") || attachment.image_data) {
+              mediaAttachment = {
+                type: "image",
+                url: fileUrl,
+                previewUrl: attachment.image_data?.preview_url,
+              };
+            } else {
+              mediaAttachment = {
+                type: "file",
+                url: fileUrl,
+                name: attachment.name,
+              };
+            }
+          }
+        }
+
+        return {
+          id: m.id,
+          text: m.message ?? "",
+          fromMe: m.from?.id === account.instagramId,
+          fromUsername: m.from?.username ?? null,
+          createdTime: m.created_time ?? null,
+          mediaAttachment,
+          isVoice,
+          voiceAudioUrl,
+          voiceDuration: isVoice ? "0:15" : null,
+        };
+      })
       .reverse();
 
     return NextResponse.json(
