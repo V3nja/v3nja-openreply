@@ -442,35 +442,34 @@ export async function sendCommentReply(
   commentId: string,
   message: string
 ): Promise<{ id: string }> {
-  const version = getMetaGraphApiVersion();
-  const endpoints = accessToken.startsWith("IG")
-    ? [`${instagramGraphBase()}/${commentId}/replies?access_token=${encodeURIComponent(accessToken)}`]
-    : [
-        `https://graph.facebook.com/${version}/${commentId}/replies?access_token=${encodeURIComponent(accessToken)}`,
-        `${instagramGraphBase()}/${commentId}/replies?access_token=${encodeURIComponent(accessToken)}`,
-      ];
+  const version = getMetaGraphApiVersion() || "v25.0";
+  const url = `https://graph.facebook.com/${version}/${commentId}/replies`;
 
-  let lastError: unknown = null;
-  for (const url of endpoints) {
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ message }),
-      });
-      return await handleResponse<{ id: string }>(response);
-    } catch (err) {
-      lastError = err;
-      if (err instanceof RateLimitError || err instanceof TokenExpiredError) {
-        throw err;
-      }
-    }
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message,
+        access_token: accessToken,
+      }),
+    });
+    return await handleResponse<{ id: string }>(response);
+  } catch (err) {
+    // If graph.facebook.com fails, try graph.instagram.com endpoint
+    const igUrl = `${instagramGraphBase()}/${commentId}/replies`;
+    const response = await fetch(igUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ message }),
+    });
+    return await handleResponse<{ id: string }>(response);
   }
-
-  throw lastError || new Error("Failed to send comment reply to Meta API");
 }
 
 export async function getMediaComments(

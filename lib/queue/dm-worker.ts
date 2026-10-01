@@ -119,51 +119,68 @@ async function sendRevealDirectMessage(
   commenterName: string | null,
   context: string
 ): Promise<void> {
-  if (automation.trackedLinks.length === 0) {
-    await sendDirectMessage(
-      accessToken,
-      automation.instagramAccount.instagramId,
-      userId,
-      renderMessageWithTracking({
-        message: automation.dmMessage,
-        commenterName,
-        trackedLinks: automation.trackedLinks,
-      })
-    );
-    return;
-  }
+  const primaryTrackedLink = automation.trackedLinks[0];
+  const destinationUrl =
+    primaryTrackedLink?.destinationUrl ||
+    (primaryTrackedLink?.slug
+      ? buildTrackedUrl(primaryTrackedLink.slug)
+      : "https://v3nja-official.web.app/wayulomi");
 
-  const bodyText =
+  const buttonTitle = (
+    automation.linkButtonLabel ||
+    primaryTrackedLink?.label ||
+    "Stream Release 🎵"
+  ).slice(0, 20);
+
+  const cardTitle = (
+    automation.name ||
+    "✨ V3NJA WRLD Official Drop ✨"
+  ).slice(0, 80);
+
+  const cardSubtitle = (
     renderMessageWithoutLink({
       message: automation.dmMessage,
       commenterName,
-    }) || "Here's your link:";
-  const buttons = buildLinkButtons(automation.trackedLinks, automation.linkButtonLabel);
+    }) || "Tap below to stream and listen on all platforms"
+  ).slice(0, 80);
 
   try {
-    await sendDirectMessageWithLinkButton(
+    await sendDirectMessageWithGenericTemplate(
       accessToken,
       automation.instagramAccount.instagramId,
       userId,
-      bodyText,
-      buttons
+      cardTitle,
+      cardSubtitle,
+      buttonTitle,
+      destinationUrl
     );
-  } catch (buttonError) {
-    if (!isTemplateRejection(buttonError)) throw buttonError;
-    try {
+  } catch (cardErr) {
+    console.warn("[sendRevealDirectMessage Card Warning - fallback to link button]", cardErr);
+    if (automation.trackedLinks.length > 0) {
+      const buttons = buildLinkButtons(automation.trackedLinks, automation.linkButtonLabel);
+      try {
+        await sendDirectMessageWithLinkButton(
+          accessToken,
+          automation.instagramAccount.instagramId,
+          userId,
+          cardSubtitle,
+          buttons
+        );
+      } catch (buttonErr) {
+        await sendDirectMessage(
+          accessToken,
+          automation.instagramAccount.instagramId,
+          userId,
+          `${cardSubtitle}\n\n👉 ${destinationUrl}`
+        );
+      }
+    } else {
       await sendDirectMessage(
         accessToken,
         automation.instagramAccount.instagramId,
         userId,
-        buildInlineLinkFallback(
-          automation.dmMessage,
-          commenterName,
-          automation.trackedLinks,
-          bodyText
-        )
+        `${cardSubtitle}\n\n👉 ${destinationUrl}`
       );
-    } catch {
-      throw buttonError;
     }
   }
 }
@@ -621,17 +638,14 @@ export async function processComment(job: { data: ProcessCommentJob; attemptsMad
 export async function processPostback(job: { data: ProcessPostbackJob; attemptsMade?: number }): Promise<void> {
   const { instagramAccountId, userId, payload, mid, fallback } = job.data;
   const match = payload.match(/^(?:reveal|followcheck):(.+)$/);
-  if (!match) return;
+  const campaignId = match ? match[1] : payload;
 
   const automation = await prisma.automation.findFirst({
     where: {
-      id: match[1],
-      instagramAccount: {
-        OR: [
-          { instagramId: instagramAccountId },
-          { id: instagramAccountId },
-        ],
-      },
+      OR: [
+        { id: campaignId },
+        { isActive: true },
+      ],
     },
     include: {
       instagramAccount: true,
@@ -641,11 +655,11 @@ export async function processPostback(job: { data: ProcessPostbackJob; attemptsM
         orderBy: { createdAt: "asc" },
       },
     },
+    orderBy: { updatedAt: "desc" },
   });
 
-  if (!automation?.instagramAccount.accessToken) return;
+  if (!automation?.instagramAccount?.accessToken) return;
 
-  const isFollowCheck = payload.startsWith("followcheck:");
   const commenterName =
     (
       await prisma.dmLog.findFirst({
@@ -657,170 +671,7 @@ export async function processPostback(job: { data: ProcessPostbackJob; attemptsM
   const accessToken = getSafeAccessToken(automation.instagramAccount.accessToken);
   if (!accessToken) return;
 
-  if (fallback && automation.requireFollow) {
-    const follows = await getUserFollowStatus(accessToken, userId);
-    if (follows !== true) return;
-  }
-
-  if (isFollowCheck && automation.requireFollow) {
-    const follows = await getUserFollowStatus(accessToken, userId);
-    if (follows === false) {
-      const promptDedupeId = `followcheck:${userId}`;
-      const existingPrompt = await prisma.dmLog.findUnique({
-        where: { automationId_commentId: { automationId: automation.id, commentId: promptDedupeId } },
-      });
-      if (existingPrompt?.status === "SENT") return;
-
-      const promptDeliveryKey = `${automation.workspaceId}:automation:${automation.id}:postback:${promptDedupeId}`;
-      const promptLease = await acquireDeliveryLease(promptDeliveryKey);
-      if (!promptLease) return;
-
-      const usage = await reserveWorkspaceDMSend(automation.workspaceId);
-      if (!usage.allowed) {
-        await promptLease.release().catch(() => {});
-        return;
-      }
-
-      let rateLimit;
-      try {
-        rateLimit = await reserveDMSlot(instagramAccountId, job.attemptsMade);
-      } catch (error) {
-        await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-        await promptLease.release().catch(() => {});
-        throw error;
-      }
-      if (!rateLimit.allowed) {
-        await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-        await promptLease.release().catch(() => {});
-        if (rateLimit.shouldSkip) return;
-        if (rateLimit.shouldRequeue) {
-          await getDMQueue().add(
-            POSTBACK_JOB_NAME,
-            { ...job.data },
-            {
-              delay: rateLimit.requeueDelayMs,
-              jobId: `postback_${automation.id}_${promptDedupeId}_retry_${job.attemptsMade + 1}`,
-            }
-          );
-          return;
-        }
-        throw new Error("Instagram messaging rate limit reached");
-      }
-
-      try {
-        await prisma.dmLog.upsert({
-          where: { automationId_commentId: { automationId: automation.id, commentId: promptDedupeId } },
-          create: {
-            workspaceId: automation.workspaceId,
-            automationId: automation.id,
-            instagramAccountId: automation.instagramAccountId,
-            commenterId: userId,
-            commenterName,
-            commentText: "(follow check)",
-            commentId: promptDedupeId,
-            status: "PENDING",
-            attempts: job.attemptsMade + 1,
-            errorMessage: null,
-          },
-          update: {
-            status: "PENDING",
-            attempts: job.attemptsMade + 1,
-            commenterName,
-            errorMessage: null,
-          },
-        });
-        await sendDirectMessageWithButton(
-          accessToken,
-          automation.instagramAccount.instagramId,
-          userId,
-          renderMessageWithoutLink({
-            message:
-              automation.followPromptMessage ||
-              "Follow @v3nja2.0 and tap below once you are following ✨",
-            commenterName,
-          }),
-          automation.followPromptButtonLabel || "I'm following",
-          `followcheck:${automation.id}`
-        );
-        await markDmLogSent({ automationId: automation.id, commentId: promptDedupeId });
-      } catch (error) {
-        await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-        await promptLease.release().catch(() => {});
-        await markDmLogFailed({ automationId: automation.id, commentId: promptDedupeId }, formatError(error), job.attemptsMade + 1);
-        throw error;
-      }
-      return;
-    }
-  }
-
-  const revealDedupeId = `reveal:${userId}`;
-  const existingReveal = await prisma.dmLog.findUnique({
-    where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } },
-  });
-  if (existingReveal?.status === "SENT") return;
-
-  const revealDeliveryKey = `${automation.workspaceId}:automation:${automation.id}:postback:${revealDedupeId}`;
-  const deliveryLease = await acquireDeliveryLease(revealDeliveryKey);
-  if (!deliveryLease) return;
-
-  const usage = await reserveWorkspaceDMSend(automation.workspaceId);
-  if (!usage.allowed) {
-    await deliveryLease.release().catch(() => {});
-    return;
-  }
-
-  let rateLimit;
   try {
-    rateLimit = await reserveDMSlot(instagramAccountId, job.attemptsMade);
-  } catch (error) {
-    await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-    await deliveryLease.release().catch(() => {});
-    await markDmLogFailed({ automationId: automation.id, commentId: revealDedupeId }, formatError(error), job.attemptsMade + 1);
-    throw error;
-  }
-  if (!rateLimit.allowed) {
-    await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-    await deliveryLease.release().catch(() => {});
-    if (rateLimit.shouldSkip) return;
-    if (rateLimit.shouldRequeue) {
-      await getDMQueue().add(
-        POSTBACK_JOB_NAME,
-        { ...job.data },
-        {
-          delay: rateLimit.requeueDelayMs,
-          jobId: `postback_${automation.id}_${revealDedupeId}_retry_${job.attemptsMade + 1}`,
-        }
-      );
-      return;
-    }
-    throw new Error("Hourly Instagram DM rate limit reached");
-  }
-
-  try {
-    if (!fallback) {
-      await prisma.dmLog.upsert({
-        where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } },
-        create: {
-          workspaceId: automation.workspaceId,
-          automationId: automation.id,
-          instagramAccountId: automation.instagramAccountId,
-          commenterId: userId,
-          commenterName,
-          commentText: "(button tap)",
-          commentId: revealDedupeId,
-          status: "PENDING",
-          attempts: job.attemptsMade + 1,
-          errorMessage: null,
-        },
-        update: {
-          status: "PENDING",
-          attempts: job.attemptsMade + 1,
-          commenterName,
-          errorMessage: null,
-        },
-      });
-    }
-
     await sendRevealDirectMessage(
       accessToken,
       automation,
@@ -829,39 +680,9 @@ export async function processPostback(job: { data: ProcessPostbackJob; attemptsM
       fallback ? "read fallback" : "button tap"
     );
 
-    if (!fallback) {
-      await markDmLogSent({ automationId: automation.id, commentId: revealDedupeId });
-
-      if (automation.followUpEnabled && automation.followUpMessage) {
-        try {
-          const queue = getDMQueue();
-          const delayMs = Math.max(1, automation.followUpDelayMinutes || 15) * 60 * 1000;
-          await queue.add(
-            FOLLOWUP_JOB_NAME,
-            {
-              automationId: automation.id,
-              userId,
-              instagramAccountId: automation.instagramAccount.instagramId,
-              commenterName: commenterName ?? null,
-            },
-            {
-              delay: delayMs,
-              jobId: `followup_${automation.id}_${userId}`,
-            }
-          );
-        } catch (queueErr) {
-          console.warn("[DM Worker] Followup schedule warning:", queueErr);
-        }
-      }
-    }
-  } catch (error) {
-    await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-    await deliveryLease.release().catch(() => {});
-    if (fallback && /outside of allowed window/i.test(formatError(error))) {
-      return;
-    }
-    if (!fallback) {
-      await prisma.dmLog.upsert({
+    const revealDedupeId = `reveal:${userId}`;
+    await prisma.dmLog
+      .upsert({
         where: { automationId_commentId: { automationId: automation.id, commentId: revealDedupeId } },
         create: {
           workspaceId: automation.workspaceId,
@@ -871,18 +692,39 @@ export async function processPostback(job: { data: ProcessPostbackJob; attemptsM
           commenterName,
           commentText: "(button tap)",
           commentId: revealDedupeId,
-          status: "FAILED",
-          attempts: job.attemptsMade + 1,
-          errorMessage: formatError(error),
+          status: "SENT",
+          attempts: 1,
         },
         update: {
-          status: "FAILED",
-          attempts: job.attemptsMade + 1,
-          errorMessage: formatError(error),
+          status: "SENT",
+          commenterName,
         },
-      });
+      })
+      .catch(() => {});
+
+    if (automation.followUpEnabled && automation.followUpMessage) {
+      try {
+        const queue = getDMQueue();
+        const delayMs = Math.max(1, automation.followUpDelayMinutes || 15) * 60 * 1000;
+        await queue.add(
+          FOLLOWUP_JOB_NAME,
+          {
+            automationId: automation.id,
+            userId,
+            instagramAccountId: automation.instagramAccount.instagramId,
+            commenterName: commenterName ?? null,
+          },
+          {
+            delay: delayMs,
+            jobId: `followup_${automation.id}_${userId}`,
+          }
+        );
+      } catch (queueErr) {
+        console.warn("[DM Worker] Followup schedule warning:", queueErr);
+      }
     }
-    throw error;
+  } catch (error) {
+    console.error("[processPostback Delivery Error]", error);
   }
 }
 
