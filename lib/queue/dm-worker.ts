@@ -141,10 +141,11 @@ async function sendRevealDirectMessage(
     renderMessageWithoutLink({
       message: automation.dmMessage,
       commenterName,
-    }) || "Tap below to stream and listen on all platforms"
+    }) || "Tap below to stream and listen on all digital platforms:"
   ).slice(0, 80);
 
   try {
+    // 1. Try Native Generic Template Card with interactive Web URL Button
     await sendDirectMessageWithGenericTemplate(
       accessToken,
       automation.instagramAccount.instagramId,
@@ -155,31 +156,40 @@ async function sendRevealDirectMessage(
       destinationUrl
     );
   } catch (cardErr) {
-    console.warn("[sendRevealDirectMessage Card Warning - fallback to link button]", cardErr);
-    if (automation.trackedLinks.length > 0) {
-      const buttons = buildLinkButtons(automation.trackedLinks, automation.linkButtonLabel);
-      try {
-        await sendDirectMessageWithLinkButton(
-          accessToken,
-          automation.instagramAccount.instagramId,
-          userId,
-          cardSubtitle,
-          buttons
-        );
-      } catch (buttonErr) {
-        await sendDirectMessage(
-          accessToken,
-          automation.instagramAccount.instagramId,
-          userId,
-          `${cardSubtitle}\n\n👉 ${destinationUrl}`
-        );
-      }
-    } else {
+    console.warn("[sendRevealDirectMessage Card Warning - trying link button template]", cardErr);
+    try {
+      const buttons = buildLinkButtons(
+        automation.trackedLinks.length > 0
+          ? automation.trackedLinks
+          : [{ slug: "official", label: buttonTitle, destinationUrl }],
+        buttonTitle
+      );
+      await sendDirectMessageWithLinkButton(
+        accessToken,
+        automation.instagramAccount.instagramId,
+        userId,
+        cardSubtitle,
+        buttons
+      );
+    } catch (buttonErr) {
+      console.warn("[sendRevealDirectMessage Button Warning - fallback to formatted DM]", buttonErr);
+      // Clean artist-styled formatted reveal message
+      const formattedMessage = [
+        `✨ ${cardTitle} ✨`,
+        "",
+        cardSubtitle,
+        "",
+        `🎵 Tap here to stream:`,
+        destinationUrl,
+        "",
+        "Much love for supporting the music! 🙏🏾❤️",
+      ].join("\n");
+
       await sendDirectMessage(
         accessToken,
         automation.instagramAccount.instagramId,
         userId,
-        `${cardSubtitle}\n\n👉 ${destinationUrl}`
+        formattedMessage
       );
     }
   }
