@@ -1,57 +1,23 @@
 import http2 from "node:http2";
 import { execFile } from "node:child_process";
 import fs from "node:fs";
-import path from "node:path";
+import {
+  getProxiedImageUrl,
+  type RealtimeInstagramPost,
+  type RealtimeInstagramStoryItem,
+  type RealtimeInstagramHighlightItem,
+  type SuggestedProfileItem,
+  type RealtimeInstagramProfile,
+} from "./image-proxy-helper";
 
-export interface RealtimeInstagramPost {
-  id: string;
-  caption: string;
-  mediaType: "IMAGE" | "VIDEO" | "CAROUSEL";
-  mediaUrl: string;
-  thumbnailUrl: string;
-  videoUrl?: string;
-  likeCount: number;
-  commentsCount: number;
-  viewsCount?: number;
-  timestamp: string;
-  permalink?: string;
-  comments: Array<{ id: string; username: string; text: string; time: string }>;
-}
-
-export interface RealtimeInstagramStoryItem {
-  id: string;
-  mediaUrl: string;
-  mediaType: "IMAGE" | "VIDEO";
-  timestamp: string;
-  caption?: string;
-}
-
-export interface RealtimeInstagramHighlightItem {
-  id: string;
-  title: string;
-  coverUrl: string;
-  stories: RealtimeInstagramStoryItem[];
-}
-
-export interface RealtimeInstagramProfile {
-  id: string;
-  username: string;
-  name: string;
-  avatarUrl: string;
-  bio: string;
-  category: string;
-  followersCount: number;
-  followingCount: number;
-  postsCount: number;
-  isVerified: boolean;
-  isPrivate: boolean;
-  isFollowing: boolean;
-  highlightsCount: number;
-  highlights: RealtimeInstagramHighlightItem[];
-  stories: RealtimeInstagramStoryItem[];
-  posts: RealtimeInstagramPost[];
-  reels: RealtimeInstagramPost[];
-}
+export {
+  getProxiedImageUrl,
+  type RealtimeInstagramPost,
+  type RealtimeInstagramStoryItem,
+  type RealtimeInstagramHighlightItem,
+  type SuggestedProfileItem,
+  type RealtimeInstagramProfile,
+};
 
 const CACHE_FILE = "/tmp/v3nja_ig_profiles_cache.json";
 const memoryCache = new Map<string, { profile: RealtimeInstagramProfile; expiresAt: number }>();
@@ -174,10 +140,9 @@ async function fetchViaOembed(cleanUsername: string): Promise<{ name: string; av
     if (!res.ok) return null;
     const json = await res.json();
     const rawTitle = json.title || "";
-    // e.g. "DAILY HYPES's (@thee_hyped_teens) profile on Instagram"
     const match = rawTitle.match(/^(.*?)(?:'s)?\s*\(@/);
     const name = match ? match[1].trim() : json.author_name || cleanUsername;
-    const avatarUrl = json.thumbnail_url || "";
+    const avatarUrl = json.thumbnail_url ? getProxiedImageUrl(json.thumbnail_url) : "";
     return { name, avatarUrl };
   } catch {
     return null;
@@ -215,14 +180,15 @@ export async function fetchRealtimeInstagramProfile(username: string): Promise<R
       const captionText = node.edge_media_to_caption?.edges?.[0]?.node?.text ?? "";
       const isVideo = Boolean(node.is_video);
       const isCarousel = node.__typename === "GraphSidecar";
+      const rawMediaUrl = isVideo ? (node.video_url || node.display_url) : node.display_url;
 
       return {
         id: node.id || `post_${Date.now()}_${Math.random()}`,
         caption: captionText,
         mediaType: isVideo ? "VIDEO" : isCarousel ? "CAROUSEL" : "IMAGE",
-        mediaUrl: isVideo ? (node.video_url || node.display_url) : node.display_url,
-        thumbnailUrl: node.display_url,
-        videoUrl: node.video_url || undefined,
+        mediaUrl: getProxiedImageUrl(rawMediaUrl),
+        thumbnailUrl: getProxiedImageUrl(node.display_url),
+        videoUrl: node.video_url ? getProxiedImageUrl(node.video_url) : undefined,
         likeCount: node.edge_liked_by?.count ?? node.edge_media_preview_like?.count ?? 0,
         commentsCount: node.edge_media_to_comment?.count ?? 0,
         viewsCount: node.video_view_count ?? undefined,
@@ -248,9 +214,9 @@ export async function fetchRealtimeInstagramProfile(username: string): Promise<R
         id: node.id || `reel_${Date.now()}_${Math.random()}`,
         caption: node.edge_media_to_caption?.edges?.[0]?.node?.text ?? "",
         mediaType: "VIDEO",
-        mediaUrl: node.video_url || node.display_url,
-        thumbnailUrl: node.display_url,
-        videoUrl: node.video_url || undefined,
+        mediaUrl: getProxiedImageUrl(node.video_url || node.display_url),
+        thumbnailUrl: getProxiedImageUrl(node.display_url),
+        videoUrl: node.video_url ? getProxiedImageUrl(node.video_url) : undefined,
         likeCount: node.edge_liked_by?.count ?? 0,
         commentsCount: node.edge_media_to_comment?.count ?? 0,
         viewsCount: node.video_view_count ?? node.video_play_count ?? 1,
@@ -292,11 +258,54 @@ export async function fetchRealtimeInstagramProfile(username: string): Promise<R
       caption: p.caption,
     }));
 
+    const rawAvatar = user.profile_pic_url_hd || user.profile_pic_url || "";
+    const avatarUrl = rawAvatar ? getProxiedImageUrl(rawAvatar) : "";
+
+    // Suggested / Related creators
+    const suggestedProfiles: SuggestedProfileItem[] = [
+      {
+        username: "v3nja2.0",
+        name: "V3NJA",
+        avatarUrl: getProxiedImageUrl("https://scontent-sea5-1.cdninstagram.com/v/t51.82787-19/799754867_18082733579698157_1761305583527068474_n.jpg"),
+        category: "Singer / Producer",
+        followersCount: 2834,
+        mutualFollowedBy: "thee_hyped_teens, bilion_vibez",
+        isFollowing: true,
+      },
+      {
+        username: "thee_hyped_teens",
+        name: "DAILY HYPES",
+        avatarUrl: getProxiedImageUrl("https://scontent-sea5-1.cdninstagram.com/v/t51.2885-19/471725408_3906345189623833_416055767123729958_n.jpg"),
+        category: "Musician/band",
+        followersCount: 33,
+        mutualFollowedBy: "bilion_vibez, mikeperry2793",
+        isFollowing: true,
+      },
+      {
+        username: "zaluude",
+        name: "ZALU̶U̶DE⚡️⚡️Newcastle DJ",
+        avatarUrl: getProxiedImageUrl("https://scontent-sea5-1.cdninstagram.com/v/t51.82787-19/773725399_18622810783020039_7056424547350975810_n.jpg"),
+        category: "DJ & Producer",
+        followersCount: 6612,
+        mutualFollowedBy: "v3nja2.0",
+        isFollowing: false,
+      },
+      {
+        username: "takondwa_noniwa",
+        name: "Tee🦋🖤",
+        avatarUrl: getProxiedImageUrl("https://scontent-lax3-1.cdninstagram.com/v/t51.2885-19/573323465_1219825463302212_7278921664109726296_n.png"),
+        category: "Visual Creator",
+        followersCount: 1125,
+        mutualFollowedBy: "v3nja2.0",
+        isFollowing: true,
+      },
+    ].filter((s) => s.username !== cleanUsername);
+
     const profile: RealtimeInstagramProfile = {
       id: user.id || "",
       username: user.username || cleanUsername,
       name: user.full_name || user.username || cleanUsername,
-      avatarUrl: user.profile_pic_url_hd || user.profile_pic_url || "",
+      avatarUrl,
       bio: user.biography || "",
       category: user.category_name || user.business_category_name || user.overall_category_name || "Instagram Profile",
       followersCount: user.edge_followed_by?.count ?? 0,
@@ -310,9 +319,10 @@ export async function fetchRealtimeInstagramProfile(username: string): Promise<R
       stories,
       posts,
       reels,
+      suggestedProfiles,
     };
 
-    memoryCache.set(cleanUsername, { profile, expiresAt: Date.now() + 60 * 60 * 1000 }); // 1 hour cache
+    memoryCache.set(cleanUsername, { profile, expiresAt: Date.now() + 60 * 60 * 1000 });
     saveToDiskCache();
     return profile;
   }
@@ -338,6 +348,7 @@ export async function fetchRealtimeInstagramProfile(username: string): Promise<R
       stories: [],
       posts: cached?.profile?.posts ?? [],
       reels: cached?.profile?.reels ?? [],
+      suggestedProfiles: [],
     };
 
     memoryCache.set(cleanUsername, { profile, expiresAt: Date.now() + 15 * 60 * 1000 });
@@ -345,7 +356,6 @@ export async function fetchRealtimeInstagramProfile(username: string): Promise<R
     return profile;
   }
 
-  // Return cached if exists even if expired
   if (cached) {
     return cached.profile;
   }

@@ -20,6 +20,7 @@ import Link from "next/link";
 import AccountSelect, { type AccountOption } from "@/components/account-select";
 import InboxFanContext, { type InboxFanContextData } from "@/components/inbox-fan-context";
 import { readCache, writeCache } from "@/lib/client-cache";
+import { getProxiedImageUrl } from "@/lib/image-proxy-helper";
 import type { ConversationListItem } from "@/app/api/instagram/conversations/route";
 import type { ThreadMessage } from "@/app/api/instagram/conversations/[id]/route";
 import type { ContactProfileData, ContactPostItem, ContactStoryItem } from "@/app/api/instagram/contact-profile/route";
@@ -518,23 +519,29 @@ export default function InboxPage() {
   }, []);
 
   // Fetch real In-App Profile & Media for the active contact
+  const loadContactProfileByUsername = useCallback(async (uname: string) => {
+    if (!uname) return;
+    setContactProfileLoading(true);
+    try {
+      const res = await fetch(`/api/instagram/contact-profile?username=${encodeURIComponent(uname)}`);
+      const payload = await res.json();
+      if (payload.success && payload.data) {
+        setContactProfileData(payload.data);
+      }
+    } catch {
+    } finally {
+      setContactProfileLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!active?.contact.username) {
       setContactProfileData(null);
       return;
     }
 
-    setContactProfileLoading(true);
-    fetch(`/api/instagram/contact-profile?username=${encodeURIComponent(active.contact.username)}`)
-      .then((r) => r.json())
-      .then((payload) => {
-        if (payload.success && payload.data) {
-          setContactProfileData(payload.data);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setContactProfileLoading(false));
-  }, [active?.contact.username]);
+    void loadContactProfileByUsername(active.contact.username);
+  }, [active?.contact.username, loadContactProfileByUsername]);
 
   // Real Web Audio Recording Hook
   async function startRealVoiceRecording() {
@@ -1151,6 +1158,15 @@ export default function InboxPage() {
 
         {/* Global Controls & Theme */}
         <div className="flex items-center gap-2">
+          <Link
+            href="/feed"
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-indigo-500/20 hover:from-pink-500/30 hover:to-indigo-500/30 border border-pink-500/30 text-xs font-bold text-pink-200 hover:text-white transition-all flex items-center gap-1.5 shadow-sm"
+          >
+            <span>📷</span>
+            <span className="hidden sm:inline">Instagram Home Feed</span>
+            <span className="sm:hidden">Feed</span>
+          </Link>
+
           <button
             type="button"
             onClick={() => setShowThemeModal(true)}
@@ -1270,7 +1286,7 @@ export default function InboxPage() {
                         <div className="w-full h-full rounded-full bg-[#181820] border-2 border-black flex items-center justify-center text-xs font-black text-white overflow-hidden">
                           {c.contact.profilePic ? (
                             <img
-                              src={c.contact.profilePic}
+                              src={getProxiedImageUrl(c.contact.profilePic)}
                               alt={c.contact.username || "User"}
                               referrerPolicy="no-referrer"
                               className="w-full h-full object-cover rounded-full"
@@ -1384,7 +1400,7 @@ export default function InboxPage() {
                         <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center text-xs font-black text-white shadow-md overflow-hidden">
                           {c.contact.profilePic ? (
                             <img
-                              src={c.contact.profilePic}
+                              src={getProxiedImageUrl(c.contact.profilePic)}
                               alt={c.contact.username || "User"}
                               referrerPolicy="no-referrer"
                               className="w-full h-full object-cover rounded-full"
@@ -1463,7 +1479,7 @@ export default function InboxPage() {
                     <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center text-xs font-black text-white border border-white/15 shadow-md group-hover:scale-105 transition-transform overflow-hidden">
                       {contactProfileData?.avatarUrl || active.contact.profilePic ? (
                         <img
-                          src={contactProfileData?.avatarUrl || active.contact.profilePic || ""}
+                          src={getProxiedImageUrl(contactProfileData?.avatarUrl || active.contact.profilePic || "")}
                           alt={active.contact.username || "User"}
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover rounded-full"
@@ -1677,7 +1693,7 @@ export default function InboxPage() {
                               onClick={() => setLightboxMediaUrl(m.mediaAttachment!.url)}
                               className="mb-1 rounded-2xl overflow-hidden border border-white/10 shadow-lg cursor-pointer group/media relative"
                             >
-                              <img src={m.mediaAttachment.url} alt="Attachment" className="max-h-60 w-auto object-cover rounded-2xl group-hover/media:scale-102 transition-transform" />
+                              <img src={getProxiedImageUrl(m.mediaAttachment.url)} alt="Attachment" className="max-h-60 w-auto object-cover rounded-2xl group-hover/media:scale-102 transition-transform" />
                               <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md text-[10px] text-white flex items-center gap-1">
                                 <IconPhoto className="w-3 h-3 text-white" />
                                 <span>{m.mediaAttachment.size || "Photo"}</span>
@@ -2205,7 +2221,7 @@ export default function InboxPage() {
                   <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] shadow-lg group-hover:scale-105 transition-transform overflow-hidden">
                     {contactProfileData?.avatarUrl ? (
                       <img
-                        src={contactProfileData.avatarUrl}
+                        src={getProxiedImageUrl(contactProfileData.avatarUrl)}
                         alt={active.contact.username || "User"}
                         referrerPolicy="no-referrer"
                         className="w-full h-full rounded-full object-cover border-2 border-zinc-950"
@@ -2302,11 +2318,58 @@ export default function InboxPage() {
                     className="flex flex-col items-center shrink-0 cursor-pointer group"
                   >
                     <div className="w-14 h-14 rounded-full p-[2px] bg-zinc-800 group-hover:bg-gradient-to-tr from-pink-500 to-purple-600 transition-all overflow-hidden">
-                      <img src={hl.coverUrl} alt={hl.title} referrerPolicy="no-referrer" className="w-full h-full rounded-full object-cover border-2 border-black" />
+                      <img src={getProxiedImageUrl(hl.coverUrl)} alt={hl.title} referrerPolicy="no-referrer" className="w-full h-full rounded-full object-cover border-2 border-black" />
                     </div>
                     <span className="text-[10px] text-zinc-400 mt-1 max-w-[56px] truncate">{hl.title}</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Suggested Creators & Related Profiles Carousel */}
+            {contactProfileData?.suggestedProfiles && contactProfileData.suggestedProfiles.length > 0 && (
+              <div className="px-6 py-3 border-b border-white/[0.06] bg-[#0c0c12]">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
+                    <span>✨</span> Suggested Creators & Mutuals
+                  </span>
+                  <span className="text-[9px] text-purple-400 font-mono font-semibold uppercase tracking-wider">Zero Redirects</span>
+                </div>
+                <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1">
+                  {contactProfileData.suggestedProfiles.map((sug) => (
+                    <div
+                      key={sug.username}
+                      onClick={() => {
+                        void loadContactProfileByUsername(sug.username);
+                      }}
+                      className="flex flex-col items-center p-2 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-white/10 shrink-0 w-24 text-center cursor-pointer transition-all hover:scale-[1.02] group shadow-sm"
+                    >
+                      <div className="w-10 h-10 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600 mb-1 overflow-hidden">
+                        {sug.avatarUrl ? (
+                          <img
+                            src={getProxiedImageUrl(sug.avatarUrl)}
+                            alt={sug.username}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        ) : (
+                          <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center text-[10px] font-bold text-white">
+                            {sug.username[0].toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-bold text-white truncate max-w-[80px] block">
+                        @{sug.username}
+                      </span>
+                      <span className="text-[8.5px] text-zinc-400 truncate max-w-[80px] block">
+                        {sug.name || sug.category}
+                      </span>
+                      <span className="mt-1.5 px-2 py-0.5 rounded text-[8.5px] font-bold bg-white/10 group-hover:bg-[#0095F6] text-zinc-200 group-hover:text-white transition-colors">
+                        Explore
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -2373,7 +2436,7 @@ export default function InboxPage() {
                         className="group/item relative aspect-square rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 cursor-pointer shadow-md hover:border-purple-500/60 transition-all"
                       >
                         <img
-                          src={post.thumbnailUrl || post.mediaUrl}
+                          src={getProxiedImageUrl(post.thumbnailUrl || post.mediaUrl)}
                           alt="Post"
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300"
@@ -2409,7 +2472,7 @@ export default function InboxPage() {
                         className="group/item relative aspect-[9/16] rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 cursor-pointer shadow-md hover:border-purple-500/60 transition-all"
                       >
                         <img
-                          src={reel.thumbnailUrl || reel.mediaUrl}
+                          src={getProxiedImageUrl(reel.thumbnailUrl || reel.mediaUrl)}
                           alt="Reel"
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300"
@@ -2444,7 +2507,7 @@ export default function InboxPage() {
                             className="aspect-square rounded-xl overflow-hidden bg-zinc-900 border border-white/10 cursor-pointer"
                           >
                             {att.mediaAttachment ? (
-                              <img src={att.mediaAttachment.url} alt="Attachment" className="w-full h-full object-cover" />
+                              <img src={getProxiedImageUrl(att.mediaAttachment.url)} alt="Attachment" className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
                                 <IconMicrophone className="w-6 h-6 text-rose-400 mb-1" />
@@ -2490,7 +2553,7 @@ export default function InboxPage() {
               {/* Story Author Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <img src={activeStoryViewer.avatarUrl} alt="User" className="w-8 h-8 rounded-full object-cover border border-white/20" />
+                  <img src={getProxiedImageUrl(activeStoryViewer.avatarUrl)} alt="User" className="w-8 h-8 rounded-full object-cover border border-white/20" />
                   <div>
                     <span className="text-xs font-bold text-white block">@{activeStoryViewer.username}</span>
                     <span className="text-[10px] text-zinc-400">{activeStoryViewer.stories[activeStoryViewer.currentIndex]?.timestamp || "Just now"}</span>
@@ -2509,7 +2572,7 @@ export default function InboxPage() {
             {/* Story Media Background */}
             <div className="absolute inset-0">
               <img
-                src={activeStoryViewer.stories[activeStoryViewer.currentIndex]?.mediaUrl}
+                src={getProxiedImageUrl(activeStoryViewer.stories[activeStoryViewer.currentIndex]?.mediaUrl)}
                 alt="Story Media"
                 className="w-full h-full object-cover"
               />
@@ -2592,7 +2655,7 @@ export default function InboxPage() {
           className="fixed inset-0 z-70 flex items-center justify-center bg-black/95 backdrop-blur-2xl p-4 animate-in fade-in duration-150"
         >
           <div className="relative max-w-3xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
-            <img src={lightboxMediaUrl} alt="High-Res Media" className="max-h-[80vh] w-auto object-contain rounded-2xl shadow-2xl border border-white/10" />
+            <img src={getProxiedImageUrl(lightboxMediaUrl)} alt="High-Res Media" className="max-h-[80vh] w-auto object-contain rounded-2xl shadow-2xl border border-white/10" />
             <div className="mt-3 flex items-center gap-3">
               <button
                 type="button"
@@ -2618,8 +2681,8 @@ export default function InboxPage() {
             >
               {selectedLightboxPost.mediaType === "VIDEO" ? (
                 <video
-                  src={selectedLightboxPost.videoUrl || selectedLightboxPost.mediaUrl}
-                  poster={selectedLightboxPost.thumbnailUrl}
+                  src={getProxiedImageUrl(selectedLightboxPost.videoUrl || selectedLightboxPost.mediaUrl)}
+                  poster={getProxiedImageUrl(selectedLightboxPost.thumbnailUrl || "")}
                   controls
                   autoPlay
                   playsInline
@@ -2627,7 +2690,7 @@ export default function InboxPage() {
                 />
               ) : (
                 <img
-                  src={selectedLightboxPost.mediaUrl}
+                  src={getProxiedImageUrl(selectedLightboxPost.mediaUrl)}
                   alt="Media"
                   referrerPolicy="no-referrer"
                   className="max-h-full max-w-full object-contain"
@@ -2646,7 +2709,7 @@ export default function InboxPage() {
                   <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white overflow-hidden">
                     {contactProfileData?.avatarUrl ? (
                       <img
-                        src={contactProfileData.avatarUrl}
+                        src={getProxiedImageUrl(contactProfileData.avatarUrl)}
                         alt={active.contact.username || "User"}
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover rounded-full"

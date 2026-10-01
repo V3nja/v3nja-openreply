@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentWorkspaceId } from "@/lib/auth";
-import { fetchRealtimeInstagramProfile } from "@/lib/instagram-realtime";
+import {
+  fetchRealtimeInstagramProfile,
+  type RealtimeInstagramProfile,
+  type RealtimeInstagramPost,
+  type RealtimeInstagramStoryItem,
+  type RealtimeInstagramHighlightItem,
+  type SuggestedProfileItem,
+} from "@/lib/instagram-realtime";
+
+export type ContactProfileData = RealtimeInstagramProfile;
+export type ContactPostItem = RealtimeInstagramPost;
+export type ContactStoryItem = RealtimeInstagramStoryItem;
+export type ContactHighlightItem = RealtimeInstagramHighlightItem;
 
 export const dynamic = "force-dynamic";
 

@@ -9,11 +9,12 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: "📊" },
+  { label: "Instagram Home Feed", href: "/feed", icon: "🏠" },
+  { label: "Instagram Inbox", href: "/inbox", icon: "💬" },
   { label: "Overview & Growth", href: "/overview", icon: "📈" },
   { label: "Analytics", href: "/analytics", icon: "📉" },
   { label: "Fans & Audience", href: "/fans", icon: "👥" },
   { label: "Live Comment Tester", href: "/tester", icon: "🧪" },
-  { label: "Instagram Inbox", href: "/inbox", icon: "💬" },
   { label: "Campaigns & Triggers", href: "/campaigns", icon: "⚡" },
   { label: "DM Logs", href: "/logs", icon: "📋" },
   { label: "Settings & Keys", href: "/settings", icon: "⚙️" },
