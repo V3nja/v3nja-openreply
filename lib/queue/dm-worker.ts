@@ -547,15 +547,17 @@ export async function processComment(job: { data: ProcessCommentJob; attemptsMad
       } else if (automation.trackedLinks.length > 0) {
         const bodyText =
           renderMessageWithoutLink({ message: automation.dmMessage, commenterName }) ||
-          "Here's your link:";
-        const buttons = buildLinkButtons(automation.trackedLinks, automation.linkButtonLabel);
+          "Tap below to open your exclusive VIP link ✨";
+        const buttonLabel = (automation.linkButtonLabel || "Stream Music 🎵").slice(0, 20);
         try {
-          await sendPrivateReplyWithLinkButton(
+          // Send interactive postback button for comment private reply
+          await sendPrivateReplyWithButton(
             accessToken,
             automation.instagramAccount.instagramId,
             commentId,
             bodyText,
-            buttons
+            buttonLabel,
+            `reveal:${automation.id}`
           );
         } catch (buttonError) {
           if (!isTemplateRejection(buttonError)) throw buttonError;

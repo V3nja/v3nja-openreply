@@ -404,8 +404,8 @@ export async function sendDirectMessageWithGenericTemplate(
 }
 
 /**
- * Send a direct message as a button template with up to 3 web_url buttons —
- * the reveal message plus tappable link buttons (cleaner than inline URLs).
+ * Send a direct message as a rich Generic Template with up to 3 tappable web_url buttons —
+ * native Instagram card format (eliminates template rejection and displays interactive buttons).
  */
 export async function sendDirectMessageWithLinkButton(
   accessToken: string,
@@ -414,15 +414,23 @@ export async function sendDirectMessageWithLinkButton(
   text: string,
   buttons: LinkButton[]
 ): Promise<{ recipient_id: string; message_id: string }> {
+  const cleanTitle = (text.split("\n")[0] || "✨ V3NJA WRLD Official Link ✨").slice(0, 80);
+  const cleanSubtitle = (text.split("\n").slice(1).join(" ").trim() || "Tap the button below to stream and access the official release").slice(0, 80);
+
   return postToMessagesEndpoint(accessToken, instagramAccountId, {
     recipient: { id: userId },
     message: {
       attachment: {
         type: "template",
         payload: {
-          template_type: "button",
-          text: text.slice(0, 640),
-          buttons: toWebUrlButtons(buttons),
+          template_type: "generic",
+          elements: [
+            {
+              title: cleanTitle,
+              subtitle: cleanSubtitle,
+              buttons: toWebUrlButtons(buttons),
+            },
+          ],
         },
       },
     },

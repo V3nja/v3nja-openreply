@@ -16,20 +16,25 @@ export async function enqueueVerifiedWebhook(
 ): Promise<{ eventId: string; queued: number; duplicate: boolean }> {
   const eventId = createHash("sha256").update(rawBody).digest("hex");
 
-  const existing = await prisma.webhookEvent.findUnique({
-    where: { id: eventId },
-    select: { id: true, status: true },
-  });
-
-  if (existing?.status === "PROCESSED") {
-    return { eventId, queued: 0, duplicate: true };
-  }
-
-  if (existing?.status === "FAILED") {
-    await prisma.webhookEvent.update({
+  let existing: { id: string; status: string } | null = null;
+  try {
+    existing = await prisma.webhookEvent.findUnique({
       where: { id: eventId },
-      data: { status: "PENDING", errorMessage: null, processedAt: null },
+      select: { id: true, status: true },
     });
+
+    if (existing?.status === "PROCESSED") {
+      return { eventId, queued: 0, duplicate: true };
+    }
+
+    if (existing?.status === "FAILED") {
+      await prisma.webhookEvent.update({
+        where: { id: eventId },
+        data: { status: "PENDING", errorMessage: null, processedAt: null },
+      });
+    }
+  } catch (dbErr) {
+    console.warn("[Webhook DB Lookup warning - proceeding directly]", dbErr);
   }
 
   const commentEvents = parseCommentEvents(payload);
@@ -67,15 +72,28 @@ export async function enqueueVerifiedWebhook(
   const fallbackAccount = accounts[0] ?? defaultAccount;
 
   if (!existing) {
-    await prisma.webhookEvent.create({
-      data: {
-        id: eventId,
-        workspaceId,
-        object: payload.object,
-        payload,
-        status: "PENDING",
-      },
-    });
+    try {
+      await prisma.webhookEvent.create({
+        data: {
+          id: eventId,
+          workspaceId,
+          object: payload.object,
+          payload,
+          status: "PENDING",
+        },
+      });
+
+      // Automated log pruning: keep Neon storage permanently under 5MB
+      const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+      prisma.webhookEvent
+        .deleteMany({ where: { createdAt: { lt: threeDaysAgo } } })
+        .catch(() => {});
+      prisma.operationalEvent
+        .deleteMany({ where: { createdAt: { lt: threeDaysAgo } } })
+        .catch(() => {});
+    } catch (dbErr) {
+      console.warn("[Webhook DB Warning - Proceeding in-memory]", dbErr);
+    }
   }
 
   let queue: ReturnType<typeof getDMQueue> | null = null;
