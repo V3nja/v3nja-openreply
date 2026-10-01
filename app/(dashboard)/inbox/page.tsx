@@ -442,9 +442,8 @@ export default function InboxPage() {
     setSending(true);
     setSendError(null);
 
-    const messagePayload = replyingTo
-      ? `💬 Replying to: "${replyingTo.text.slice(0, 40)}..."\n\n${text}`
-      : text;
+    // Clean, natural message text sent directly to Meta API (no artificial prefix pollution)
+    const messagePayload = text;
 
     const optimistic: ExtendedMessage = {
       id: `optimistic-${Date.now()}`,
