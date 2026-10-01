@@ -38,9 +38,47 @@ export function evaluateAutomationRule(
   rule: AutomationRuleConfig,
   context: TriggerContext
 ): TriggerDecision {
-  // `pendingNextReel` is intentionally treated as an account-level future-post
-  // flag elsewhere. Once a concrete media id exists, it behaves like a normal
-  // any-post campaign rather than silently matching unrelated historic media.
+  const isDirectMessage = !context.mediaId;
+
+  // For 1-on-1 Inbound Direct Messages:
+  // Strictly enforce that matchAnyWord NEVER triggers on normal conversation.
+  // Inbound DMs only trigger if explicit keywords are configured AND matched.
+  if (isDirectMessage) {
+    if (!rule.keywords || rule.keywords.length === 0) {
+      return {
+        matched: false,
+        matchedKeyword: null,
+        reason: "NO_TEXT_MATCH",
+      };
+    }
+
+    const cleanText = (context.text || "").trim().toLowerCase();
+    const commonGreetings = ["hi", "hie", "hey", "hello", "yo", "sup", "whatsup", "whats up", "good morning", "good evening", "gm", "gn"];
+    if (commonGreetings.includes(cleanText) && !rule.keywords.some((k) => k.toLowerCase() === cleanText)) {
+      return {
+        matched: false,
+        matchedKeyword: null,
+        reason: "NO_TEXT_MATCH",
+      };
+    }
+
+    const result = matchKeywords(context.text, rule.keywords, rule.wholeWordMatch);
+    if (!result.matched) {
+      return {
+        matched: false,
+        matchedKeyword: null,
+        reason: "NO_TEXT_MATCH",
+      };
+    }
+
+    return {
+      matched: true,
+      matchedKeyword: result.matchedKeyword ?? null,
+      reason: "KEYWORD",
+    };
+  }
+
+  // For Post & Reel Comments:
   const postOk = mediaMatches(rule, context) || (rule.pendingNextReel && !rule.postId);
   if (!postOk) {
     return {
@@ -54,7 +92,7 @@ export function evaluateAutomationRule(
     return {
       matched: true,
       matchedKeyword: null,
-      reason: context.mediaId ? "ANY_WORD" : "ANY_WORD",
+      reason: "ANY_WORD",
     };
   }
 
@@ -70,6 +108,6 @@ export function evaluateAutomationRule(
   return {
     matched: true,
     matchedKeyword: result.matchedKeyword ?? null,
-    reason: context.mediaId ? "KEYWORD" : "KEYWORD",
+    reason: "KEYWORD",
   };
 }

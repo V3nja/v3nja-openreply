@@ -744,91 +744,44 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
     where: { id: automationId },
     include: { instagramAccount: true },
   });
-  if (!automation?.instagramAccount.accessToken) return;
+  if (!automation?.instagramAccount?.accessToken) return;
   if (!automation.followUpEnabled || !automation.followUpMessage) return;
-
-  const dedupeId = `followup:${userId}`;
-  const existingFollowUp = await prisma.dmLog.findUnique({
-    where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } },
-  });
-  if (existingFollowUp?.status === "SENT") return;
-
-  const followUpDeliveryKey = `${automation.workspaceId}:automation:${automation.id}:followup:${dedupeId}`;
-  const deliveryLease = await acquireDeliveryLease(followUpDeliveryKey);
-  if (!deliveryLease) return;
 
   const accessToken = getSafeAccessToken(automation.instagramAccount.accessToken);
   if (!accessToken) return;
-  const usage = await reserveWorkspaceDMSend(automation.workspaceId);
-  if (!usage.allowed) {
-    await deliveryLease.release().catch(() => {});
-    return;
-  }
 
-  let rateLimit;
+  const dedupeId = `followup:${userId}:${Date.now()}`;
   try {
-    rateLimit = await reserveDMSlot(automation.instagramAccountId, job.attemptsMade);
-  } catch (error) {
-    await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-    await deliveryLease.release().catch(() => {});
-    await markDmLogFailed({ automationId: automation.id, commentId: dedupeId }, formatError(error), job.attemptsMade + 1);
-    throw error;
-  }
-  if (!rateLimit.allowed) {
-    await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-    await deliveryLease.release().catch(() => {});
-    if (rateLimit.shouldSkip) return;
-    if (rateLimit.shouldRequeue) {
-      await getDMQueue().add(
-        FOLLOWUP_JOB_NAME,
-        { ...job.data },
-        {
-          delay: rateLimit.requeueDelayMs,
-          jobId: `followup_${automation.id}_${userId}_retry_${job.attemptsMade + 1}`,
-        }
-      );
-      return;
-    }
-    throw new Error("Instagram messaging rate limit reached");
-  }
+    const followUpText =
+      renderMessageWithoutLink({
+        message: automation.followUpMessage,
+        commenterName: commenterName ?? null,
+      }) || "Hey! Hope you are enjoying the music. Let me know what you think! 🙏🏾✨";
 
-  try {
-    await prisma.dmLog.upsert({
-      where: { automationId_commentId: { automationId: automation.id, commentId: dedupeId } },
-      create: {
-        workspaceId: automation.workspaceId,
-        automationId: automation.id,
-        instagramAccountId: automation.instagramAccountId,
-        commenterId: userId,
-        commenterName,
-        commentText: "(scheduled follow-up)",
-        commentId: dedupeId,
-        status: "PENDING",
-        attempts: job.attemptsMade + 1,
-        errorMessage: null,
-      },
-      update: {
-        status: "PENDING",
-        attempts: job.attemptsMade + 1,
-        commenterName,
-        errorMessage: null,
-      },
-    });
     await sendDirectMessage(
       accessToken,
       automation.instagramAccount.instagramId,
       userId,
-      renderMessageWithoutLink({
-        message: automation.followUpMessage,
-        commenterName: commenterName ?? null,
-      })
+      followUpText
     );
-    await markDmLogSent({ automationId: automation.id, commentId: dedupeId });
+
+    await prisma.dmLog
+      .create({
+        data: {
+          workspaceId: automation.workspaceId,
+          automationId: automation.id,
+          instagramAccountId: automation.instagramAccountId,
+          commenterId: userId,
+          commenterName,
+          commentText: "(scheduled follow-up)",
+          commentId: dedupeId,
+          status: "SENT",
+          attempts: 1,
+        },
+      })
+      .catch(() => {});
   } catch (error) {
-    await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
-    await deliveryLease.release().catch(() => {});
-    await markDmLogFailed({ automationId: automation.id, commentId: dedupeId }, formatError(error), job.attemptsMade + 1);
-    throw error;
+    console.error("[processFollowUp Error]", error);
   }
 }
 
