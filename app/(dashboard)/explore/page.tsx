@@ -1,228 +1,202 @@
 "use client";
 
 /**
- * Universal Instagram Explore & Discovery Engine (V3NJA Social OS)
- * Exact authentic Meta Instagram web explore grid matching screenshots 7 & 8 with rich tiles,
- * video reel indicators, live likes & comments, and interactive lightbox.
+ * Real-Time Instagram Explore & Discovery Engine (V3NJA Social OS)
+ * Real-time search for live Instagram accounts, hashtags, and Meta Graph API media.
+ * Zero fake stock photos or simulated mock rosters.
  */
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { getExploreGridItems, type ExploreTileItem } from "@/lib/instagram-feed-engine";
 import InstagramMessagesDock from "@/components/instagram-messages-dock";
 
 export default function InstagramExplorePage() {
-  const [items, setItems] = useState<ExploreTileItem[]>(getExploreGridItems());
-  const [selectedItem, setSelectedItem] = useState<ExploreTileItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTopic, setActiveTopic] = useState("All");
+  const [loading, setLoading] = useState(false);
+  const [searchedProfile, setSearchedProfile] = useState<any>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
-  const TOPICS = [
-    "All",
-    "🤖 AI & Tech",
-    "🎵 Music",
-    "🎬 Reels",
-    "💃 Dance",
-    "🌍 Africa & Culture",
-    "👗 Fashion",
-    "🚗 Cars",
-    "🎨 3D Art",
+  const QUICK_PROFILES = [
+    { username: "v3nja2.0", name: "V3NJA", category: "Singer / Producer" },
+    { username: "thee_hyped_teens", name: "DAILY HYPES", category: "Musician/band" },
+    { username: "zaluude", name: "ZALU̶U̶DE⚡️", category: "DJ & Producer" },
+    { username: "takondwa_noniwa", name: "Tee 🦋", category: "Visual Creator" },
+    { username: "bilion_vibez", name: "BIL!ON VIBEZ", category: "Record Label" },
   ];
 
-  const filteredItems = items.filter((item) => {
-    if (activeTopic !== "All" && item.topic && !activeTopic.includes(item.topic)) {
-      return false;
+  async function handleSearch(targetUsername?: string) {
+    const q = (targetUsername || searchQuery).trim().replace(/^@/, "");
+    if (!q) return;
+    setLoading(true);
+    setSearchError(null);
+    setSearchedProfile(null);
+
+    try {
+      const res = await fetch(`/api/instagram/contact-profile?username=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setSearchedProfile(data.data);
+      } else {
+        setSearchError(data.error || `No public profile found for @${q}.`);
+      }
+    } catch (err: any) {
+      setSearchError(err?.message || "Failed to search Instagram profile.");
+    } finally {
+      setLoading(false);
     }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        item.caption.toLowerCase().includes(q) ||
-        item.author.username.toLowerCase().includes(q) ||
-        (item.topic && item.topic.toLowerCase().includes(q))
-      );
-    }
-    return true;
-  });
+  }
 
   return (
     <div className="min-h-screen bg-black text-white font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,Helvetica,Arial,sans-serif] pb-24">
       
-      {/* Top Search Bar & Topic Navigation */}
-      <div className="max-w-5xl mx-auto px-4 py-4 space-y-4">
+      {/* Search Header */}
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         
-        {/* Search Input Bar */}
+        <div className="text-center space-y-1">
+          <h1 className="text-xl font-black tracking-tight">Instagram Live Discovery & Search</h1>
+          <p className="text-xs text-zinc-400">
+            Real-time profile exploration, followers, media, and zero-redirect CRM routing.
+          </p>
+        </div>
+
+        {/* Live Search Input */}
         <div className="relative max-w-lg mx-auto">
-          <span className="absolute left-3.5 top-2.5 text-zinc-400 text-sm">🔍</span>
+          <span className="absolute left-3.5 top-3 text-zinc-400 text-sm">🔍</span>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search creators, audio tracks, AI tools, hashtags…"
-            className="w-full bg-zinc-900 border border-white/10 rounded-2xl pl-10 pr-4 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSearch();
+            }}
+            placeholder="Search Instagram username (e.g. v3nja2.0, thee_hyped_teens)…"
+            className="w-full bg-zinc-900 border border-white/10 rounded-2xl pl-10 pr-20 py-2.5 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#0095F6] transition-colors"
           />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3.5 top-2 text-xs text-zinc-400 hover:text-white"
-            >
-              ✕
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => handleSearch()}
+            disabled={loading || !searchQuery.trim()}
+            className="absolute right-2 top-1.5 px-3 py-1.5 rounded-xl bg-[#0095F6] hover:bg-blue-600 disabled:opacity-40 text-white text-xs font-bold transition-all"
+          >
+            {loading ? "Searching…" : "Search"}
+          </button>
         </div>
 
-        {/* Topic Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar justify-start sm:justify-center">
-          {TOPICS.map((topic) => (
+        {/* Quick Profile Suggestions */}
+        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+          <span className="text-[11px] text-zinc-500 font-bold mr-1">Quick Search:</span>
+          {QUICK_PROFILES.map((p) => (
             <button
-              key={topic}
+              key={p.username}
               type="button"
-              onClick={() => setActiveTopic(topic)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                activeTopic === topic
-                  ? "bg-white text-black shadow-md scale-102"
-                  : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-white/5"
-              }`}
+              onClick={() => {
+                setSearchQuery(p.username);
+                handleSearch(p.username);
+              }}
+              className="px-3 py-1 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-xs font-bold text-zinc-300 transition-colors"
             >
-              {topic}
+              @{p.username}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Explore Grid (Matching screenshots 7 & 8) */}
-      <div className="max-w-5xl mx-auto px-2 sm:px-4">
-        <div className="grid grid-cols-3 gap-1 sm:gap-2">
-          {filteredItems.map((item, idx) => {
-            const isTallReel = idx % 5 === 1;
-
-            return (
-              <div
-                key={item.id}
-                onClick={() => setSelectedItem(item)}
-                className={`group relative rounded-lg sm:rounded-xl overflow-hidden bg-zinc-900 cursor-pointer select-none border border-white/5 transition-transform ${
-                  isTallReel ? "row-span-2 aspect-[9/16]" : "aspect-square"
-                }`}
-              >
-                {/* Media Thumbnail */}
-                <img
-                  src={item.thumbnailUrl}
-                  alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-
-                {/* Badge Indicator (Reel play icon / Carousel icon) */}
-                <div className="absolute top-2 right-2 text-xs bg-black/50 backdrop-blur-md px-1.5 py-0.5 rounded text-white font-mono">
-                  {item.badge === "reel" ? "▶" : item.badge === "carousel" ? "▦" : ""}
-                </div>
-
-                {/* Caption Banner (for meme & news items as seen in screenshot 7 & 8) */}
-                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2 text-[11px] font-bold text-white line-clamp-2">
-                  {item.caption}
-                </div>
-
-                {/* Hover Dark Overlay with Likes & Comments Count */}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-4 text-white text-xs font-extrabold transition-opacity">
-                  <span className="flex items-center gap-1">
-                    <span>❤️</span>
-                    <span>{item.likeCount}</span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span>💬</span>
-                    <span>{item.commentsCount}</span>
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Explore Lightbox Modal */}
-      {selectedItem && (
-        <div
-          onClick={() => setSelectedItem(null)}
-          className="fixed inset-0 z-90 flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-4xl max-h-[85vh] rounded-3xl bg-black border border-white/15 overflow-hidden shadow-2xl grid grid-cols-1 md:grid-cols-12"
-          >
-            {/* Left Media Area */}
-            <div className="md:col-span-7 bg-zinc-950 flex items-center justify-center max-h-[75vh]">
-              <img
-                src={selectedItem.mediaUrl}
-                alt=""
-                className="max-h-full max-w-full object-contain"
-              />
-            </div>
-
-            {/* Right Information & Interactions Rail */}
-            <div className="md:col-span-5 p-5 flex flex-col justify-between border-t md:border-t-0 md:border-l border-white/10 space-y-4">
-              {/* Creator Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full overflow-hidden border border-white">
-                    <img
-                      src={selectedItem.author.avatarUrl}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-white block">
-                      @{selectedItem.author.username}
-                    </span>
-                    <span className="text-[10px] text-zinc-400">
-                      {selectedItem.author.category}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedItem(null)}
-                  className="w-7 h-7 rounded-full bg-white/10 text-white flex items-center justify-center text-xs font-bold"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Caption & Comments */}
-              <div className="flex-1 overflow-y-auto space-y-3 text-xs text-zinc-200">
-                <p className="leading-relaxed">{selectedItem.caption}</p>
-                <div className="p-3 rounded-2xl bg-zinc-900 border border-white/5 space-y-1">
-                  <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
-                    Community Response
-                  </div>
-                  <div className="flex items-center justify-between font-mono text-xs">
-                    <span>❤️ {selectedItem.likeCount} likes</span>
-                    <span>💬 {selectedItem.commentsCount} comments</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                <Link
-                  href={`/inbox?user=${selectedItem.author.username}`}
-                  className="px-4 py-2 rounded-xl bg-[#0095F6] hover:bg-blue-600 text-white text-xs font-bold transition-colors"
-                >
-                  Direct Message Creator
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => alert("Saved to collection!")}
-                  className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold"
-                >
-                  Save 🔖
-                </button>
-              </div>
-            </div>
+        {/* Search Results Display */}
+        {loading && (
+          <div className="py-16 text-center space-y-2">
+            <div className="w-8 h-8 border-2 border-[#0095F6] border-t-transparent rounded-full animate-spin mx-auto" />
+            <span className="text-xs text-zinc-400 font-medium">Fetching live Instagram profile…</span>
           </div>
-        </div>
-      )}
+        )}
+
+        {searchError && (
+          <div className="p-4 rounded-2xl bg-zinc-950 border border-red-500/20 text-center text-xs text-red-400">
+            {searchError}
+          </div>
+        )}
+
+        {searchedProfile && (
+          <div className="p-6 rounded-3xl bg-zinc-950 border border-white/10 space-y-6 shadow-2xl animate-in fade-in duration-200">
+            {/* Profile Header */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+              <div className="w-20 h-20 rounded-full p-[2px] bg-gradient-to-tr from-pink-500 to-purple-600 shrink-0">
+                <div className="w-full h-full rounded-full bg-black border-2 border-black flex items-center justify-center font-bold text-xl text-white">
+                  {searchedProfile.username[0].toUpperCase()}
+                </div>
+              </div>
+
+              <div className="flex-1 text-center sm:text-left space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <span className="text-lg font-bold text-white">@{searchedProfile.username}</span>
+                  <Link
+                    href={`/inbox?user=${searchedProfile.username}`}
+                    className="px-4 py-1.5 rounded-xl bg-[#0095F6] text-white text-xs font-bold hover:bg-blue-600 transition-colors inline-block"
+                  >
+                    Open in Direct CRM 💬
+                  </Link>
+                </div>
+
+                <div className="flex items-center justify-center sm:justify-start gap-6 text-xs font-semibold text-zinc-300">
+                  <span>
+                    <strong className="text-white">{searchedProfile.postsCount || 0}</strong> posts
+                  </span>
+                  <span>
+                    <strong className="text-white">
+                      {(searchedProfile.followersCount || 0).toLocaleString()}
+                    </strong>{" "}
+                    followers
+                  </span>
+                  <span>
+                    <strong className="text-white">{searchedProfile.followingCount || 0}</strong> following
+                  </span>
+                </div>
+
+                {searchedProfile.name && (
+                  <div className="text-xs font-bold text-white">{searchedProfile.name}</div>
+                )}
+                {searchedProfile.bio && (
+                  <p className="text-xs text-zinc-300 whitespace-pre-line leading-relaxed">
+                    {searchedProfile.bio}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Profile Media Grid */}
+            {searchedProfile.posts && searchedProfile.posts.length > 0 && (
+              <div className="space-y-3 pt-4 border-t border-white/10">
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">
+                  Published Posts & Reels
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  {searchedProfile.posts.map((p: any) => (
+                    <div
+                      key={p.id}
+                      className="aspect-square rounded-xl overflow-hidden bg-zinc-900 border border-white/5 relative group"
+                    >
+                      {p.mediaType === "VIDEO" ? (
+                        <video
+                          src={p.mediaUrl}
+                          poster={p.thumbnailUrl}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img
+                          src={p.thumbnailUrl || p.mediaUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                      <div className="absolute top-1.5 right-1.5 px-1 py-0.5 rounded bg-black/60 text-[10px] text-white">
+                        {p.mediaType === "VIDEO" ? "🎬" : "📷"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Floating Messages Dock */}
       <InstagramMessagesDock />
